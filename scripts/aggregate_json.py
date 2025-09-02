@@ -1,72 +1,128 @@
-#!/usr/bin/env python3
-"""
-aggregate_json.py
+name: Parse & Aggregate Data
 
-Collects all JSON files under data/parsed/** (single-record JSONs or arrays)
-and writes/updates a cumulative data/metadata.json without losing prior entries.
-De-duplicates by a stable key (id/uuid/source_path/filename/sha256) or by content hash.
-"""
+on:
+  push:
+    paths:
+      - "data/**"
+  workflow_dispatch:
 
-from __future__ import annotations
-import json, glob, hashlib, os, sys
-from typing import Dict, Any, Iterable
+permissions:
+  contents: write
 
+concurrency:
+  group: parse-and-aggregate-${{ github.ref }}
+  cancel-in-progress: false
 
-def _iter_records() -> Iterable[Dict[str, Any]]:
-    for path in glob.glob('data/parsed/**/*.json', recursive=True):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-        except Exception:
-            continue
-        items = data if isinstance(data, list) else [data]
-        for item in items:
-            if not isinstance(item, dict):
-                item = {"_raw": data, "source_path": path}
-            if "source_path" not in item:
-                item["source_path"] = path
-            yield item
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
 
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-def _load_existing(out_path: str) -> Dict[str, Dict[str, Any]]:
-    if not os.path.exists(out_path):
-        return {}
-    try:
-        with open(out_path, 'r', encoding='utf-8') as f:
-            arr = json.load(f)
-    except Exception:
-        return {}
-    if not isinstance(arr, list):
-        return {}
-    records: Dict[str, Dict[str, Any]] = {}
-    for item in arr:
-        if not isinstance(item, dict):
-            continue
-        key = _make_key(item)
-        records[key] = item
-    return records
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install striprtf
+          if [ -f scripts/requirements.txt ]; then
+            pip install -r scripts/requirements.txt
+          fi
 
-def _make_key(item: Dict[str, Any]) -> str:
-    for k in ('id','uuid','source','source_path','filename','sha256'):
-        if k in item and item[k]:
-            return f"{k}:{item[k]}"
-    # fallback to content hash
-    return hashlib.sha256(json.dumps(item, sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
+      - name: Ensure output folders exist
+        run: |
+          mkdir -p data/parsed
+          mkdir -p data/completed
 
+      - name: Determine changed source files
+        id: changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          BEFORE="${{ github.event.before }}"
 
-def main():
-    out = sys.argv[1] if len(sys.argv) > 1 else 'data/metadata.json'
-    records: Dict[str, Dict[str, Any]] = _load_existing(out)
+          if [ -z "${BEFORE}" ] || [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
+            git ls-files 'data/**' \
+            | grep -v -E '\.json$' \
+            | grep -v -E '^data/parsed/' \
+            | grep -v -E '^data/completed/' \
+            > changed.txt || true
+          else
+            git diff --name-only "${BEFORE}" "${{ github.sha }}" -- 'data/**' \
+            | grep -v -E '\.json$' \
+            | grep -v -E '^data/parsed/' \
+            | grep -v -E '^data/completed/' \
+            > changed.txt || true
+          fi
 
-    for item in _iter_records():
-        key = _make_key(item)
-        records[key] = item
+          echo "Changed candidate files:"
+          cat changed.txt || true
+          echo "list=$(pwd)/changed.txt" >> "$GITHUB_OUTPUT"
 
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    with open(out, 'w', encoding='utf-8') as f:
-        json.dump(list(records.values()), f, ensure_ascii=False, indent=2)
+      - name: Parse changed files → JSON (via scripts/parse_any.py)
+        if: ${{ always() && steps.changed.outputs.list != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          LIST_FILE="${{ steps.changed.outputs.list }}"
 
+          if [ ! -s "$LIST_FILE" ]; then
+            echo "No source files to parse."
+            exit 0
+          fi
 
-if __name__ == "__main__":
-    main()
+          while IFS= read -r f; do
+            [ -z "${f:-}" ] && continue
+            [ ! -f "$f" ] && continue
+            echo "Parsing: $f"
+            python scripts/parse_any.py "$f" \
+              -o data/parsed \
+              --completed-dir data/completed \
+              --pretty
+          done < "$LIST_FILE"
+
+          # Safety cleanup: remove any leftover metadata sources outside parsed/completed
+          find data -type f \
+            ! -path "data/parsed/*" \
+            ! -path "data/completed/*" \
+            \( -iname "*.rtf" -o -iname "*.pca" -o -iname "*.xtekct" -o -iname "*.xml" \) \
+            -print -exec rm -f {} +
+
+      - name: Aggregate & de-duplicate metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f scripts/aggregate_json.py ]; then
+            # Use script defaults (writes to data/metadata.json)
+            python scripts/aggregate_json.py
+          else
+            echo "scripts/aggregate_json.py not found!" >&2
+            exit 1
+          fi
+
+      - name: Commit & push results
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A data/parsed
+          git add -A data/completed
+          git add -A data/metadata.json
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Parse & aggregate data [skip ci]"
+          git push
