@@ -1,128 +1,120 @@
-name: Parse & Aggregate Data
+#!/usr/bin/env python3
+"""
+Aggregate & de-duplicate JSON records into a cumulative metadata.json.
 
-on:
-  push:
-    paths:
-      - "data/**"
-  workflow_dispatch:
+- Scans JSON files under one or more roots (default: 'data').
+- Skips the output file itself to avoid self-ingest.
+- Loads existing OUT (if present) and upserts new/changed records.
+- Dedup key priority: first present of ['id','uuid','source','source_path','filename'],
+  else SHA-256 of canonicalized record.
 
-permissions:
-  contents: write
+Usage:
+    python scripts/aggregate_json.py \
+        [--roots data data/parsed] \
+        [--out data/metadata.json]
+"""
 
-concurrency:
-  group: parse-and-aggregate-${{ github.ref }}
-  cancel-in-progress: false
+import argparse
+import glob
+import hashlib
+import json
+import os
+from typing import Any, Dict, Iterable, List
 
-jobs:
-  parse:
-    runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+DEFAULT_OUT = "data/metadata.json"
+DEFAULT_ROOTS = ["data"]  # scan everything under data by default
 
-    steps:
-      - name: Check out repo
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+def iter_json_files(roots: Iterable[str], out_path: str) -> Iterable[str]:
+    out_abs = os.path.abspath(out_path) if out_path else ""
+    for root in roots:
+        for path in glob.glob(os.path.join(root, "**", "*.json"), recursive=True):
+            if out_abs and os.path.abspath(path) == out_abs:
+                continue  # skip the output file itself
+            yield path
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install striprtf
-          if [ -f scripts/requirements.txt ]; then
-            pip install -r scripts/requirements.txt
-          fi
 
-      - name: Ensure output folders exist
-        run: |
-          mkdir -p data/parsed
-          mkdir -p data/completed
+def load_json_safely(path: str) -> Any:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
 
-      - name: Determine changed source files
-        id: changed
-        shell: bash
-        run: |
-          set -euo pipefail
-          BEFORE="${{ github.event.before }}"
 
-          if [ -z "${BEFORE}" ] || [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
-            git ls-files 'data/**' \
-            | grep -v -E '\.json$' \
-            | grep -v -E '^data/parsed/' \
-            | grep -v -E '^data/completed/' \
-            > changed.txt || true
-          else
-            git diff --name-only "${BEFORE}" "${{ github.sha }}" -- 'data/**' \
-            | grep -v -E '\.json$' \
-            | grep -v -E '^data/parsed/' \
-            | grep -v -E '^data/completed/' \
-            > changed.txt || true
-          fi
+def records_from_data(data: Any, source_path: str) -> List[Dict[str, Any]]:
+    if data is None:
+        return []
+    if isinstance(data, list):
+        items = data
+    else:
+        items = [data]
+    out = []
+    for item in items:
+        if not isinstance(item, dict):
+            item = {"_raw": item}
+        # Preserve where this came from
+        item.setdefault("source_path", source_path)
+        out.append(item)
+    return out
 
-          echo "Changed candidate files:"
-          cat changed.txt || true
-          echo "list=$(pwd)/changed.txt" >> "$GITHUB_OUTPUT"
 
-      - name: Parse changed files → JSON (via scripts/parse_any.py)
-        if: ${{ always() && steps.changed.outputs.list != '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          LIST_FILE="${{ steps.changed.outputs.list }}"
+def dedupe_key(item: Dict[str, Any]) -> str:
+    for k in ("id", "uuid", "source", "source_path", "filename"):
+        v = item.get(k)
+        if v is not None:
+            return f"{k}:{v}"
+    # canonical hash fallback
+    payload = json.dumps(item, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
-          if [ ! -s "$LIST_FILE" ]; then
-            echo "No source files to parse."
-            exit 0
-          fi
 
-          while IFS= read -r f; do
-            [ -z "${f:-}" ] && continue
-            [ ! -f "$f" ] && continue
-            echo "Parsing: $f"
-            python scripts/parse_any.py "$f" \
-              -o data/parsed \
-              --completed-dir data/completed \
-              --pretty
-          done < "$LIST_FILE"
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--roots",
+        nargs="*",
+        default=DEFAULT_ROOTS,
+        help="Root folders to scan recursively for JSON files (default: data)",
+    )
+    parser.add_argument(
+        "--out",
+        default=DEFAULT_OUT,
+        help=f"Output metadata JSON path (default: {DEFAULT_OUT})",
+    )
+    args = parser.parse_args()
 
-          # Safety cleanup: remove any leftover metadata sources outside parsed/completed
-          find data -type f \
-            ! -path "data/parsed/*" \
-            ! -path "data/completed/*" \
-            \( -iname "*.rtf" -o -iname "*.pca" -o -iname "*.xtekct" -o -iname "*.xml" \) \
-            -print -exec rm -f {} +
+    out = (args.out or "").strip()
+    if not out:
+        out = DEFAULT_OUT
 
-      - name: Aggregate & de-duplicate metadata
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -f scripts/aggregate_json.py ]; then
-            # Use script defaults (writes to data/metadata.json)
-            python scripts/aggregate_json.py
-          else
-            echo "scripts/aggregate_json.py not found!" >&2
-            exit 1
-          fi
+    # Ensure parent directory exists if there is one
+    out_dir = os.path.dirname(out)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
 
-      - name: Commit & push results
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+    # Start with existing metadata if present
+    existing: Dict[str, Dict[str, Any]] = {}
+    if os.path.exists(out):
+        prev = load_json_safely(out)
+        if isinstance(prev, list):
+            for item in prev:
+                if isinstance(item, dict):
+                    existing[dedupe_key(item)] = item
 
-          git add -A data/parsed
-          git add -A data/completed
-          git add -A data/metadata.json
+    # Collect new/changed records
+    merged = dict(existing)  # copy
+    for path in iter_json_files(args.roots, out):
+        data = load_json_safely(path)
+        for rec in records_from_data(data, source_path=path):
+            merged[dedupe_key(rec)] = rec  # upsert
 
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
-          fi
+    # Write back
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(list(merged.values()), f, ensure_ascii=False, indent=2)
 
-          git commit -m "Parse & aggregate data [skip ci]"
-          git push
+    print(f"Wrote {len(merged)} records to {out}")
+
+
+if __name__ == "__main__":
+    main()
