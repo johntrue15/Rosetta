@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-from __future__ import annotations
+"""
+aggregate_metadata.py
+
+- Reads existing data/metadata.json if present
+- Scans data/parsed/**/*.json and merges with existing records
+- De-duplicates using stable keys (id/uuid/source/source_path/filename) or sha256 of canonical JSON
+- Writes back to data/metadata.json
+"""
 
 import argparse
 import glob
@@ -7,94 +14,76 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Dict, List, Any
 
-# ---- Keying logic for de-duplication ---------------------------------
-PRIORITY_KEYS = ("id", "uuid", "source", "source_path", "filename")
 
-def record_key(item: Dict[str, Any]) -> str:
-    """
-    Compute a stable key for a record to prevent duplicates across runs.
-    Prefer semantic identifiers; otherwise hash the canonical JSON.
-    """
-    for k in PRIORITY_KEYS:
-        v = item.get(k)
-        if v not in (None, ""):
-            return f"{k}:{v}"
-    # canonical hash fallback
-    blob = json.dumps(item, ensure_ascii=False, sort_keys=True)
-    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
-
-# ---- Loading helpers ---------------------------------------------------
-
-def load_existing(out_path: Path) -> List[Dict[str, Any]]:
-    if not out_path.exists():
-        return []
+def canonical_hash(obj: Any) -> str:
     try:
-        with out_path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-        if isinstance(data, list):
-            return data
-        # If somehow it's a dict, wrap it
-        return [data]
+        return hashlib.sha256(json.dumps(obj, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
     except Exception:
-        return []
+        return hashlib.sha256(repr(obj).encode("utf-8")).hexdigest()
 
-def iter_parsed_json(parsed_dir: Path) -> Iterable[Path]:
-    # Consider only files written by the parser, not metadata.json
-    for p in parsed_dir.rglob("*.json"):
-        if p.name == "metadata.json":
-            continue
-        yield p
 
-def load_items_from_file(path: Path) -> List[Dict[str, Any]]:
+def load_json(path: Path):
     try:
         with path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
+            return json.load(f)
     except Exception:
-        return []
-    if isinstance(data, list):
-        # Ensure dicts only
-        return [x if isinstance(x, dict) else {"_raw": x, "source_path": str(path)} for x in data]
-    if isinstance(data, dict):
-        return [data]
-    return [{"_raw": data, "source_path": str(path)}]
+        return None
 
-# ---- Main --------------------------------------------------------------
+
+def normalize_items(blob) -> List[Dict[str, Any]]:
+    if isinstance(blob, list):
+        return [x if isinstance(x, dict) else {"_raw": x} for x in blob]
+    elif isinstance(blob, dict):
+        return [blob]
+    else:
+        return [{"_raw": blob}]
+
+
+def key_for(item: Dict[str, Any]) -> str:
+    for k in ("id", "uuid", "source", "source_path", "filename"):
+        if k in item and item[k] not in (None, ""):
+            return f"{k}:{item[k]}"
+    return canonical_hash(item)
+
 
 def main():
-    ap = argparse.ArgumentParser(description="Append new parsed items into a cumulative metadata.json")
-    ap.add_argument("--parsed-dir", default="data/parsed", help="Directory containing parsed JSON files")
-    ap.add_argument("--out", default="data/metadata.json", help="Cumulative JSON output file")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", type=str, default="data/metadata.json")
     args = ap.parse_args()
 
-    parsed_dir = Path(args.parsed_dir).resolve()
-    out_path = Path(args.out).resolve()
-
+    out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    parsed_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load existing cumulative records
-    cumulative: List[Dict[str, Any]] = load_existing(out_path)
-    seen = {record_key(x) for x in cumulative}
+    # Load existing metadata (cumulative behavior)
+    existing: Dict[str, Dict[str, Any]] = {}
+    if out_path.exists():
+        old = load_json(out_path)
+        if old is not None:
+            for it in normalize_items(old):
+                existing[key_for(it)] = it
 
-    # Append new items from parsed files
-    new_count = 0
-    for jf in iter_parsed_json(parsed_dir):
-        items = load_items_from_file(jf)
-        for it in items:
-            k = record_key(it)
-            if k in seen:
-                continue
-            cumulative.append(it)
-            seen.add(k)
-            new_count += 1
+    # Scan new parsed JSONs
+    parsed_files = glob.glob("data/parsed/**/*.json", recursive=True)
+    for p in parsed_files:
+        if os.path.normpath(p) == os.path.normpath(str(out_path)):
+            continue
+        blob = load_json(Path(p))
+        if blob is None:
+            continue
+        for item in normalize_items(blob):
+            # ensure provenance
+            item.setdefault("source_path", p)
+            existing[key_for(item)] = item
 
-    # Write back the cumulative JSON (append semantics via merge)
+    # Write merged list
+    merged = list(existing.values())
     with out_path.open("w", encoding="utf-8") as f:
-        json.dump(cumulative, f, ensure_ascii=False, indent=2)
+        json.dump(merged, f, ensure_ascii=False, indent=2)
 
-    print(f"Appended {new_count} new record(s) into {out_path}")
+    print(f"[aggregate] Wrote {len(merged)} records to {out_path}")
+
 
 if __name__ == "__main__":
     main()
