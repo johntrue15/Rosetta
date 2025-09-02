@@ -64,10 +64,37 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p data/parsed
+
+          # One generic wrapper to avoid repeating heredocs (and YAML errors)
+          generic_wrap() {
+            python - "$1" "$2" <<'PY'
+import sys, json, os, base64, hashlib
+p, out = sys.argv[1], sys.argv[2]
+info = {
+    "source_path": p,
+    "filename": os.path.basename(p),
+    "extension": os.path.splitext(p)[1].lstrip('.'),
+    "size_bytes": os.path.getsize(p),
+    "sha256": hashlib.sha256(open(p, 'rb').read()).hexdigest(),
+}
+try:
+    txt = open(p, 'r', encoding='utf-8').read()
+    info["content_text"] = txt
+    info["encoding"] = "utf-8"
+except Exception:
+    raw = open(p, 'rb').read()
+    info["content_base64"] = base64.b64encode(raw).decode('ascii')
+    info["encoding"] = "base64"
+os.makedirs(os.path.dirname(out), exist_ok=True)
+json.dump(info, open(out, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
+PY
+          }
+
           IFS=',' read -ra arr <<< "$FILES"
           for f in "${arr[@]}"; do
             [ -z "$f" ] && continue
             [ ! -f "$f" ] && continue
+
             base="$(basename "$f")"
             stem="${base%.*}"
             ext="${f##*.}"
@@ -81,90 +108,30 @@ jobs:
                 ;;
               xml)
                 if [ -f scripts/xml_to_json.py ]; then
-                  python scripts/xml_to_json.py "$f" -o "$out" || {
+                  if ! python scripts/xml_to_json.py "$f" -o "$out"; then
                     echo "XML parser failed, falling back to generic for: $f"
-                    python - "$f" "$out" <<'PY'
-import sys, json, os, base64, hashlib
-p,out=sys.argv[1],sys.argv[2]
-info={"source_path":p,"filename":os.path.basename(p),"extension":os.path.splitext(p)[1].lstrip('.'),"size_bytes":os.path.getsize(p),"sha256":hashlib.sha256(open(p,'rb').read()).hexdigest()}
-try:
-    txt=open(p,'r',encoding='utf-8').read()
-    info["content_text"]=txt; info["encoding"]="utf-8"
-except Exception:
-    raw=open(p,'rb').read()
-    info["content_base64"]=base64.b64encode(raw).decode('ascii'); info["encoding"]="base64"
-os.makedirs(os.path.dirname(out),exist_ok=True)
-json.dump(info,open(out,'w',encoding='utf-8'),ensure_ascii=False,indent=2)
-PY
-                  }
+                    generic_wrap "$f" "$out"
+                  fi
                 else
                   echo "No XML parser found; using generic for: $f"
-                  python - "$f" "$out" <<'PY'
-import sys, json, os, base64, hashlib
-p,out=sys.argv[1],sys.argv[2]
-info={"source_path":p,"filename":os.path.basename(p),"extension":os.path.splitext(p)[1].lstrip('.'),"size_bytes":os.path.getsize(p),"sha256":hashlib.sha256(open(p,'rb').read()).hexdigest()}
-try:
-    txt=open(p,'r',encoding='utf-8').read()
-    info["content_text"]=txt; info["encoding"]="utf-8"
-except Exception:
-    raw=open(p,'rb').read()
-    info["content_base64"]=base64.b64encode(raw).decode('ascii'); info["encoding"]="base64"
-os.makedirs(os.path.dirname(out),exist_ok=True)
-json.dump(info,open(out,'w',encoding='utf-8'),ensure_ascii=False,indent=2)
-PY
+                  generic_wrap "$f" "$out"
                 fi
                 ;;
               pca)
                 if [ -f scripts/pca_to_json.py ]; then
-                  python scripts/pca_to_json.py "$f" -o "$out" || {
+                  if ! python scripts/pca_to_json.py "$f" -o "$out"; then
                     echo "PCA parser failed, falling back to generic for: $f"
-                    python - "$f" "$out" <<'PY'
-import sys, json, os, base64, hashlib
-p,out=sys.argv[1],sys.argv[2]
-info={"source_path":p,"filename":os.path.basename(p),"extension":os.path.splitext(p)[1].lstrip('.'),"size_bytes":os.path.getsize(p),"sha256":hashlib.sha256(open(p,'rb').read()).hexdigest()}
-try:
-    txt=open(p,'r',encoding='utf-8').read()
-    info["content_text"]=txt; info["encoding"]="utf-8"
-except Exception:
-    raw=open(p,'rb').read()
-    info["content_base64"]=base64.b64encode(raw).decode('ascii'); info["encoding"]="base64"
-os.makedirs(os.path.dirname(out),exist_ok=True)
-json.dump(info,open(out,'w',encoding='utf-8'),ensure_ascii=False,indent=2)
-PY
-                  }
+                    generic_wrap "$f" "$out"
+                  fi
                 else
                   echo "No PCA parser found; using generic for: $f"
-                  python - "$f" "$out" <<'PY'
-import sys, json, os, base64, hashlib
-p,out=sys.argv[1],sys.argv[2]
-info={"source_path":p,"filename":os.path.basename(p),"extension":os.path.splitext(p)[1].lstrip('.'),"size_bytes":os.path.getsize(p),"sha256":hashlib.sha256(open(p,'rb').read()).hexdigest()}
-try:
-    txt=open(p,'r',encoding='utf-8').read()
-    info["content_text"]=txt; info["encoding"]="utf-8"
-except Exception:
-    raw=open(p,'rb').read()
-    info["content_base64"]=base64.b64encode(raw).decode('ascii'); info["encoding"]="base64"
-os.makedirs(os.path.dirname(out),exist_ok=True)
-json.dump(info,open(out,'w',encoding='utf-8'),ensure_ascii=False,indent=2)
-PY
+                  generic_wrap "$f" "$out"
                 fi
                 ;;
               *)
                 # Generic fallback for ANY other metadata file type
                 echo "Using generic wrapper for: $f"
-                python - "$f" "$out" <<'PY'
-import sys, json, os, base64, hashlib
-p,out=sys.argv[1],sys.argv[2]
-info={"source_path":p,"filename":os.path.basename(p),"extension":os.path.splitext(p)[1].lstrip('.'),"size_bytes":os.path.getsize(p),"sha256":hashlib.sha256(open(p,'rb').read()).hexdigest()}
-try:
-    txt=open(p,'r',encoding='utf-8').read()
-    info["content_text"]=txt; info["encoding"]="utf-8"
-except Exception:
-    raw=open(p,'rb').read()
-    info["content_base64"]=base64.b64encode(raw).decode('ascii'); info["encoding"]="base64"
-os.makedirs(os.path.dirname(out),exist_ok=True)
-json.dump(info,open(out,'w',encoding='utf-8'),ensure_ascii=False,indent=2)
-PY
+                generic_wrap "$f" "$out"
                 ;;
             esac
           done
