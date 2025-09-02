@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - 'data/metadata.json'
-      - 'data/users.csv'
+      - 'users.csv'
       - 'scripts/metadata_to_csv.py'
   workflow_dispatch:
 
