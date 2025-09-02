@@ -4,8 +4,8 @@ on:
   push:
     paths:
       - 'data/metadata.json'
-      - 'data/users.csv'
-      - '.github/scripts/metadata_to_csv.py'
+      - 'users.csv'
+      - 'scripts/metadata_to_csv.py'
   workflow_dispatch:
 
 permissions:
@@ -30,7 +30,7 @@ jobs:
         env:
           LOG_MATCHES: "1"  # set to "0" to silence; leave at "1" for this debug run
         run: |
-          python .github/scripts/metadata_to_csv.py
+          python scripts/metadata_to_csv.py
 
       - name: Commit CSV (if changed)
         run: |
