@@ -53,4 +53,25 @@ def main():
             try:
                 data = parse_xml(ip)
             except Exception:
-                data = ge
+                data = generic(ip)
+        elif ext == "pca":
+            data = generic(ip)  # plug real PCA parser here later
+        else:
+            data = generic(ip)
+    except Exception as e:
+        data = generic(ip)
+        data["_parse_error"] = str(e)
+
+    outdir = Path(args.outdir)
+    dest_dir = _dest_dir_for(ip, outdir)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    # APPEND ".json" to the original filename (keeps original extension)
+    op = dest_dir / f"{ip.name}.json"
+
+    js = json.dumps(data, ensure_ascii=False, indent=2 if args.pretty else None)
+    op.write_text(js, encoding="utf-8")
+    print(op)
+
+if __name__ == "__main__":
+    main()
