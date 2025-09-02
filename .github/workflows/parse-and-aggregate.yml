@@ -31,15 +31,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install core parser deps
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install striprtf
-
-      - name: Install extra parser deps (optional)
-        run: |
           if [ -f scripts/requirements.txt ]; then
             pip install -r scripts/requirements.txt
+          else
+            pip install striprtf xmltodict
           fi
 
       - name: Determine changed source files
@@ -57,89 +55,21 @@ jobs:
           printf '%s\n' "$files"
           echo "FILES=$(printf '%s\n' "$files" | paste -sd "," -)" >> $GITHUB_ENV
 
-      - name: Parse changed files to JSON (known types + generic fallback)
+      - name: Parse changed files to JSON
         if: env.FILES != ''
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p data/parsed
           IFS=',' read -ra arr <<< "$FILES"
-
           for f in "${arr[@]}"; do
             [ -z "$f" ] && continue
             [ ! -f "$f" ] && continue
-
-            base="$(basename "$f")"
-            stem="${base%.*}"
-            ext="${f##*.}"
-            lc_ext="$(echo "$ext" | tr '[:upper:]' '[:lower:]')"
-            out="data/parsed/${stem}.json"
-
-            case "$lc_ext" in
-              rtf)
-                python scripts/rtf_to_json.py "$f" -o "$out" --pretty
-                ;;
-              xml)
-                if [ -f scripts/xml_to_json.py ]; then
-                  if ! python scripts/xml_to_json.py "$f" -o "$out"; then
-                    echo "XML parser failed, falling back to generic: $f"
-                    python scripts/generic_wrap.py "$f" "$out"
-                  fi
-                else
-                  echo "No XML parser found; using generic: $f"
-                  python scripts/generic_wrap.py "$f" "$out"
-                fi
-                ;;
-              pca)
-                if [ -f scripts/pca_to_json.py ]; then
-                  if ! python scripts/pca_to_json.py "$f" -o "$out"; then
-                    echo "PCA parser failed, falling back to generic: $f"
-                    python scripts/generic_wrap.py "$f" "$out"
-                  fi
-                else
-                  echo "No PCA parser found; using generic: $f"
-                  python scripts/generic_wrap.py "$f" "$out"
-                fi
-                ;;
-              *)
-                echo "Using generic wrapper for: $f"
-                python scripts/generic_wrap.py "$f" "$out"
-                ;;
-            esac
+            python scripts/parse_any.py "$f" --outdir data/parsed
           done
 
       - name: Aggregate & de-duplicate metadata
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -c "
-import os, json, glob, hashlib
-OUT = 'data/metadata.json'
-records = {}
-for path in glob.glob('data/**/*.json', recursive=True):
-    if os.path.normpath(path) == os.path.normpath(OUT):
-        continue
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-    except Exception:
-        continue
-    items = data if isinstance(data, list) else [data]
-    for item in items:
-        if not isinstance(item, dict):
-            item = {'_raw': data, 'source_path': path}
-        key = None
-        for k in ('id','uuid','source','source_path','filename'):
-            if k in item and item[k] is not None:
-                key = f'{k}:{item[k]}'
-                break
-        if key is None:
-            key = hashlib.sha256(json.dumps(item, sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
-        records[key] = item
-os.makedirs(os.path.dirname(OUT), exist_ok=True)
-with open(OUT, 'w', encoding='utf-8') as f:
-    json.dump(list(records.values()), f, ensure_ascii=False, indent=2)
-"
+        run: python scripts/aggregate_metadata.py
 
       - name: Commit & push results
         shell: bash
