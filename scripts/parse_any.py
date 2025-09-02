@@ -1,31 +1,37 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse, json, os, sys, hashlib
+import argparse, json, sys
 from pathlib import Path
 
-def safe_stem(rel_path: str) -> str:
-    """Make a unique stem using basename + short hash of relative path."""
-    base = os.path.basename(rel_path)
-    stem, _ = os.path.splitext(base)
-    h = hashlib.sha1(rel_path.encode("utf-8")).hexdigest()[:8]
-    return f"{stem}-{h}"
-
 def parse_rtf(ip: Path) -> dict:
-    from rtf_to_json import rtf_to_json_dict  # local file import
+    from rtf_to_json import rtf_to_json_dict
     return rtf_to_json_dict(ip)
 
 def parse_xml(ip: Path) -> dict:
     try:
         import xmltodict
-    except Exception:
-        raise RuntimeError("xmltodict not installed")
+    except Exception as e:
+        raise RuntimeError("xmltodict not installed") from e
     with ip.open("rb") as f:
-        data = xmltodict.parse(f.read())
-    return data  # dict-like
+        return xmltodict.parse(f.read())
 
 def generic(ip: Path) -> dict:
     from generic_wrap import file_to_envelope
     return file_to_envelope(ip)
+
+def _dest_dir_for(ip: Path, outdir: Path) -> Path:
+    """Mirror the relative folder under data/, else under repo root."""
+    cwd = Path.cwd().resolve()
+    data_root = (cwd / "data").resolve()
+    try:
+        rel_parent = ip.parent.resolve().relative_to(data_root)
+        return (outdir / rel_parent).resolve()
+    except Exception:
+        try:
+            rel_parent = ip.parent.resolve().relative_to(cwd)
+            return (outdir / rel_parent).resolve()
+        except Exception:
+            return outdir.resolve()
 
 def main():
     ap = argparse.ArgumentParser(description="Parse any metadata file to JSON.")
@@ -36,14 +42,10 @@ def main():
 
     ip = Path(args.input_path).resolve()
     if not ip.exists():
-        print(f"Missing input: {ip}", file=sys.stderr); sys.exit(1)
+        print(f"Missing input: {ip}", file=sys.stderr)
+        sys.exit(1)
 
     ext = ip.suffix.lower().lstrip(".")
-    rel = os.path.relpath(str(ip), start=os.getcwd())
-    outdir = Path(args.outdir).resolve()
-    outdir.mkdir(parents=True, exist_ok=True)
-    op = outdir / f"{safe_stem(rel)}.json"
-
     try:
         if ext == "rtf":
             data = parse_rtf(ip)
@@ -51,20 +53,4 @@ def main():
             try:
                 data = parse_xml(ip)
             except Exception:
-                data = generic(ip)
-        elif ext == "pca":
-            # If you later add a real PCA parser, swap it in here.
-            data = generic(ip)
-        else:
-            data = generic(ip)
-    except Exception as e:
-        # Absolute last resort: generic envelope with error note
-        data = generic(ip)
-        data["_parse_error"] = str(e)
-
-    js = json.dumps(data, ensure_ascii=False, indent=2 if args.pretty else None)
-    op.write_text(js, encoding="utf-8")
-    print(op)
-
-if __name__ == "__main__":
-    main()
+                data = ge
