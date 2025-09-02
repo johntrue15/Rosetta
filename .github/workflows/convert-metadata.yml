@@ -4,8 +4,8 @@ on:
   push:
     paths:
       - 'data/metadata.json'
-      - 'users.csv'
-      - 'scripts/metadata_to_csv.py'
+      - 'data/users.csv'
+      - '.github/scripts/metadata_to_csv.py'
   workflow_dispatch:
 
 permissions:
@@ -26,11 +26,11 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Convert metadata.json -> metadata.csv
+      - name: Convert metadata.json -> metadata.csv (with debug)
         env:
-          LOG_MATCHES: "0"  # set to "1" to print match diagnostics to logs
+          LOG_MATCHES: "1"  # set to "0" to silence; leave at "1" for this debug run
         run: |
-          python scripts/metadata_to_csv.py
+          python .github/scripts/metadata_to_csv.py
 
       - name: Commit CSV (if changed)
         run: |
