@@ -30,7 +30,7 @@ jobs:
         env:
           LOG_MATCHES: "0"  # set to "1" to print match diagnostics to logs
         run: |
-          python /scripts/metadata_to_csv.py
+          python scripts/metadata_to_csv.py
 
       - name: Commit CSV (if changed)
         run: |
