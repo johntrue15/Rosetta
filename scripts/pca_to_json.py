@@ -3,22 +3,15 @@
 pca_to_json.py
 
 - Parses phoenix .pca (INI-like) files
-- Fills normalized fields (geometry, CT, xray, detector, image, CNC axes)
-- Captures [CalibImages] fields and the calibration folder path
-- Sets `file_path` to the calibration folder path (e.g. 'S:\\CT_DATA\\...') when available
-  from CalibImages entries (preferring MGainImg, then GainImg, then OffsetImg, then DefPixelImg).
-  Falls back to the local repo file path only if no calibration path is found.
-- Writes a single JSON dict per input .pca
-
-CLI:
-  python scripts/pca_to_json.py <input.pca> <output.json> [--pretty]
+- Sets `file_path` to calibration folder from [CalibImages] (e.g. 'S:\\CT_DATA\\...')
+  when available (prefers MGainImg, then GainImg, OffsetImg, DefPixelImg),
+  else falls back to repository file path.
 """
 
 import argparse
 import configparser
 import hashlib
 import json
-import os
 import ntpath
 from datetime import datetime
 from pathlib import Path
@@ -45,7 +38,7 @@ def init_record(fp: Path) -> Dict[str, Any]:
         'file_name': fp.name,
         'file_hyperlink': f'file:///{fp.resolve()}'.replace("\\", "/"),
         'ct_voxel_size_um': 'N/A',
-        'ct_objective': 'DXR-250',  # per your original script
+        'ct_objective': 'DXR-250',
         'ct_number_images': 'N/A',
         'Geometric_magnificiation': 'N/A',
         'Source_detector_distance': 'N/A',
@@ -67,9 +60,8 @@ def init_record(fp: Path) -> Dict[str, Any]:
         'scan_time': 'N/A',
         'start_time': datetime.fromtimestamp(fp.stat().st_mtime).isoformat(),
         'end_time': datetime.now().isoformat(),
-        # NOTE: this will be overwritten with the calibration folder path if found
-        'file_path': str(fp.resolve()),
         'txrm_file_path': 'N/A',
+        'file_path': str(fp.resolve()),
         'acquisition_successful': 'Yes',
         'sample_x_start': 'N/A',
         'sample_x_end': 'N/A',
@@ -81,7 +73,6 @@ def init_record(fp: Path) -> Dict[str, Any]:
         'sample_z_end': 'N/A',
         'sample_z_range': 'N/A',
         'sample_theta_start': 'N/A',
-        # Calibration info bucket
         'calib_images': {
             'MGainPoints': 'N/A',
             'Avg': 'N/A',
@@ -100,35 +91,22 @@ def init_record(fp: Path) -> Dict[str, Any]:
 
 
 def safe_get(cfg: configparser.RawConfigParser, section: str, option: str) -> Optional[str]:
-    if cfg.has_section(section) and cfg.has_option(section, option):
-        return cfg.get(section, option)
-    return None
+    return cfg.get(section, option) if cfg.has_section(section) and cfg.has_option(section, option) else None
 
 
-def _is_meaningful(value: Optional[str]) -> bool:
-    if value is None:
-        return False
-    v = value.strip()
-    if not v or v.upper() == 'N/A':
-        return False
-    return True
+def _is_meaningful(s: Optional[str]) -> bool:
+    return bool(s) and s.strip().upper() != "N/A"
 
 
-def _windows_dirname(path_str: str) -> str:
-    """
-    Return the directory component of a Windows-style path string.
-    Uses ntpath to correctly handle backslashes and drive letters on any OS.
-    """
-    return ntpath.dirname(path_str)
+def _win_dirname(p: str) -> str:
+    return ntpath.dirname(p)
 
 
 def parse_pca_file(input_path: Path, output_path: Path, pretty: bool = False) -> None:
     rec = init_record(input_path)
 
     cfg = configparser.RawConfigParser()
-    cfg.optionxform = str  # preserve case
-
-    # Robust encoding handling
+    cfg.optionxform = str
     try:
         with input_path.open('r', encoding='utf-8') as f:
             cfg.read_file(f)
@@ -143,61 +121,57 @@ def parse_pca_file(input_path: Path, output_path: Path, pretty: bool = False) ->
             rec['ct_voxel_size_um'] = str(float(vsx) * 1000.0)
         except Exception:
             rec['ct_voxel_size_um'] = vsx
-
-    val = safe_get(cfg, 'Geometry', 'Magnification')
-    if _is_meaningful(val):
-        rec['Geometric_magnificiation'] = val
-    val = safe_get(cfg, 'Geometry', 'FDD')
-    if _is_meaningful(val):
-        rec['Source_detector_distance'] = val
-    val = safe_get(cfg, 'Geometry', 'FOD')
-    if _is_meaningful(val):
-        rec['Source_sample_distance'] = val
+    for k_src, k_dst in [('Magnification', 'Geometric_magnificiation'),
+                         ('FDD', 'Source_detector_distance'),
+                         ('FOD', 'Source_sample_distance')]:
+        v = safe_get(cfg, 'Geometry', k_src)
+        if _is_meaningful(v):
+            rec[k_dst] = v
 
     # CT
-    val = safe_get(cfg, 'CT', 'NumberImages')
-    if _is_meaningful(val):
-        rec['ct_number_images'] = val
-    val = safe_get(cfg, 'CT', 'ScanTimeCmpl')
-    if _is_meaningful(val):
-        rec['scan_time'] = val
+    v = safe_get(cfg, 'CT', 'NumberImages')
+    if _is_meaningful(v):
+        rec['ct_number_images'] = v
+    v = safe_get(cfg, 'CT', 'ScanTimeCmpl')
+    if _is_meaningful(v):
+        rec['scan_time'] = v
 
     # Xray
-    xkv = safe_get(cfg, 'Xray', 'Voltage')
-    xua = safe_get(cfg, 'Xray', 'Current')
     xid = safe_get(cfg, 'Xray', 'Name')
     if _is_meaningful(xid):
         rec['xray_tube_ID'] = xid
+    xkv = safe_get(cfg, 'Xray', 'Voltage')
+    xua = safe_get(cfg, 'Xray', 'Current')
     if _is_meaningful(xkv):
         rec['xray_tube_voltage'] = xkv
     if _is_meaningful(xua):
         rec['xray_tube_current'] = xua
     try:
         if _is_meaningful(xkv) and _is_meaningful(xua):
-            rec['xray_tube_power'] = str((float(xkv) * float(xua)) / 1000.0)  # W
+            rec['xray_tube_power'] = str((float(xkv) * float(xua)) / 1000.0)
     except Exception:
         pass
-    val = safe_get(cfg, 'Xray', 'Filter')
-    if _is_meaningful(val):
-        rec['xray_filter'] = val
+    xf = safe_get(cfg, 'Xray', 'Filter')
+    if _is_meaningful(xf):
+        rec['xray_filter'] = xf
 
     # Detector
     binning = safe_get(cfg, 'Detector', 'Binning')
     if _is_meaningful(binning):
         try:
-            b_int = int(binning)
-            rec['detector_binning'] = '1x1' if b_int == 0 else f'{2**b_int}x{2**b_int}'
+            b = int(binning)
+            rec['detector_binning'] = '1x1' if b == 0 else f'{2**b}x{2**b}'
         except Exception:
             rec['detector_binning'] = binning
-    val = safe_get(cfg, 'Detector', 'TimingVal')
-    if _is_meaningful(val):
-        rec['detector_capture_time'] = val
-    val = safe_get(cfg, 'Detector', 'Avg')
-    if _is_meaningful(val):
-        rec['detector_averaging'] = val
-    val = safe_get(cfg, 'Detector', 'Skip')
-    if _is_meaningful(val):
-        rec['detector_skip'] = val
+    for sec, key in [('Detector', 'TimingVal'),
+                     ('Detector', 'Avg'),
+                     ('Detector', 'Skip')]:
+        v = safe_get(cfg, sec, key)
+        dst = {'TimingVal': 'detector_capture_time',
+               'Avg': 'detector_averaging',
+               'Skip': 'detector_skip'}[key]
+        if _is_meaningful(v):
+            rec[dst] = v
 
     # Image
     dimx = safe_get(cfg, 'Image', 'DimX')
@@ -214,30 +188,19 @@ def parse_pca_file(input_path: Path, output_path: Path, pretty: bool = False) ->
     except Exception:
         pass
 
-    # CNC axes
-    val = safe_get(cfg, 'CNC_0', 'LoadPos')
-    if _is_meaningful(val):
-        rec['sample_x_start'] = val
-    val = safe_get(cfg, 'CNC_0', 'AcqPos')
-    if _is_meaningful(val):
-        rec['sample_x_end'] = val
-    val = safe_get(cfg, 'CNC_1', 'LoadPos')
-    if _is_meaningful(val):
-        rec['sample_y_start'] = val
-    val = safe_get(cfg, 'CNC_1', 'AcqPos')
-    if _is_meaningful(val):
-        rec['sample_y_end'] = val
-    val = safe_get(cfg, 'CNC_2', 'LoadPos')
-    if _is_meaningful(val):
-        rec['sample_z_start'] = val
-    val = safe_get(cfg, 'CNC_2', 'AcqPos')
-    if _is_meaningful(val):
-        rec['sample_z_end'] = val
-    val = safe_get(cfg, 'CNC_3', 'AcqPos')
-    if _is_meaningful(val):
-        rec['sample_theta_start'] = val
-
-    # Ranges
+    # CNC
+    for axis, dsts in [('CNC_0', ('sample_x_start', 'sample_x_end')),
+                       ('CNC_1', ('sample_y_start', 'sample_y_end')),
+                       ('CNC_2', ('sample_z_start', 'sample_z_end'))]:
+        lp = safe_get(cfg, axis, 'LoadPos')
+        ap = safe_get(cfg, axis, 'AcqPos')
+        if _is_meaningful(lp):
+            rec[dsts[0]] = lp
+        if _is_meaningful(ap):
+            rec[dsts[1]] = ap
+    v = safe_get(cfg, 'CNC_3', 'AcqPos')
+    if _is_meaningful(v):
+        rec['sample_theta_start'] = v
     try:
         if rec['sample_x_start'] != 'N/A' and rec['sample_x_end'] != 'N/A':
             rec['sample_x_range'] = str(abs(float(rec['sample_x_end']) - float(rec['sample_x_start'])))
@@ -248,38 +211,34 @@ def parse_pca_file(input_path: Path, output_path: Path, pretty: bool = False) ->
     except Exception:
         pass
 
-    # -------- Calibration images --------
+    # Calibration images & folder
     calib = rec['calib_images']
-    for key in (
-        'MGainPoints', 'Avg', 'Skip', 'EnableAutoAcq',
-        'MGainVoltage', 'MGainCurrent', 'MGainFilter',
-        'GainImg', 'MGainImg', 'OffsetImg', 'DefPixelImg'
-    ):
+    for key in ('MGainPoints','Avg','Skip','EnableAutoAcq','MGainVoltage',
+                'MGainCurrent','MGainFilter','GainImg','MGainImg','OffsetImg','DefPixelImg'):
         val = safe_get(cfg, 'CalibImages', key)
         if _is_meaningful(val):
             calib[key] = val
-
-    # Prefer a Windows-style path from CalibImages to derive folder
     candidate = None
     for k in ('MGainImg', 'GainImg', 'OffsetImg', 'DefPixelImg'):
         if _is_meaningful(calib.get(k)):
             candidate = calib[k].strip()
             break
-
     if _is_meaningful(candidate):
-        folder = _windows_dirname(candidate)
+        folder = _win_dirname(candidate)
         if _is_meaningful(folder):
             calib['calib_folder_path'] = folder
-            # << IMPORTANT: set file_path to this calibration folder path >>
             rec['file_path'] = folder
 
-    # Add file hash
     rec['sha256'] = hashlib.sha256(input_path.read_bytes()).hexdigest()
 
-    # Write final single-record JSON
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as f:
-        json.dump(rec, f, ensure_ascii=False, indent=2 if pretty else None)
+        json.dump({k: rec.get(k, 'N/A') for k in COLUMN_ORDER} | {
+            # keep calib and hashes alongside normalized fields
+            'calib_images': calib,
+            'sha256': rec['sha256'],
+            'source_path': str(output_path)  # where this JSON lives
+        }, f, ensure_ascii=False, indent=2 if pretty else None)
 
 
 def main():
