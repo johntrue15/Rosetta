@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - 'data/metadata.json'
-      - '.github/scripts/metadata_to_csv.py'
+      - 'scripts/metadata_to_csv.py'
       - 'data/users.csv'
   workflow_dispatch:
 
@@ -29,7 +29,7 @@ jobs:
 
       - name: Convert metadata.json -> metadata.csv
         run: |
-          python .github/scripts/metadata_to_csv.py
+          python scripts/metadata_to_csv.py
 
       - name: Commit CSV (if changed)
         run: |
