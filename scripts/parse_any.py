@@ -4,226 +4,123 @@ from __future__ import annotations
 
 import argparse
 import base64
-import json
 import hashlib
-import sys
+import json
+import os
+import shutil
 from pathlib import Path
-from typing import Dict, Any, Iterable, List, Optional
+from typing import Any, Dict, List, Tuple
 
-# --------------------------- helpers ---------------------------
+# Parsers
+from scripts.rtf_to_json import parse_rtf_file        # must exist
+from scripts.pca_to_json import parse_pca_file        # must exist
+from scripts.xtekct_to_json import parse_xtekct_file  # NEW
 
-def _is_text(path: Path) -> bool:
-    """
-    Very light heuristic: try UTF-8, else Latin-1.
-    If both fail, treat as binary.
-    """
-    try:
-        path.read_text(encoding="utf-8")
-        return True
-    except UnicodeDecodeError:
-        try:
-            path.read_text(encoding="latin-1")
-            return True
-        except Exception:
-            return False
-    except Exception:
-        return False
-
-
-def _read_text_best_effort(path: Path) -> str:
-    try:
-        return path.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        return path.read_text(encoding="latin-1")
-
-
-def file_to_envelope(path: Path) -> Dict[str, Any]:
-    """
-    Generic wrapper for any file type:
-    - Always includes metadata (size, sha256, extension, paths).
-    - If text-ish: include content_text; else base64.
-    """
-    meta: Dict[str, Any] = {
-        "source_path": str(path),
-        "filename": path.name,
-        "extension": path.suffix.lstrip("."),
-        "size_bytes": path.stat().st_size if path.exists() else None,
-        "sha256": hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None,
+# Optional XML helper (if you have one)
+def parse_xml_file(p: Path) -> Dict[str, Any]:
+    # lightweight generic: read as text if possible; else base64
+    info: Dict[str, Any] = {
+        "source_path": str(p),
+        "filename": p.name,
+        "extension": p.suffix.lstrip("."),
+        "size_bytes": p.stat().st_size,
+        "sha256": hashlib.sha256(p.read_bytes()).hexdigest(),
     }
-    if _is_text(path):
-        meta["content_text"] = _read_text_best_effort(path)
-        meta["encoding"] = "utf-8-or-latin1"
-    else:
-        meta["content_base64"] = base64.b64encode(path.read_bytes()).decode("ascii")
-        meta["encoding"] = "base64"
-    return meta
-
-
-def _dest_dir_for(ip: Path, outdir: Path) -> Path:
-    """
-    Mirror the relative folder under data/, else under repo root,
-    else flatten into outdir.
-    """
-    cwd = Path.cwd().resolve()
-    data_root = (cwd / "data").resolve()
     try:
-        rel_parent = ip.parent.resolve().relative_to(data_root)
-        return (outdir / rel_parent).resolve()
+        txt = p.read_text(encoding="utf-8")
+        info["content_text"] = txt
+        info["encoding"] = "utf-8"
     except Exception:
-        try:
-            rel_parent = ip.parent.resolve().relative_to(cwd)
-            return (outdir / rel_parent).resolve()
-        except Exception:
-            return outdir.resolve()
+        raw = p.read_bytes()
+        info["content_base64"] = base64.b64encode(raw).decode("ascii")
+        info["encoding"] = "base64"
+    return info
 
-
-# --------------------------- specific parsers ---------------------------
-
-def parse_rtf(ip: Path) -> Dict[str, Any]:
-    """
-    Preferred: local scripts/rtf_to_json.py exposes rtf_to_json_dict
-    Fallback: striprtf -> text, then generic envelope with content_text
-    """
-    # Try our dedicated converter first
+def parse_generic_file(p: Path) -> Dict[str, Any]:
+    info: Dict[str, Any] = {
+        "source_path": str(p),
+        "filename": p.name,
+        "extension": p.suffix.lstrip("."),
+        "size_bytes": p.stat().st_size,
+        "sha256": hashlib.sha256(p.read_bytes()).hexdigest(),
+    }
     try:
-        from rtf_to_json import rtf_to_json_dict  # local module in scripts/
-        return rtf_to_json_dict(ip)
-    except Exception as e:
-        # Fallback path: just extract text (if library available) and wrap
-        try:
-            from striprtf.striprtf import rtf_to_text
-            text = rtf_to_text(ip.read_text(encoding="utf-8", errors="ignore"))
-            env = file_to_envelope(ip)
-            env["content_text"] = text
-            env["encoding"] = "utf-8"
-            env["_parse_note"] = f"Fallback via striprtf (rtf_to_json module unavailable or failed: {e})"
-            return env
-        except Exception:
-            env = file_to_envelope(ip)
-            env["_parse_error"] = f"RTF parse failed and striprtf not available: {e}"
-            return env
+        txt = p.read_text(encoding="utf-8")
+        info["content_text"] = txt
+        info["encoding"] = "utf-8"
+    except Exception:
+        raw = p.read_bytes()
+        info["content_base64"] = base64.b64encode(raw).decode("ascii")
+        info["encoding"] = "base64"
+    return info
 
-
-def parse_xml(ip: Path) -> Dict[str, Any]:
-    try:
-        import xmltodict  # optional dep; installed in workflow by default
-        with ip.open("rb") as f:
-            return xmltodict.parse(f.read())
-    except Exception as e:
-        env = file_to_envelope(ip)
-        env["_parse_error"] = f"XML parse failed: {e}"
-        return env
-
-
-def parse_pca(ip: Path) -> Dict[str, Any]:
-    """
-    Preferred: local scripts/pca_to_json.py exposes parse_pca_file
-    Fallback: generic envelope
-    """
-    try:
-        from pca_to_json import parse_pca_file  # local module in scripts/
-        return parse_pca_file(ip)
-    except Exception as e:
-        env = file_to_envelope(ip)
-        env["_parse_error"] = f"PCA parse failed or parser unavailable: {e}"
-        return env
-
-
-# --------------------------- dispatcher ---------------------------
-
-SUPPORTED_EXTS = {"rtf", "xml", "pca"}
-
-def parse_one_file(ip: Path) -> Dict[str, Any]:
-    ext = ip.suffix.lower().lstrip(".")
+def decide_parser(p: Path):
+    ext = p.suffix.lower().lstrip(".")
     if ext == "rtf":
-        return parse_rtf(ip)
-    if ext == "xml":
-        return parse_xml(ip)
+        return parse_rtf_file
     if ext == "pca":
-        return parse_pca(ip)
-    # Anything else → generic
-    return file_to_envelope(ip)
+        return parse_pca_file
+    if ext == "xtekct":
+        return parse_xtekct_file            # NEW
+    if ext == "xml":
+        return parse_xml_file
+    return parse_generic_file
 
+def ensure_dirs(*dirs: Path) -> None:
+    for d in dirs:
+        d.mkdir(parents=True, exist_ok=True)
 
-def iter_files(root: Path, allow_all: bool = False) -> Iterable[Path]:
-    """
-    Yield files:
-      - If root is a file: yield it.
-      - If root is a dir: recurse. If allow_all=False, only known types.
-    """
-    if root.is_file():
-        yield root
-        return
-    for p in root.rglob("*"):
-        if not p.is_file():
-            continue
-        if allow_all:
-            yield p
-        else:
-            ext = p.suffix.lower().lstrip(".")
-            if ext in SUPPORTED_EXTS:
-                yield p
-
-
-# --------------------------- cli ---------------------------
-
-def main() -> None:
-    ap = argparse.ArgumentParser(
-        description="Parse metadata files to JSON (RTF, XML, PCA, or generic fallback)."
-    )
-    ap.add_argument("input_path", help="File or directory to parse")
-    ap.add_argument(
-        "--outdir",
-        default="data/parsed",
-        help="Directory to write outputs (default: data/parsed)"
-    )
-    ap.add_argument(
-        "--pretty",
-        action="store_true",
-        help="Pretty-print JSON output"
-    )
-    ap.add_argument(
-        "--all",
-        action="store_true",
-        help="In directory mode, parse all files (not just known types)"
-    )
+def main():
+    ap = argparse.ArgumentParser(description="Parse ANY metadata file → JSON")
+    ap.add_argument("input", help="File or directory (under data/**)")
+    ap.add_argument("-o", "--outdir", default="data/parsed", help="Where to write JSON (default: data/parsed)")
+    ap.add_argument("--completed-dir", default="data/completed", help="Where to move originals after success")
+    ap.add_argument("--pretty", action="store_true", help="Pretty-print JSON")
     args = ap.parse_args()
 
-    ip = Path(args.input_path).resolve()
-    outdir = Path(args.outdir).resolve()
-    if not ip.exists():
-        print(f"Missing input: {ip}", file=sys.stderr)
-        sys.exit(1)
+    src = Path(args.input)
+    outdir = Path(args.outdir)
+    completed = Path(args.completed_dir)
+    ensure_dirs(outdir, completed)
 
-    # Directory: iterate multiple inputs. File: single path.
-    targets: List[Path] = list(iter_files(ip, allow_all=args.all))
+    files: List[Path]
+    if src.is_dir():
+        files = [p for p in src.rglob("*") if p.is_file()]
+    else:
+        files = [src]
 
-    if not targets:
-        print("No files found to parse.", file=sys.stderr)
-        sys.exit(0)
-
-    wrote_any = False
-    for f in targets:
+    wrote = 0
+    for p in files:
+        if p.suffix.lower() == ".json":
+            continue  # never parse JSON
+        parser = decide_parser(p)
         try:
-            data = parse_one_file(f)
+            record = parser(p)
+            # output name: original filename + ".json" (keep original extension)
+            out_path = outdir / f"{p.name}.json"
+            with out_path.open("w", encoding="utf-8") as f:
+                json.dump(record, f, ensure_ascii=False, indent=2 if args.pretty else None)
+            wrote += 1
+            # move original to completed/* (preserve subdir structure relative to data/)
+            try:
+                # If file path contains 'data/', keep the relative tail under completed/
+                p_abs = p.resolve()
+                data_root = (Path("data")).resolve()
+                if str(p_abs).startswith(str(data_root)):
+                    rel = p_abs.relative_to(data_root)
+                    dest = (completed / rel).with_suffix(p.suffix)  # same name
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(p), str(dest))
+                else:
+                    # Else just drop it into completed root
+                    shutil.move(str(p), str(completed / p.name))
+            except Exception as e:
+                # Don't fail the job just because the move failed
+                print(f"[warn] failed moving original {p} → completed/: {e}")
         except Exception as e:
-            data = file_to_envelope(f)
-            data["_parse_error"] = f"Unhandled exception: {e}"
+            print(f"[error] failed parsing {p}: {e}")
 
-        dest_dir = _dest_dir_for(f, outdir)
-        dest_dir.mkdir(parents=True, exist_ok=True)
-
-        # Append .json to the original filename (keep original extension)
-        out_path = dest_dir / f"{f.name}.json"
-
-        js = json.dumps(data, ensure_ascii=False, indent=2 if args.pretty else None)
-        out_path.write_text(js, encoding="utf-8")
-        print(out_path)
-        wrote_any = True
-
-    if not wrote_any:
-        sys.exit(1)
-
+    print(f"Parsed {wrote} file(s) → {outdir}")
 
 if __name__ == "__main__":
     main()
