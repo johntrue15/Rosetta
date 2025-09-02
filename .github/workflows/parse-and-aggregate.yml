@@ -4,8 +4,7 @@ on:
   push:
     paths:
       - 'data/**'
-    paths-ignore:
-      - 'data/**/*.json'
+      - '!data/**/*.json'   # exclude JSON to avoid loops
   workflow_dispatch:
 
 permissions:
