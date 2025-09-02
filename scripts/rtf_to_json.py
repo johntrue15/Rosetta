@@ -1,137 +1,102 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-
-import argparse
-import json
-import re
+import argparse, json, re
 from pathlib import Path
 from typing import Dict, Any, Optional
-
-try:
-    from striprtf.striprtf import rtf_to_text
-except Exception as e:  # pragma: no cover
-    raise SystemExit(
-        "Missing dependency 'striprtf'. Install with: pip install striprtf\n"
-        f"Import error: {e}"
-    )
+from striprtf.striprtf import rtf_to_text
 
 SECTION_HEADERS = {
-    "Xray Source",
-    "Detector",
-    "Distances",
+    "Xray Source","Detector","Distances",
     "Geometric Unsharpness Custom Formula",
-    "Motion Positions",
-    "Setup",
-    "CT Scan",
+    "Motion Positions","Setup","CT Scan",
 }
 
 KV_RE = re.compile(r"^\s*([^:]+?):\s*\|?(.*?)\|?\s*$")
 SECTION_RE = re.compile(r"^\s*([A-Za-z0-9 \-\(\)\/]+?):\s*(\|\|?)?\s*$")
 
-
-def normalize_text(text: str) -> str:
+def _normalize(text: str) -> str:
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     return "\n".join(line.rstrip() for line in text.split("\n"))
 
-
-class PushbackIterator:
-    __slots__ = ("_it", "_buf")
-    def __init__(self, lines):
-        self._it = iter(lines)
-        self._buf = None
-    def __iter__(self):
-        return self
+class _PBIter:
+    __slots__ = ("_it","_buf")
+    def __init__(self, lines): self._it, self._buf = iter(lines), None
+    def __iter__(self): return self
     def __next__(self):
         if self._buf is not None:
-            v = self._buf
-            self._buf = None
-            return v
+            v = self._buf; self._buf = None; return v
         return next(self._it)
-    def pushback(self, line):
-        self._buf = line
+    def push(self, v): self._buf = v
 
-
-def parse_gucf(lines_iter) -> Dict[str, Any]:
+def _parse_gucf(lines) -> Dict[str, Any]:
     out: Dict[str, Any] = {}
-    current_name: Optional[str] = None
-    for line in lines_iter:
-        if not line or line == "||":
-            continue
+    current = None
+    for line in lines:
+        if not line or line == "||": continue
         if SECTION_RE.match(line):
-            lines_iter.pushback(line)
-            break
-        mkv = KV_RE.match(line)
-        if not mkv:
-            continue
-        key, val = mkv.group(1).strip(), mkv.group(2).strip()
-        if key.lower() == "name":
-            current_name = val
-            out.setdefault(current_name, {})
-        elif key.lower() in ("expression", "value"):
-            if current_name is None:
-                out.setdefault("_misc", {}).setdefault(key, []).append(val)
-            else:
-                out[current_name][key] = val
+            lines.push(line); break
+        m = KV_RE.match(line)
+        if not m: continue
+        k, v = m.group(1).strip(), m.group(2).strip()
+        if k.lower() == "name":
+            current = v; out.setdefault(current, {})
+        elif k.lower() in ("expression","value"):
+            out.setdefault(current or "_misc", {})[k] = v
         else:
-            (out.setdefault("_misc", {}) if current_name is None else out.setdefault(current_name, {}))[key] = val
+            out.setdefault(current or "_misc", {})[k] = v
     return out
 
-
-def parse_sections(plain_text: str) -> Dict[str, Any]:
+def _parse_sections(text: str) -> Dict[str, Any]:
     data: Dict[str, Any] = {}
-    current_section: Optional[str] = None
-    lines = PushbackIterator(plain_text.split("\n"))
-
-    for raw_line in lines:
-        line = raw_line.strip()
-        if not line or line == "||":
-            continue
-
-        msec = SECTION_RE.match(line)
-        if msec:
-            sec = msec.group(1).strip()
+    current: Optional[str] = None
+    lines = _PBIter(text.split("\n"))
+    for raw in lines:
+        line = raw.strip()
+        if not line or line == "||": continue
+        ms = SECTION_RE.match(line)
+        if ms:
+            sec = ms.group(1).strip()
             if sec in SECTION_HEADERS:
-                current_section = sec
+                current = sec
                 if sec == "Geometric Unsharpness Custom Formula":
-                    data[sec] = parse_gucf(lines)
-                    current_section = None
+                    data[sec] = _parse_gucf(lines); current = None
                 else:
                     data.setdefault(sec, {})
                 continue
-
-        mkv = KV_RE.match(line)
-        if mkv:
-            key = mkv.group(1).strip()
-            val = mkv.group(2).strip()
-            (data if current_section is None else data.setdefault(current_section, {}))[key] = val
+        m = KV_RE.match(line)
+        if m:
+            k, v = m.group(1).strip(), m.group(2).strip()
+            (data if current is None else data.setdefault(current, {}))[k] = v
     return data
-
 
 def rtf_to_json_dict(path: Path) -> Dict[str, Any]:
     raw = path.read_text(encoding="utf-8", errors="ignore")
-    text = rtf_to_text(raw)
-    text = normalize_text(text)
-    return parse_sections(text)
-
+    text = _normalize(rtf_to_text(raw))
+    return _parse_sections(text)
 
 def main():
     ap = argparse.ArgumentParser(description="Convert an RTF technique sheet to JSON.")
-    ap.add_argument("input", help="Path to input .rtf file")
-    ap.add_argument("-o", "--output", help="Path to output .json file (default: <input basename>.json)")
-    ap.add_argument("--pretty", action="store_true", help="Pretty-print JSON")
+    ap.add_argument("input")
+    ap.add_argument("-o","--output", help="Output JSON path (defaults to <input>.json appended).")
+    ap.add_argument("--pretty", action="store_true")
     args = ap.parse_args()
 
-    in_path = Path(args.input).expanduser().resolve()
-    if not in_path.exists():
-        raise SystemExit(f"Input not found: {in_path}")
+    ip = Path(args.input).resolve()
+    if not ip.exists():
+        raise SystemExit(f"Input not found: {ip}")
 
-    data = rtf_to_json_dict(in_path)
-    out_path = Path(args.output).expanduser().resolve() if args.output else in_path.with_suffix(".json")
+    data = rtf_to_json_dict(ip)
+
+    # APPEND .json to the *full* filename (keeps original extension)
+    if args.output:
+        op = Path(args.output).resolve()
+    else:
+        op = Path(str(ip) + ".json")
 
     js = json.dumps(data, indent=2 if args.pretty else None, ensure_ascii=False)
-    out_path.write_text(js, encoding="utf-8")
-    print(str(out_path))
-
+    op.parent.mkdir(parents=True, exist_ok=True)
+    op.write_text(js, encoding="utf-8")
+    print(op)
 
 if __name__ == "__main__":
     main()
