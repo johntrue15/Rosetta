@@ -58,14 +58,14 @@ jobs:
           printf '%s\n' "$files"
           echo "FILES=$(printf '%s\n' "$files" | paste -sd "," -)" >> $GITHUB_ENV
 
-      - name: Parse changed files → JSON (known types + generic fallback)
+      - name: Parse changed files to JSON (known types + generic fallback)
         if: env.FILES != ''
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p data/parsed
 
-          # One generic wrapper to avoid repeating heredocs (and YAML errors)
+          # Single generic wrapper to avoid repeated heredocs
           generic_wrap() {
             python - "$1" "$2" <<'PY'
 import sys, json, os, base64, hashlib
@@ -103,7 +103,6 @@ PY
 
             case "$lc_ext" in
               rtf)
-                # Use integrated RTF parser
                 python scripts/rtf_to_json.py "$f" -o "$out" --pretty
                 ;;
               xml)
@@ -129,7 +128,6 @@ PY
                 fi
                 ;;
               *)
-                # Generic fallback for ANY other metadata file type
                 echo "Using generic wrapper for: $f"
                 generic_wrap "$f" "$out"
                 ;;
@@ -141,35 +139,35 @@ PY
         run: |
           set -euo pipefail
           python - <<'PY'
-          import os, json, glob, hashlib
-          OUT = 'data/metadata.json'
-          records = {}
-          for path in glob.glob('data/**/*.json', recursive=True):
-              if os.path.normpath(path) == os.path.normpath(OUT):
-                  continue
-              try:
-                  with open(path, 'r', encoding='utf-8') as f:
-                      data = json.load(f)
-              except Exception:
-                  continue
-              items = data if isinstance(data, list) else [data]
-              for item in items:
-                  if not isinstance(item, dict):
-                      item = {"_raw": data, "source_path": path}
-                  key = None
-                  for k in ('id','uuid','source','source_path','filename'):
-                      if k in item and item[k] is not None:
-                          key = f"{k}:{item[k]}"
-                          break
-                  if key is None:
-                      key = hashlib.sha256(
-                          json.dumps(item, sort_keys=True, ensure_ascii=False).encode('utf-8')
-                      ).hexdigest()
-                  records[key] = item
-          os.makedirs(os.path.dirname(OUT), exist_ok=True)
-          with open(OUT, 'w', encoding='utf-8') as f:
-              json.dump(list(records.values()), f, ensure_ascii=False, indent=2)
-          PY
+import os, json, glob, hashlib
+OUT = 'data/metadata.json'
+records = {}
+for path in glob.glob('data/**/*.json', recursive=True):
+    if os.path.normpath(path) == os.path.normpath(OUT):
+        continue
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except Exception:
+        continue
+    items = data if isinstance(data, list) else [data]
+    for item in items:
+        if not isinstance(item, dict):
+            item = {"_raw": data, "source_path": path}
+        key = None
+        for k in ('id','uuid','source','source_path','filename'):
+            if k in item and item[k] is not None:
+                key = f"{k}:{item[k]}"
+                break
+        if key is None:
+            key = hashlib.sha256(
+                json.dumps(item, sort_keys=True, ensure_ascii=False).encode('utf-8')
+            ).hexdigest()
+        records[key] = item
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
+with open(OUT, 'w', encoding='utf-8') as f:
+    json.dump(list(records.values()), f, ensure_ascii=False, indent=2)
+PY
 
       - name: Commit & push results
         shell: bash
