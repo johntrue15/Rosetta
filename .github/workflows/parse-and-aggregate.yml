@@ -76,15 +76,15 @@ jobs:
           for f in "${arr[@]}"; do
             [ -z "$f" ] && continue
             [ ! -f "$f" ] && continue
-            # Run as a module so 'from scripts.*' imports work
-            python -m scripts.parse_any "$f" -o data/parsed --completed-dir data/completed --pretty
+            # Run the dispatcher as a .py script
+            python scripts/parse_any.py "$f" -o data/parsed --completed-dir data/completed --pretty
           done
 
       - name: Aggregate & de-duplicate metadata cumulatively
         shell: bash
         run: |
           set -euo pipefail
-          python -m scripts.aggregate_metadata --out data/metadata.json
+          python scripts/aggregate_metadata.py --out data/metadata.json
 
       - name: Commit & push results
         shell: bash
