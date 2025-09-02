@@ -2,7 +2,7 @@ name: Parse & Aggregate Data
 
 on:
   push:
-    # Keep this simple; we'll filter JSON in the job logic
+    # Watch all content under data/**
     paths:
       - 'data/**'
   workflow_dispatch:
@@ -33,7 +33,7 @@ jobs:
       - name: Install core parser deps
         run: |
           python -m pip install --upgrade pip
-          pip install striprtf xmltodict pandas
+          pip install striprtf pandas
 
       - name: Install extra parser deps (optional)
         run: |
@@ -41,12 +41,12 @@ jobs:
             pip install -r scripts/requirements.txt
           fi
 
-      - name: Ensure output dirs exist
+      - name: Ensure output folders exist
         run: |
           mkdir -p data/parsed
-          mkdir -p data
+          mkdir -p data/completed
 
-      - name: Determine changed source files (ignore *.json)
+      - name: Determine changed source files (excluding JSON)
         id: changed
         shell: bash
         run: |
@@ -61,7 +61,7 @@ jobs:
           printf '%s\n' "$files"
           echo "FILES=$(printf '%s\n' "$files" | paste -sd "," -)" >> $GITHUB_ENV
 
-      - name: Parse changed files → JSON (append .json to original filename)
+      - name: Parse changed files → JSON (and move originals)
         if: env.FILES != ''
         shell: bash
         run: |
@@ -70,15 +70,20 @@ jobs:
           for f in "${arr[@]}"; do
             [ -z "$f" ] && continue
             [ ! -f "$f" ] && continue
-            echo "Parsing: $f"
-            python scripts/parse_any.py "$f" --outdir data/parsed --pretty
+            # parse_any.py decides the correct parser based on extension
+            python scripts/parse_any.py "$f" -o data/parsed --completed-dir data/completed --pretty
           done
 
-      - name: Aggregate & append to metadata.json (cumulative)
+      - name: Aggregate & de-duplicate metadata cumulatively
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/aggregate_metadata.py --parsed-dir data/parsed --out data/metadata.json
+          # This script should:
+          #  - read existing data/metadata.json if present
+          #  - merge with all JSONs under data/parsed/**
+          #  - de-duplicate using stable keys/hash
+          #  - write back to data/metadata.json
+          python scripts/aggregate_metadata.py --out data/metadata.json
 
       - name: Commit & push results
         shell: bash
@@ -86,14 +91,14 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Ensure folders exist (idempotent)
-          mkdir -p data/parsed
-          mkdir -p data
+          # Ensure folders exist before adding
+          mkdir -p data/parsed data/completed
           git add -A data/parsed
+          git add -A data/completed
           git add data/metadata.json 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
-          git commit -m "Parse & aggregate data (append) [skip ci]"
+          git commit -m "Parse & aggregate data [skip ci]"
           git push
