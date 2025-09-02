@@ -1,150 +1,68 @@
 #!/usr/bin/env python3
+"""
+metadata_to_csv.py
+
+- Reads data/metadata.json (list of dicts; may include nested dicts like calib_images)
+- Reads data/users.csv (Folder,User name,Email) — delimiter can be tab or comma (auto-detected)
+- Produces data/metadata.csv with all flattened fields + an appended "X-ray User" column.
+
+Matching strategy (most-specific wins):
+  1) Component match: if ANY path component in a record equals the users.csv "Folder" (case/space-insensitive)
+  2) Substring match: if users.csv "Folder" is a full/partial path, match as a substring against the record's full path
+In both cases, ties are resolved by the length of the matched key (longer = more specific).
+
+To debug matches in CI logs, set env LOG_MATCHES=1 for the workflow step.
+"""
 import csv
 import json
 import os
 import re
-from pathlib import PurePosixPath, PureWindowsPath
+from pathlib import Path
+from typing import Dict, List, Tuple
 
 METADATA_JSON = "data/metadata.json"
 USERS_CSV     = "data/users.csv"
 OUTPUT_CSV    = "data/metadata.csv"
 
-# -------- Helpers
+DEBUG = os.getenv("LOG_MATCHES", "0") == "1"
 
-def read_json(path):
+# -------------------- utilities --------------------
+
+def read_json(path: str):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Missing {path}")
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def detect_delimiter(sample):
+def detect_delimiter(sample: str) -> str:
     try:
         dialect = csv.Sniffer().sniff(sample, delimiters=[",", "\t", ";", "|"])
         return dialect.delimiter
     except Exception:
-        # Fallbacks: prefer tab (your example), then comma
         return "\t" if "\t" in sample else ","
 
-def read_users_map(path):
-    """
-    Reads data/users.csv and returns a dict:
-      { normalized_folder_name : email }
-    Assumptions:
-      - First column = folder key (what appears as a path component)
-      - Last column = email
-      - There may or may not be a header row. If present and includes
-        'folder' and 'email' (any case), we honor it. Otherwise:
-        col0=folder, col_last=email.
-    """
-    if not os.path.exists(path):
-        return {}
-
-    with open(path, "r", encoding="utf-8-sig", newline="") as f:
-        sample = f.read(2048)
-        f.seek(0)
-        delim = detect_delimiter(sample)
-        reader = csv.reader(f, delimiter=delim)
-        rows = [r for r in reader if any(cell.strip() for cell in r)]
-
-    if not rows:
-        return {}
-
-    # Check for header
-    header = [c.strip().lower() for c in rows[0]]
-    has_header = ("folder" in header and "email" in header) or ("name" in header and "email" in header)
-
-    folder_idx = 0
-    email_idx = -1
-    start = 1 if has_header else 0
-    if has_header:
-        # Prefer 'folder' if present, else 'name'
-        if "folder" in header:
-            folder_idx = header.index("folder")
-        elif "name" in header:
-            folder_idx = header.index("name")
-        email_idx = header.index("email")
-
-    mapping = {}
-    for r in rows[start:]:
-        if not r:
-            continue
-        # Tolerant indexing
-        if len(r) == 1:
-            # Only one column? Can't map email—skip.
-            continue
-        fkey = r[folder_idx].strip()
-        email = r[email_idx].strip() if email_idx != -1 else r[-1].strip()
-        if fkey and email:
-            mapping[normalize(fkey)] = email
-    return mapping
-
-def normalize(s):
+def normalize_component(s: str) -> str:
+    """Normalize a single path component or short token."""
     return re.sub(r"\s+", " ", s.strip().lower())
 
-def split_path_components(any_path_str):
-    """
-    Split a path string into components, handling both Windows and POSIX.
-    """
-    # Use regex split on both separators
-    parts = [p for p in re.split(r"[\\/]+", any_path_str) if p]
-    return parts
+def normalize_path(s: str) -> str:
+    """Normalize a full path for reliable substring checks."""
+    s = s.strip()
+    # remove file:// prefixes
+    s = re.sub(r"^file:(/{2,3})?", "", s, flags=re.IGNORECASE)
+    # unify slashes and collapse repeats
+    s = s.replace("\\", "/")
+    s = re.sub(r"/+", "/", s)
+    # collapse whitespace, lowercase
+    s = re.sub(r"\s+", " ", s).lower()
+    return s
 
-def gather_candidate_paths(meta):
-    """
-    Collect all path-like fields from a metadata record where a user-folder might appear.
-    Priority order: file_path, txrm_file_path, calib_images.* entries, source_path.
-    """
-    candidates = []
-    def maybe_add(val):
-        if isinstance(val, str) and val.strip() and val.strip().lower() != "n/a":
-            candidates.append(val.strip())
+def split_path_components(any_path_str: str) -> List[str]:
+    """Split into components across Windows/POSIX separators."""
+    comps = [p for p in re.split(r"[\\/]+", any_path_str) if p]
+    return comps
 
-    # top-level
-    for k in ("file_path", "txrm_file_path", "source_path"):
-        if k in meta:
-            maybe_add(meta[k])
-
-    # nested calib_images paths (if present)
-    calib = meta.get("calib_images", {})
-    if isinstance(calib, dict):
-        for k in ("MGainImg", "OffsetImg", "GainImg", "DefPixelImg", "calib_folder_path"):
-            if k in calib:
-                maybe_add(calib[k])
-
-    return candidates
-
-def find_user_email_for_record(meta, users_map):
-    """
-    Try to match any folder component found in candidate paths against keys in users_map.
-    If multiple match, prefer the longest folder key (most specific).
-    """
-    if not users_map:
-        return ""
-
-    candidates = gather_candidate_paths(meta)
-    if not candidates:
-        return ""
-
-    # Collect matches as (key, email)
-    matches = []
-    for p in candidates:
-        # Remove URI prefixes like file:// if present
-        p2 = re.sub(r"^file:(/{2,3})?", "", p, flags=re.IGNORECASE).strip()
-        # Split into components
-        comps = split_path_components(p2)
-        for c in comps:
-            c_norm = normalize(c)
-            if c_norm in users_map:
-                matches.append((c_norm, users_map[c_norm]))
-
-    if not matches:
-        return ""
-
-    # Pick the match with the longest key (most specific)
-    best = max(matches, key=lambda x: len(x[0]))
-    return best[1]
-
-def flatten_dict(d, prefix="", out=None):
+def flatten_dict(d: dict, prefix: str = "", out: dict = None) -> dict:
     if out is None:
         out = {}
     for k, v in d.items():
@@ -155,27 +73,183 @@ def flatten_dict(d, prefix="", out=None):
             out[key] = v
     return out
 
-# -------- Main conversion
+# -------------------- users.csv handling --------------------
+
+class UsersIndex:
+    """
+    Holds two matching structures:
+      - component_map: { normalized_component : email }
+      - path_list: [ (normalized_full_path, email) ]  for substring matches
+    """
+    def __init__(self, component_map: Dict[str, str], path_list: List[Tuple[str, str]]):
+        self.component_map = component_map
+        self.path_list = path_list
+
+def read_users_index(path: str) -> UsersIndex:
+    """
+    Reads data/users.csv and builds:
+      component_map: keys are normalized short tokens (e.g., 'stanley', 'fa no band filter with aluminum')
+      path_list: normalized full paths for substring matches (e.g., 's:/ct_data/stanley/fa no band filter with aluminum')
+    Assumptions:
+      - First row may be a header (expects 'folder' and 'email' if present)
+      - Otherwise: col0 = folder, last col = email
+      - Delimiter auto-detected (tab or comma, etc.)
+    """
+    if not os.path.exists(path):
+        return UsersIndex({}, [])
+
+    with open(path, "r", encoding="utf-8-sig", newline="") as f:
+        sample = f.read(2048)
+        f.seek(0)
+        delim = detect_delimiter(sample)
+        reader = csv.reader(f, delimiter=delim)
+        rows = [r for r in reader if any(cell.strip() for cell in r)]
+
+    if not rows:
+        return UsersIndex({}, [])
+
+    header = [c.strip().lower() for c in rows[0]]
+    has_header = ("folder" in header and "email" in header)
+
+    folder_idx = 0
+    email_idx = -1
+    start = 1 if has_header else 0
+    if has_header:
+        folder_idx = header.index("folder")
+        email_idx = header.index("email")
+
+    component_map: Dict[str, str] = {}
+    path_list: List[Tuple[str, str]] = []
+
+    for r in rows[start:]:
+        if not r:
+            continue
+        # tolerate ragged rows
+        folder_raw = r[folder_idx].strip() if folder_idx < len(r) else ""
+        email = r[email_idx].strip() if (email_idx != -1 and email_idx < len(r)) else (r[-1].strip() if r else "")
+
+        if not folder_raw or not email:
+            continue
+
+        # always add a component key for each component of the folder_raw
+        # (so 'S:\CT_DATA\Stanley\FA no band filter...' adds 'stanley' and 'fa no band filter with aluminum')
+        comps = split_path_components(folder_raw)
+        for c in comps:
+            comp = normalize_component(c)
+            if comp:
+                component_map[comp] = email
+
+        # also add a full-path normalized entry for substring matches
+        path_norm = normalize_path(folder_raw)
+        if path_norm:
+            path_list.append((path_norm, email))
+
+    return UsersIndex(component_map, path_list)
+
+# -------------------- metadata path gathering & matching --------------------
+
+CANDIDATE_TOP_LEVEL_FIELDS = (
+    "file_path",
+    "txrm_file_path",
+    "file_hyperlink",
+    "source_path",
+)
+CANDIDATE_CALIB_FIELDS = (
+    "MGainImg",
+    "OffsetImg",
+    "GainImg",
+    "DefPixelImg",
+    "calib_folder_path",
+)
+
+def gather_candidate_paths(meta: dict) -> List[str]:
+    candidates: List[str] = []
+
+    def maybe_add(val):
+        if isinstance(val, str):
+            v = val.strip()
+            if v and v.lower() != "n/a":
+                candidates.append(v)
+
+    # top-level
+    for k in CANDIDATE_TOP_LEVEL_FIELDS:
+        if k in meta:
+            maybe_add(meta[k])
+
+    # nested calib_images
+    calib = meta.get("calib_images", {})
+    if isinstance(calib, dict):
+        for k in CANDIDATE_CALIB_FIELDS:
+            if k in calib:
+                maybe_add(calib[k])
+
+    return candidates
+
+def find_user_email_for_record(meta: dict, users: UsersIndex) -> str:
+    """
+    Match order (highest specificity wins):
+      1) Component equals user 'Folder' component  -> weight = len(component)
+      2) Full-path contains user 'Folder' normalized path -> weight = len(folder_path_norm)
+    """
+    if not users.component_map and not users.path_list:
+        return ""
+
+    candidates = gather_candidate_paths(meta)
+    if not candidates:
+        return ""
+
+    best_email = ""
+    best_weight = -1
+
+    for raw in candidates:
+        full_norm = normalize_path(raw)
+        comps = [normalize_component(c) for c in split_path_components(raw)]
+
+        # 1) component matches
+        for c in comps:
+            email = users.component_map.get(c)
+            if email:
+                w = len(c)
+                if w > best_weight:
+                    best_weight = w
+                    best_email = email
+
+        # 2) full-path substring matches
+        for key_norm_path, email in users.path_list:
+            if key_norm_path and key_norm_path in full_norm:
+                w = len(key_norm_path)
+                if w > best_weight:
+                    best_weight = w
+                    best_email = email
+
+    if DEBUG:
+        print("---- MATCH DEBUG ----")
+        print("Record candidates:", candidates)
+        print("Chosen email:", best_email, "weight:", best_weight)
+        print("---------------------")
+
+    return best_email
+
+# -------------------- main conversion --------------------
 
 def main():
     data = read_json(METADATA_JSON)
     if not isinstance(data, list):
         raise ValueError("metadata.json must contain a list of objects")
 
-    users_map = read_users_map(USERS_CSV)
+    users = read_users_index(USERS_CSV)
 
-    # Flatten and build field set
+    # Flatten and collect rows
     rows = []
     fieldnames = set()
     for rec in data:
         flat = flatten_dict(rec)
-        email = find_user_email_for_record(rec, users_map)
+        email = find_user_email_for_record(rec, users)
         flat["X-ray User"] = email
         rows.append(flat)
         fieldnames.update(flat.keys())
 
-    # Ensure consistent, readable column order:
-    # 1) Put a few common fields first if present
+    # Preferred order for readability if present
     preferred = [
         "file_name",
         "file_hyperlink",
@@ -196,11 +270,10 @@ def main():
         "sha256",
         "source_path",
     ]
-    # Append all other fields (sorted) except X-ray User, then finally X-ray User
     remaining = sorted(fn for fn in fieldnames if fn not in preferred and fn != "X-ray User")
     ordered = [fn for fn in preferred if fn in fieldnames] + remaining + ["X-ray User"]
 
-    os.makedirs(os.path.dirname(OUTPUT_CSV), exist_ok=True)
+    Path(OUTPUT_CSV).parent.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_CSV, "w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=ordered, quoting=csv.QUOTE_MINIMAL)
         writer.writeheader()
