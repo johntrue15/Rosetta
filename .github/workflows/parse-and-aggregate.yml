@@ -2,17 +2,18 @@ name: Parse & Aggregate Data
 
 on:
   push:
-    # Only react to changes under data/**
+    # Only react to source files we parse (avoid JSON loops)
     paths:
-      - 'data/**'
-    # Avoid infinite loops when this workflow commits JSON/metadata
-    paths-ignore:
-      - 'data/**/*.json'
-      - 'data/metadata.json'
+      - 'data/**/*.rtf'
+      - 'data/**/*.RTF'
+      - 'data/**/*.pca'
+      - 'data/**/*.PCA'
+      - 'data/**/*.xml'
+      - 'data/**/*.XML'
   workflow_dispatch:
 
 permissions:
-  contents: write  # needed to push commits via GITHUB_TOKEN
+  contents: write
 
 concurrency:
   group: parse-and-aggregate-${{ github.ref }}
@@ -21,7 +22,7 @@ concurrency:
 jobs:
   parse:
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"  # extra belt & suspenders
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
 
     steps:
       - name: Check out repo
@@ -36,7 +37,6 @@ jobs:
 
       - name: Install parser deps (optional)
         run: |
-          # If you have a requirements.txt for your parsers, install it; otherwise this no-ops.
           if [ -f scripts/requirements.txt ]; then
             python -m pip install --upgrade pip
             pip install -r scripts/requirements.txt
@@ -49,14 +49,12 @@ jobs:
           set -euo pipefail
           BEFORE="${{ github.event.before }}"
           if [ -z "${BEFORE}" ] || [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
-            # First push on the branch or unknown "before": consider all tracked files under data/**
             files=$(git ls-files 'data/**' | grep -E '\.(rtf|pca|xml)$' || true)
           else
             files=$(git diff --name-only "${BEFORE}" "${{ github.sha }}" -- 'data/**' | grep -E '\.(rtf|pca|xml)$' || true)
           fi
           echo "Changed files:"
           printf '%s\n' "$files"
-          # Export as a single line, comma-separated, for easy looping
           echo "FILES=$(printf '%s\n' "$files" | paste -sd "," -)" >> $GITHUB_ENV
 
       - name: Parse changed files → JSON
@@ -72,18 +70,14 @@ jobs:
             stem="${base%.*}"
             ext="${f##*.}"
             out="data/parsed/${stem}.json"
-
             case "$ext" in
               rtf|RTF)
-                # EXPECTED: scripts/rtf_to_json.py <in> <out>
                 python scripts/rtf_to_json.py "$f" "$out"
                 ;;
               pca|PCA)
-                # EXPECTED: scripts/pca_to_json.py <in> <out>
                 python scripts/pca_to_json.py "$f" "$out"
                 ;;
               xml|XML)
-                # EXPECTED: scripts/xml_to_json.py <in> <out>
                 python scripts/xml_to_json.py "$f" "$out"
                 ;;
               *)
@@ -93,9 +87,6 @@ jobs:
           done
 
       - name: Aggregate & de-duplicate metadata
-        # Scans all JSON under data/** (except the aggregate file itself),
-        # merges into data/metadata.json, and de-dupes by (id/uuid/source/source_path/filename)
-        # falling back to content-hash.
         shell: bash
         run: |
           set -euo pipefail
@@ -103,7 +94,6 @@ jobs:
           import os, json, glob, hashlib
           OUT = 'data/metadata.json'
           records = {}
-          # Collect all JSONs (parsed or otherwise), excluding the aggregate
           for path in glob.glob('data/**/*.json', recursive=True):
               if os.path.normpath(path) == os.path.normpath(OUT):
                   continue
@@ -115,9 +105,7 @@ jobs:
               items = data if isinstance(data, list) else [data]
               for item in items:
                   if not isinstance(item, dict):
-                      # If a JSON file isn't record-like, wrap it as a record with a source
                       item = {"_raw": data, "source_path": path}
-                  # Prefer stable keys; else content hash
                   key = None
                   for k in ('id','uuid','source','source_path','filename'):
                       if k in item and item[k] is not None:
@@ -141,11 +129,9 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/parsed/*.json 2>/dev/null || true
           git add data/metadata.json 2>/dev/null || true
-
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
-
           git commit -m "Parse & aggregate data [skip ci]"
           git push
