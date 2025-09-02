@@ -2,8 +2,11 @@ name: Parse & Aggregate Data
 
 on:
   push:
+    # Watch all content under data/**, but ignore JSON to avoid loops
     paths:
       - 'data/**'
+    paths-ignore:
+      - 'data/**/*.json'
   workflow_dispatch:
 
 permissions:
@@ -29,45 +32,55 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install core parser deps
+      - name: Install parser deps
         run: |
           python -m pip install --upgrade pip
           pip install striprtf pandas
 
-      - name: Install extra parser deps (optional)
+      - name: Make sure folders exist
         run: |
-          if [ -f scripts/requirements.txt ]; then
-            pip install -r scripts/requirements.txt
-          fi
-
-      - name: Ensure output folders exist
-        run: |
+          mkdir -p scripts
           mkdir -p data/parsed
           mkdir -p data/completed
 
-      - name: Determine changed source files (exclude JSON, parsed, completed)
+      # --- Drop your parser scripts into the runner workspace ---
+      - name: Write parser scripts
+        shell: bash
+        run: |
+          cat > scripts/parse_any.py << 'PY'
+{{PARSE_ANY_PY}}
+PY
+          cat > scripts/rtf_to_json.py << 'PY'
+{{RTF_TO_JSON_PY}}
+PY
+          cat > scripts/pca_to_json.py << 'PY'
+{{PCA_TO_JSON_PY}}
+PY
+          cat > scripts/xtekct_to_json.py << 'PY'
+{{XTEKCT_TO_JSON_PY}}
+PY
+          cat > scripts/aggregate_json.py << 'PY'
+{{AGGREGATE_JSON_PY}}
+PY
+
+      - name: Determine changed source files
         id: changed
         shell: bash
         run: |
           set -euo pipefail
           BEFORE="${{ github.event.before }}"
           if [ -z "${BEFORE}" ] || [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
-            files=$(git ls-files 'data/**' || true)
+            # First push / branch create: parse all non-JSON files under data/**
+            files=$(git ls-files 'data/**' | grep -v -E '\.json$' || true)
           else
-            files=$(git diff --name-only "${BEFORE}" "${{ github.sha }}" -- 'data/**' || true)
+            # Only parse changed non-JSON files under data/**
+            files=$(git diff --name-only "${BEFORE}" "${{ github.sha }}" -- 'data/**' | grep -v -E '\.json$' || true)
           fi
-
-          # Exclude JSON outputs and the parsed/completed folders
-          files=$(printf '%s\n' "$files" \
-            | grep -v -E '\.json$' \
-            | grep -v -E '^data/(parsed|completed)/' \
-            || true)
-
           echo "Changed files:"
           printf '%s\n' "$files"
           echo "FILES=$(printf '%s\n' "$files" | paste -sd "," -)" >> $GITHUB_ENV
 
-      - name: Parse changed files → JSON (and move originals)
+      - name: Parse changed files → JSON (and move originals to data/completed)
         if: env.FILES != ''
         shell: bash
         run: |
@@ -76,15 +89,20 @@ jobs:
           for f in "${arr[@]}"; do
             [ -z "$f" ] && continue
             [ ! -f "$f" ] && continue
-            # Run the dispatcher as a .py script
+            # parse_any.py decides the correct parser based on extension
             python scripts/parse_any.py "$f" -o data/parsed --completed-dir data/completed --pretty
+            # Safety: in case an older parser ever copied instead of moved
+            if [ -f "$f" ]; then
+              echo "Removing original leftover: $f"
+              rm -f "$f"
+            fi
           done
 
-      - name: Aggregate & de-duplicate metadata cumulatively
+      - name: Aggregate & de-duplicate metadata (append cumulatively)
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/aggregate_metadata.py --out data/metadata.json
+          python scripts/aggregate_json.py data/metadata.json
 
       - name: Commit & push results
         shell: bash
@@ -92,13 +110,10 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          mkdir -p data/parsed data/completed
-          git add -A data/parsed
-          git add -A data/completed
-          git add data/metadata.json 2>/dev/null || true
+          git add -A
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
-          git commit -m "Parse & aggregate data [skip ci]"
+          git commit -m "Parse, move originals to completed, and aggregate metadata [skip ci]"
           git push
