@@ -2,7 +2,6 @@ name: Parse & Aggregate Data
 
 on:
   push:
-    # Watch all content under data/**, but ignore JSON to avoid loops
     paths:
       - 'data/**'
     paths-ignore:
@@ -64,33 +63,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p data/parsed
-
-          # Single generic wrapper to avoid repeated heredocs
-          generic_wrap() {
-            python - "$1" "$2" <<'PY'
-import sys, json, os, base64, hashlib
-p, out = sys.argv[1], sys.argv[2]
-info = {
-    "source_path": p,
-    "filename": os.path.basename(p),
-    "extension": os.path.splitext(p)[1].lstrip('.'),
-    "size_bytes": os.path.getsize(p),
-    "sha256": hashlib.sha256(open(p, 'rb').read()).hexdigest(),
-}
-try:
-    txt = open(p, 'r', encoding='utf-8').read()
-    info["content_text"] = txt
-    info["encoding"] = "utf-8"
-except Exception:
-    raw = open(p, 'rb').read()
-    info["content_base64"] = base64.b64encode(raw).decode('ascii')
-    info["encoding"] = "base64"
-os.makedirs(os.path.dirname(out), exist_ok=True)
-json.dump(info, open(out, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
-PY
-          }
-
           IFS=',' read -ra arr <<< "$FILES"
+
           for f in "${arr[@]}"; do
             [ -z "$f" ] && continue
             [ ! -f "$f" ] && continue
@@ -108,28 +82,28 @@ PY
               xml)
                 if [ -f scripts/xml_to_json.py ]; then
                   if ! python scripts/xml_to_json.py "$f" -o "$out"; then
-                    echo "XML parser failed, falling back to generic for: $f"
-                    generic_wrap "$f" "$out"
+                    echo "XML parser failed, falling back to generic: $f"
+                    python scripts/generic_wrap.py "$f" "$out"
                   fi
                 else
-                  echo "No XML parser found; using generic for: $f"
-                  generic_wrap "$f" "$out"
+                  echo "No XML parser found; using generic: $f"
+                  python scripts/generic_wrap.py "$f" "$out"
                 fi
                 ;;
               pca)
                 if [ -f scripts/pca_to_json.py ]; then
                   if ! python scripts/pca_to_json.py "$f" -o "$out"; then
-                    echo "PCA parser failed, falling back to generic for: $f"
-                    generic_wrap "$f" "$out"
+                    echo "PCA parser failed, falling back to generic: $f"
+                    python scripts/generic_wrap.py "$f" "$out"
                   fi
                 else
-                  echo "No PCA parser found; using generic for: $f"
-                  generic_wrap "$f" "$out"
+                  echo "No PCA parser found; using generic: $f"
+                  python scripts/generic_wrap.py "$f" "$out"
                 fi
                 ;;
               *)
                 echo "Using generic wrapper for: $f"
-                generic_wrap "$f" "$out"
+                python scripts/generic_wrap.py "$f" "$out"
                 ;;
             esac
           done
@@ -138,7 +112,7 @@ PY
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
+          python -c "
 import os, json, glob, hashlib
 OUT = 'data/metadata.json'
 records = {}
@@ -153,21 +127,19 @@ for path in glob.glob('data/**/*.json', recursive=True):
     items = data if isinstance(data, list) else [data]
     for item in items:
         if not isinstance(item, dict):
-            item = {"_raw": data, "source_path": path}
+            item = {'_raw': data, 'source_path': path}
         key = None
         for k in ('id','uuid','source','source_path','filename'):
             if k in item and item[k] is not None:
-                key = f"{k}:{item[k]}"
+                key = f'{k}:{item[k]}'
                 break
         if key is None:
-            key = hashlib.sha256(
-                json.dumps(item, sort_keys=True, ensure_ascii=False).encode('utf-8')
-            ).hexdigest()
+            key = hashlib.sha256(json.dumps(item, sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
         records[key] = item
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 with open(OUT, 'w', encoding='utf-8') as f:
     json.dump(list(records.values()), f, ensure_ascii=False, indent=2)
-PY
+"
 
       - name: Commit & push results
         shell: bash
