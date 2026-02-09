@@ -280,6 +280,33 @@ def _to_iso(s: str, fallback: str) -> str:
             pass
     return fallback
 
+
+def parse_rtf_file(input_path: Path, output_path: Path, pretty: bool = False) -> None:
+    """
+    Parse an RTF file and write the normalized JSON to output_path.
+    This function signature matches pca_to_json and xtekct_to_json for use with parse_any.py.
+    """
+    if not input_path.exists():
+        raise FileNotFoundError(input_path)
+
+    text = load_text(input_path)
+    # normalize newlines and bars that sometimes get doubled-up
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    sections = tokenize(text)
+    rec = build_record(input_path, sections)
+    out = {
+        **{k: rec.get(k, 'N/A') for k in COLUMN_ORDER},
+        "sections": sections,  # keep the parsed raw content for auditing
+        "sha256": rec.get("sha256", ""),
+        "source_path": str(output_path),
+    }
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=(2 if pretty else None))
+
+
 def main():
     ap = argparse.ArgumentParser(description="Parse RTF metadata into normalized JSON")
     ap.add_argument("input", help="Input .rtf file")
