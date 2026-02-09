@@ -1,0 +1,112 @@
+{
+  "file_name": "Technique-USNM35717_Stanley29.rtf",
+  "file_hyperlink": "file:////home/runner/work/Rosetta/Rosetta/data/Technique-USNM35717_Stanley29.rtf",
+  "ct_voxel_size_um": "33",
+  "ct_objective": "N/A",
+  "ct_number_images": "3000",
+  "Geometric_magnificiation": "6.060598",
+  "Source_detector_distance": "799.999",
+  "Source_sample_distance": "132",
+  "ct_optical_magnification": "N/A",
+  "xray_tube_ID": "Comet FXE [1796906]",
+  "xray_tube_voltage": "130",
+  "xray_tube_power": "29.25",
+  "xray_tube_current": "225",
+  "xray_filter": "aluminum foil",
+  "detector_binning": "1x1",
+  "detector_capture_time": "4 fps",
+  "detector_averaging": "0.5 pF",
+  "detector_skip": "N/A",
+  "image_width_pixels": "2048",
+  "image_height_pixels": "2048",
+  "image_width_real": "67.584",
+  "image_height_real": "67.584",
+  "scan_time": "50m04s",
+  "start_time": "2024-06-13T11:11:12",
+  "end_time": "2024-06-13T12:01:16",
+  "txrm_file_path": "N/A",
+  "file_path": "D:\\Stanley\\USNM35685",
+  "acquisition_successful": "Yes",
+  "sample_x_start": "N/A",
+  "sample_x_end": "N/A",
+  "sample_x_range": "N/A",
+  "sample_y_start": "N/A",
+  "sample_y_end": "N/A",
+  "sample_y_range": "N/A",
+  "sample_z_start": "N/A",
+  "sample_z_end": "N/A",
+  "sample_z_range": "N/A",
+  "sample_theta_start": "N/A",
+  "sections": {
+    "_root": {
+      "Machine ID": "TX-DR",
+      "Machine Serial": "TX-DR",
+      "Operator ID": "efX-user",
+      "Date/Time": "6/13/2024 12:01:17 PM"
+    },
+    "Xray Source": {
+      "Name": "Comet FXE [1796906]",
+      "Voltage": "130 kV",
+      "Current": "225 µA",
+      "Focal spot size": "29.25 microns"
+    },
+    "Detector": {
+      "Name": "Perkin Elmer [XRD 1620/1621 AM/AN][n/a]",
+      "Pixel pitch": "[200 x 200] microns",
+      "Gain": "0.5 pF",
+      "Binning": "none",
+      "Framerate": "4 fps",
+      "Flip": "None",
+      "Rotation": "90 degree",
+      "Crop": "10 Left, 10 Top, 10 Right, 10 Bottom (pixels)",
+      "ROI": "2048x2048+0+0",
+      "Defect map": "3824 defective pixels (0.1%) (saved)",
+      "Offset map": "0.0646, dev 0.00528, 360 fravg, 4 fps (acquired 6/11/2024 9:31:40 AM)",
+      "Gain map 0": "0.576, dev 0.0497, 240 fravg, 4 fps (acquired 6/13/2024 9:44:48 AM)",
+      "Gain map 1": "0.293, dev 0.0254, 240 fravg, 4 fps (acquired 6/13/2024 9:45:53 AM)",
+      "Gain map 2": "0.15, dev 0.0131, 240 fravg, 4 fps (acquired 6/13/2024 9:46:57 AM)",
+      "Gain map 3": "0.0756, dev 0.00659, 240 fravg, 4 fps (acquired 6/13/2024 9:48:01 AM)",
+      "Gain map 4": "0.0473, dev 0.00414, 240 fravg, 4 fps (acquired 6/13/2024 9:49:05 AM)"
+    },
+    "Distances": {
+      "Units": "Same unit as at acquisition",
+      "Source to detector": "799.999 [mm] (FDD)",
+      "Source to object": "132 [mm] (FOD)",
+      "Calculated Ug": "0.148 [mm](0.74 pixels)",
+      "Zoom factor": "x6.06",
+      "Effective pixel pitch": "0.033 [mm]"
+    },
+    "Geometric Unsharpness Custom Formula": {
+      "Name": "Im Unsharpness [mm]",
+      "Expression": "Math.Pow(Math.Pow($Ug,3) + Math.Pow(2.0*$Srb,3 ),(double)1/3) / $v",
+      "Value": "0.02442"
+    },
+    "Motion Positions": {
+      "Table rotate": "0.000[deg], 50.000[deg]/s",
+      "Table left/right": "0.2[mm], 6.07[mm]/s",
+      "Table up/down": "-262[mm], 11.85[mm]/s",
+      "Detector up/down": "-0.00055[mm], 20.01[mm]/s",
+      "Table mag": "132[mm], 8.07[mm]/s",
+      "Detector mag": "799.999[mm], 27.09[mm]/s",
+      "Detector left/right": "0[mm], 10.01[mm]/s"
+    },
+    "Setup": {
+      "Fixturing": "n/a",
+      "Filter": "aluminum foil"
+    },
+    "CT Scan": {
+      "Project name": "USNM35717_",
+      "Project folder": "D:\\Stanley\\USNM35685",
+      "# Frames averaged": "4",
+      "# Skip frames": "none",
+      "Monitor xray down": "8% max image variation",
+      "Type": "continuous",
+      "# Projections": "3000",
+      "Start": "6/13/2024 11:11:12 AM",
+      "End": "6/13/2024 12:01:16 PM",
+      "Duration": "50m04s"
+    }
+  },
+  "sha256": "584ac822c00cc52a81f202ea517837c1a919aca5c1799f56fc874af71dfffd2b",
+  "source_path": "data/parsed/Technique-USNM35717_Stanley29.rtf.json"
+}
