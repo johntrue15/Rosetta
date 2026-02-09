@@ -3,6 +3,10 @@
 
 
 
+https://github.com/user-attachments/assets/71d9d673-6079-481e-a734-627c618beeae
+
+
+
 A comprehensive pipeline that transforms heterogeneous scan metadata files into clean, structured JSON and CSV formats with automated processing and user attribution.
 
 ## Overview
