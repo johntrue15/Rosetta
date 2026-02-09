@@ -1,5 +1,11 @@
 # Rosetta Parsing & Metadata Pipeline
 
+
+
+https://github.com/user-attachments/assets/c6cc63db-6647-43de-88ec-25028bf96721
+
+
+
 A comprehensive pipeline that transforms heterogeneous scan metadata files into clean, structured JSON and CSV formats with automated processing and user attribution.
 
 ## Overview
