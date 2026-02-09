@@ -108,6 +108,18 @@ jobs:
             exit 1
           fi
 
+      - name: Convert metadata.json to metadata.csv
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f scripts/metadata_to_csv.py ]; then
+            python scripts/metadata_to_csv.py
+            echo "Generated metadata.csv"
+          else
+            echo "scripts/metadata_to_csv.py not found!" >&2
+            exit 1
+          fi
+
       - name: Commit & push results
         shell: bash
         run: |
@@ -118,6 +130,7 @@ jobs:
           git add -A data/parsed
           git add -A data/completed
           git add -A data/metadata.json
+          git add -A data/metadata.csv
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
