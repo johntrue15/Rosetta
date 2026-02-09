@@ -132,10 +132,8 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add -A data/parsed
-          git add -A data/completed
-          git add -A data/metadata.json
-          git add -A data/metadata.csv
+          # Stage ALL changes in data/ (including deletions of original files)
+          git add -A data/
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
