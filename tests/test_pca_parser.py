@@ -35,8 +35,8 @@ class TestPCAParser:
         assert "sha256" in data
         assert "source_path" in data
 
-        # Verify specific values from the known file
-        assert data["file_name"] == "Amazon echo 40 micron.pca"
+        # Verify specific values from the known file (filename may have suffix if moved)
+        assert "Amazon echo 40 micron" in data["file_name"]
         assert data["ct_number_images"] == "1800"
         assert data["xray_tube_voltage"] == "200"
         assert data["xray_tube_current"] == "200"

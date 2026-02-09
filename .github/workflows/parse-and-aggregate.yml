@@ -52,14 +52,18 @@ jobs:
           if [ -z "${BEFORE}" ] || [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
             git ls-files 'data/**' \
             | grep -v -E '\.json$' \
+            | grep -v -E '\.csv$' \
             | grep -v -E '^data/parsed/' \
             | grep -v -E '^data/completed/' \
+            | grep -v -E '^data/tests/' \
             > changed.txt || true
           else
             git diff --name-only "${BEFORE}" "${{ github.sha }}" -- 'data/**' \
             | grep -v -E '\.json$' \
+            | grep -v -E '\.csv$' \
             | grep -v -E '^data/parsed/' \
             | grep -v -E '^data/completed/' \
+            | grep -v -E '^data/tests/' \
             > changed.txt || true
           fi
 
@@ -89,10 +93,11 @@ jobs:
               --pretty
           done < "$LIST_FILE"
 
-          # Safety cleanup: remove any leftover metadata sources outside parsed/completed
+          # Safety cleanup: remove any leftover metadata sources outside parsed/completed/tests
           find data -type f \
             ! -path "data/parsed/*" \
             ! -path "data/completed/*" \
+            ! -path "data/tests/*" \
             \( -iname "*.rtf" -o -iname "*.pca" -o -iname "*.xtekct" -o -iname "*.xml" \) \
             -print -exec rm -f {} +
 

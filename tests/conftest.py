@@ -27,28 +27,48 @@ def temp_dir():
 
 @pytest.fixture
 def sample_pca_path():
-    """Path to a sample PCA file in the repo."""
-    return REPO_ROOT / "data" / "completed" / "Amazon echo 40 micron.pca"
+    """Path to a sample PCA file in the repo (check data/tests/ first)."""
+    # Check various possible locations (prefer data/tests/)
+    candidates = [
+        REPO_ROOT / "data" / "tests" / "Amazon echo 40 micron.pca",
+        REPO_ROOT / "data" / "completed" / "Amazon echo 40 micron.pca",
+        REPO_ROOT / "data" / "completed" / "Amazon echo 40 micron__moved_1.pca",
+        REPO_ROOT / "data" / "Amazon echo 40 micron.pca",
+    ]
+    for path in candidates:
+        if path.exists():
+            return path
+    # Return first candidate (will be skipped if not found)
+    return candidates[0]
 
 
 @pytest.fixture
 def sample_rtf_path():
-    """Path to a sample RTF file in the repo."""
-    # Check for RTF in data folder first, then completed
-    rtf_in_data = REPO_ROOT / "data" / "Technique-USNM35717_COPY3.rtf"
-    if rtf_in_data.exists():
-        return rtf_in_data
-    return REPO_ROOT / "data" / "completed" / "Technique-USNM35717_Stanley.rtf"
+    """Path to a sample RTF file in the repo (check data/tests/ first)."""
+    candidates = [
+        REPO_ROOT / "data" / "tests" / "Technique-USNM35717_Stanley29.rtf",
+        REPO_ROOT / "data" / "completed" / "Technique-USNM35717_Stanley.rtf",
+        REPO_ROOT / "data" / "completed" / "Technique-USNM35717_Stanley29.rtf",
+        REPO_ROOT / "data" / "Technique-USNM35717_Stanley.rtf",
+    ]
+    for path in candidates:
+        if path.exists():
+            return path
+    return candidates[0]
 
 
 @pytest.fixture
 def sample_xtekct_path():
-    """Path to a sample XTEKCT file in the repo."""
-    # Check for xtekct in data folder first, then completed
-    xtekct_in_data = REPO_ROOT / "data" / "JAG_Aip-lae-FMNH-213864-head_4I2E70EtOH_4wk.xtekct"
-    if xtekct_in_data.exists():
-        return xtekct_in_data
-    return REPO_ROOT / "data" / "completed" / "JAG_Aip-lae-FMNH-213864-head_4I2E70EtOH_4wk.xtekct"
+    """Path to a sample XTEKCT file in the repo (check data/tests/ first)."""
+    candidates = [
+        REPO_ROOT / "data" / "tests" / "sample.xtekct",
+        REPO_ROOT / "data" / "completed" / "JAG_Aip-lae-FMNH-213864-head_4I2E70EtOH_4wk.xtekct",
+        REPO_ROOT / "data" / "JAG_Aip-lae-FMNH-213864-head_4I2E70EtOH_4wk.xtekct",
+    ]
+    for path in candidates:
+        if path.exists():
+            return path
+    return candidates[0]
 
 
 @pytest.fixture

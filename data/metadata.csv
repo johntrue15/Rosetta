@@ -1,6 +1,653 @@
-file_name,file_hyperlink,file_path,txrm_file_path,start_time,end_time,ct_voxel_size_um,ct_objective,ct_number_images,xray_tube_voltage,xray_tube_current,xray_tube_power,xray_filter,image_width_pixels,image_height_pixels,scan_time,sha256,source_path,Geometric_magnificiation,Source_detector_distance,Source_sample_distance,acquisition_successful,calib_images.Avg,calib_images.DefPixelImg,calib_images.EnableAutoAcq,calib_images.GainImg,calib_images.MGainCurrent,calib_images.MGainFilter,calib_images.MGainImg,calib_images.MGainPoints,calib_images.MGainVoltage,calib_images.OffsetImg,calib_images.Skip,calib_images.calib_folder_path,ct_optical_magnification,detector_averaging,detector_binning,detector_capture_time,detector_skip,image_height_real,image_width_real,sample_theta_start,sample_x_end,sample_x_range,sample_x_start,sample_y_end,sample_y_range,sample_y_start,sample_z_end,sample_z_range,sample_z_start,xray_tube_ID,X-ray User
-Amazon echo 40 micronFAKE4.pca,file:////home/runner/work/Rosetta/Rosetta/data/Amazon echo 40 micronFAKE4.pca,S:\CT_DATA\Stanley\FA no band filter with aluminum,N/A,2025-09-02T17:52:23.398962,2025-09-02T17:52:45.180671,40.65708,DXR-250,1800,200,200,40.0,0.1Cu,2024,2024,1800,7bac1237a016937c907d513873839a9b374d7db0a047dc4f70d9dac1ff48534c,data/parsed/Amazon echo 40 micronFAKE4.pca.json,4.91919266,802.77534791,163.19250000,Yes,100,C:\Program Files\phoenix x-ray\datosx 2 acq\CalibrationImages\pixmask_B1x1_x2024_y2024.tif,1,N/A,180:190:200:,__Unknown__:__Unknown__:__Unknown__:,S:\CT_DATA\Stanley\FA no band filter with aluminum\1st scan_bright_200kV_200uA_333ms_1Det.tif,3,200:200:200:,S:\CT_DATA\Stanley\FA no band filter with aluminum\1st scan_Dark_333.tif,10,S:\CT_DATA\Stanley\FA no band filter with aluminum,N/A,4,1x1,333.096,1,82.28992991999999,82.28992991999999,0.000000,0.000000,149.993687,-149.993687,198.304750,196.693875,394.998625,163.192500,110.79475000000002,273.987250,xs|240 d,estanley@ufl.edu
-Amazon echo 40 micronFAKE2.pca,file:////home/runner/work/Rosetta/Rosetta/data/Amazon echo 40 micronFAKE2.pca,S:\CT_DATA\Stanley\FA no band filter with aluminum,N/A,2025-09-02T17:46:57.485662,2025-09-02T17:47:06.109842,40.65708,DXR-250,1800,200,200,40.0,0.1Cu,2024,2024,1800,7bac1237a016937c907d513873839a9b374d7db0a047dc4f70d9dac1ff48534c,data/parsed/Amazon echo 40 micronFAKE2.pca.json,4.91919266,802.77534791,163.19250000,Yes,100,C:\Program Files\phoenix x-ray\datosx 2 acq\CalibrationImages\pixmask_B1x1_x2024_y2024.tif,1,N/A,180:190:200:,__Unknown__:__Unknown__:__Unknown__:,S:\CT_DATA\Stanley\FA no band filter with aluminum\1st scan_bright_200kV_200uA_333ms_1Det.tif,3,200:200:200:,S:\CT_DATA\Stanley\FA no band filter with aluminum\1st scan_Dark_333.tif,10,S:\CT_DATA\Stanley\FA no band filter with aluminum,N/A,4,1x1,333.096,1,82.28992991999999,82.28992991999999,0.000000,0.000000,149.993687,-149.993687,198.304750,196.693875,394.998625,163.192500,110.79475000000002,273.987250,xs|240 d,estanley@ufl.edu
-Amazon echo 40 micronFAKE.pca,file:////home/runner/work/Rosetta/Rosetta/data/Amazon echo 40 micronFAKE.pca,S:\CT_DATA\FICS\FA no band filter with aluminum,N/A,2025-09-02T17:45:28.676854,2025-09-02T17:45:37.122517,40.65708,DXR-250,1800,200,200,40.0,0.1Cu,2024,2024,1800,cd0a7c632a3bdb4c44e21af00e4b03d4e09bc3f6d64a84523e982fdc00f46c6d,data/parsed/Amazon echo 40 micronFAKE.pca.json,4.91919266,802.77534791,163.19250000,Yes,100,C:\Program Files\phoenix x-ray\datosx 2 acq\CalibrationImages\pixmask_B1x1_x2024_y2024.tif,1,N/A,180:190:200:,__Unknown__:__Unknown__:__Unknown__:,S:\CT_DATA\FICS\FA no band filter with aluminum\1st scan_bright_200kV_200uA_333ms_1Det.tif,3,200:200:200:,S:\CT_DATA\Stanley\FA no band filter with aluminum\1st scan_Dark_333.tif,10,S:\CT_DATA\FICS\FA no band filter with aluminum,N/A,4,1x1,333.096,1,82.28992991999999,82.28992991999999,0.000000,0.000000,149.993687,-149.993687,198.304750,196.693875,394.998625,163.192500,110.79475000000002,273.987250,xs|240 d,estanley@ufl.edu
-Amazon echo 40 micronFAKE3.pca,file:////home/runner/work/Rosetta/Rosetta/data/Amazon echo 40 micronFAKE3.pca,S:\CT_DATA\Stanley\FA no band filter with aluminum,N/A,2025-09-02T17:49:51.675686,2025-09-02T17:50:01.541543,40.65708,DXR-250,1800,200,200,40.0,0.1Cu,2024,2024,1800,7bac1237a016937c907d513873839a9b374d7db0a047dc4f70d9dac1ff48534c,data/parsed/Amazon echo 40 micronFAKE3.pca.json,4.91919266,802.77534791,163.19250000,Yes,100,C:\Program Files\phoenix x-ray\datosx 2 acq\CalibrationImages\pixmask_B1x1_x2024_y2024.tif,1,N/A,180:190:200:,__Unknown__:__Unknown__:__Unknown__:,S:\CT_DATA\Stanley\FA no band filter with aluminum\1st scan_bright_200kV_200uA_333ms_1Det.tif,3,200:200:200:,S:\CT_DATA\Stanley\FA no band filter with aluminum\1st scan_Dark_333.tif,10,S:\CT_DATA\Stanley\FA no band filter with aluminum,N/A,4,1x1,333.096,1,82.28992991999999,82.28992991999999,0.000000,0.000000,149.993687,-149.993687,198.304750,196.693875,394.998625,163.192500,110.79475000000002,273.987250,xs|240 d,estanley@ufl.edu
-Amazon echo 40 micron.pca,file:////home/runner/work/Rosetta/Rosetta/data/Amazon echo 40 micron.pca,S:\CT_DATA\FICS\FA no band filter with aluminum,N/A,2025-09-02T17:43:18.216854,2025-09-02T17:43:27.707248,40.65708,DXR-250,1800,200,200,40.0,0.1Cu,2024,2024,1800,11da8f09861f8baa1294ae124dafb6eb9a753be45da066f6730f9de97ae57842,data/parsed/Amazon echo 40 micron.pca.json,4.91919266,802.77534791,163.19250000,Yes,100,C:\Program Files\phoenix x-ray\datosx 2 acq\CalibrationImages\pixmask_B1x1_x2024_y2024.tif,1,N/A,180:190:200:,__Unknown__:__Unknown__:__Unknown__:,S:\CT_DATA\FICS\FA no band filter with aluminum\1st scan_bright_200kV_200uA_333ms_1Det.tif,3,200:200:200:,S:\CT_DATA\FICS\FA no band filter with aluminum\1st scan_Dark_333.tif,10,S:\CT_DATA\FICS\FA no band filter with aluminum,N/A,4,1x1,333.096,1,82.28992991999999,82.28992991999999,0.000000,0.000000,149.993687,-149.993687,198.304750,196.693875,394.998625,163.192500,110.79475000000002,273.987250,xs|240 d,email9@ufl.edu
+file_name,file_hyperlink,file_path,txrm_file_path,start_time,end_time,ct_voxel_size_um,ct_objective,ct_number_images,xray_tube_voltage,xray_tube_current,xray_tube_power,xray_filter,image_width_pixels,image_height_pixels,scan_time,sha256,source_path,Date/Time,Geometric_magnificiation,Machine ID,Machine Serial,Operator ID,Source_detector_distance,Source_sample_distance,Xray Source.Current,Xray Source.Focal spot size,Xray Source.Name,Xray Source.Voltage,acquisition_successful,calib_images.Avg,calib_images.DefPixelImg,calib_images.EnableAutoAcq,calib_images.GainImg,calib_images.MGainCurrent,calib_images.MGainFilter,calib_images.MGainImg,calib_images.MGainPoints,calib_images.MGainVoltage,calib_images.OffsetImg,calib_images.Skip,calib_images.calib_folder_path,ct_optical_magnification,detector_averaging,detector_binning,detector_capture_time,detector_skip,image_height_real,image_width_real,sample_theta_start,sample_x_end,sample_x_range,sample_x_start,sample_y_end,sample_y_range,sample_y_start,sample_z_end,sample_z_range,sample_z_start,sections.CT Scan.# Frames averaged,sections.CT Scan.# Projections,sections.CT Scan.# Skip frames,sections.CT Scan.Duration,sections.CT Scan.End,sections.CT Scan.Monitor xray down,sections.CT Scan.Project folder,sections.CT Scan.Project name,sections.CT Scan.Start,sections.CT Scan.Type,sections.Detector.Binning,sections.Detector.Crop,sections.Detector.Defect map,sections.Detector.Flip,sections.Detector.Framerate,sections.Detector.Gain,sections.Detector.Gain map 0,sections.Detector.Gain map 1,sections.Detector.Gain map 2,sections.Detector.Gain map 3,sections.Detector.Gain map 4,sections.Detector.Name,sections.Detector.Offset map,sections.Detector.Pixel pitch,sections.Detector.ROI,sections.Detector.Rotation,sections.Distances.Calculated Ug,sections.Distances.Effective pixel pitch,sections.Distances.Source to detector,sections.Distances.Source to object,sections.Distances.Units,sections.Distances.Zoom factor,sections.Geometric Unsharpness Custom Formula.Expression,sections.Geometric Unsharpness Custom Formula.Name,sections.Geometric Unsharpness Custom Formula.Value,sections.Motion Positions.Detector left/right,sections.Motion Positions.Detector mag,sections.Motion Positions.Detector up/down,sections.Motion Positions.Table left/right,sections.Motion Positions.Table mag,sections.Motion Positions.Table rotate,sections.Motion Positions.Table up/down,sections.Setup.Filter,sections.Setup.Fixturing,sections.Xray Source.Current,sections.Xray Source.Focal spot size,sections.Xray Source.Name,sections.Xray Source.Voltage,sections._root.Date/Time,sections._root.Machine ID,sections._root.Machine Serial,sections._root.Operator ID,xray_tube_ID,X-ray User
+Amazon echo 40 micronFAKE4.pca,file:////home/runner/work/Rosetta/Rosetta/data/Amazon echo 40 micronFAKE4.pca,S:\CT_DATA\Stanley\FA no band filter with aluminum,N/A,2025-09-02T17:52:23.398962,2025-09-02T17:52:45.180671,40.65708,DXR-250,1800,200,200,40.0,0.1Cu,2024,2024,1800,7bac1237a016937c907d513873839a9b374d7db0a047dc4f70d9dac1ff48534c,data/parsed/Amazon echo 40 micronFAKE4.pca.json,,4.91919266,,,,802.77534791,163.19250000,,,,,Yes,100,C:\Program Files\phoenix x-ray\datosx 2 acq\CalibrationImages\pixmask_B1x1_x2024_y2024.tif,1,N/A,180:190:200:,__Unknown__:__Unknown__:__Unknown__:,S:\CT_DATA\Stanley\FA no band filter with aluminum\1st scan_bright_200kV_200uA_333ms_1Det.tif,3,200:200:200:,S:\CT_DATA\Stanley\FA no band filter with aluminum\1st scan_Dark_333.tif,10,S:\CT_DATA\Stanley\FA no band filter with aluminum,N/A,4,1x1,333.096,1,82.28992991999999,82.28992991999999,0.000000,0.000000,149.993687,-149.993687,198.304750,196.693875,394.998625,163.192500,110.79475000000002,273.987250,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,xs|240 d,estanley@ufl.edu
+Amazon echo 40 micronFAKE2.pca,file:////home/runner/work/Rosetta/Rosetta/data/Amazon echo 40 micronFAKE2.pca,S:\CT_DATA\Stanley\FA no band filter with aluminum,N/A,2025-09-02T17:46:57.485662,2025-09-02T17:47:06.109842,40.65708,DXR-250,1800,200,200,40.0,0.1Cu,2024,2024,1800,7bac1237a016937c907d513873839a9b374d7db0a047dc4f70d9dac1ff48534c,data/parsed/Amazon echo 40 micronFAKE2.pca.json,,4.91919266,,,,802.77534791,163.19250000,,,,,Yes,100,C:\Program Files\phoenix x-ray\datosx 2 acq\CalibrationImages\pixmask_B1x1_x2024_y2024.tif,1,N/A,180:190:200:,__Unknown__:__Unknown__:__Unknown__:,S:\CT_DATA\Stanley\FA no band filter with aluminum\1st scan_bright_200kV_200uA_333ms_1Det.tif,3,200:200:200:,S:\CT_DATA\Stanley\FA no band filter with aluminum\1st scan_Dark_333.tif,10,S:\CT_DATA\Stanley\FA no band filter with aluminum,N/A,4,1x1,333.096,1,82.28992991999999,82.28992991999999,0.000000,0.000000,149.993687,-149.993687,198.304750,196.693875,394.998625,163.192500,110.79475000000002,273.987250,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,xs|240 d,estanley@ufl.edu
+Amazon echo 40 micronFAKE.pca,file:////home/runner/work/Rosetta/Rosetta/data/Amazon echo 40 micronFAKE.pca,S:\CT_DATA\FICS\FA no band filter with aluminum,N/A,2025-09-02T17:45:28.676854,2025-09-02T17:45:37.122517,40.65708,DXR-250,1800,200,200,40.0,0.1Cu,2024,2024,1800,cd0a7c632a3bdb4c44e21af00e4b03d4e09bc3f6d64a84523e982fdc00f46c6d,data/parsed/Amazon echo 40 micronFAKE.pca.json,,4.91919266,,,,802.77534791,163.19250000,,,,,Yes,100,C:\Program Files\phoenix x-ray\datosx 2 acq\CalibrationImages\pixmask_B1x1_x2024_y2024.tif,1,N/A,180:190:200:,__Unknown__:__Unknown__:__Unknown__:,S:\CT_DATA\FICS\FA no band filter with aluminum\1st scan_bright_200kV_200uA_333ms_1Det.tif,3,200:200:200:,S:\CT_DATA\Stanley\FA no band filter with aluminum\1st scan_Dark_333.tif,10,S:\CT_DATA\FICS\FA no band filter with aluminum,N/A,4,1x1,333.096,1,82.28992991999999,82.28992991999999,0.000000,0.000000,149.993687,-149.993687,198.304750,196.693875,394.998625,163.192500,110.79475000000002,273.987250,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,xs|240 d,estanley@ufl.edu
+Amazon echo 40 micronFAKE3.pca,file:////home/runner/work/Rosetta/Rosetta/data/Amazon echo 40 micronFAKE3.pca,S:\CT_DATA\Stanley\FA no band filter with aluminum,N/A,2025-09-02T17:49:51.675686,2025-09-02T17:50:01.541543,40.65708,DXR-250,1800,200,200,40.0,0.1Cu,2024,2024,1800,7bac1237a016937c907d513873839a9b374d7db0a047dc4f70d9dac1ff48534c,data/parsed/Amazon echo 40 micronFAKE3.pca.json,,4.91919266,,,,802.77534791,163.19250000,,,,,Yes,100,C:\Program Files\phoenix x-ray\datosx 2 acq\CalibrationImages\pixmask_B1x1_x2024_y2024.tif,1,N/A,180:190:200:,__Unknown__:__Unknown__:__Unknown__:,S:\CT_DATA\Stanley\FA no band filter with aluminum\1st scan_bright_200kV_200uA_333ms_1Det.tif,3,200:200:200:,S:\CT_DATA\Stanley\FA no band filter with aluminum\1st scan_Dark_333.tif,10,S:\CT_DATA\Stanley\FA no band filter with aluminum,N/A,4,1x1,333.096,1,82.28992991999999,82.28992991999999,0.000000,0.000000,149.993687,-149.993687,198.304750,196.693875,394.998625,163.192500,110.79475000000002,273.987250,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,xs|240 d,estanley@ufl.edu
+Amazon echo 40 micron.pca,file:////home/runner/work/Rosetta/Rosetta/data/Amazon echo 40 micron.pca,S:\CT_DATA\FICS\FA no band filter with aluminum,N/A,2026-02-09T22:55:34.753572,2026-02-09T22:55:37.501670,40.65708,DXR-250,1800,200,200,40.0,0.1Cu,2024,2024,1800,11da8f09861f8baa1294ae124dafb6eb9a753be45da066f6730f9de97ae57842,data/parsed/Amazon echo 40 micron.pca.json,,4.91919266,,,,802.77534791,163.19250000,,,,,Yes,100,C:\Program Files\phoenix x-ray\datosx 2 acq\CalibrationImages\pixmask_B1x1_x2024_y2024.tif,1,N/A,180:190:200:,__Unknown__:__Unknown__:__Unknown__:,S:\CT_DATA\FICS\FA no band filter with aluminum\1st scan_bright_200kV_200uA_333ms_1Det.tif,3,200:200:200:,S:\CT_DATA\FICS\FA no band filter with aluminum\1st scan_Dark_333.tif,10,S:\CT_DATA\FICS\FA no band filter with aluminum,N/A,4,1x1,333.096,1,82.28992991999999,82.28992991999999,0.000000,0.000000,149.993687,-149.993687,198.304750,196.693875,394.998625,163.192500,110.79475000000002,273.987250,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,xs|240 d,email9@ufl.edu
+,,,,,,,,,,,,,,,,,data/parsed/Technique-USNM35717_Stanley.rtf.json,"|6/13/2024 12:01:17 PM|
+||
+Xray Source:||
+Name:|Comet FXE [1796906]|
+Voltage:|130 kV|
+Current:|225 µA|
+Focal spot size:|29.25 microns|
+||
+Detector:||
+Name:|Perkin Elmer [XRD 1620/1621 AM/AN][n/a]|
+Pixel pitch:|[200 x 200] microns|
+Gain:|0.5 pF|
+Binning:|none|
+Framerate:|4 fps|
+||
+Flip:|None|
+Rotation:|90 degree|
+Crop:|10 Left, 10 Top, 10 Right, 10 Bottom (pixels)|
+ROI:|2048x2048+0+0|
+||
+Defect map:|3824 defective pixels (0.1%) (saved)|
+Offset map:|0.0646, dev 0.00528, 360 fravg, 4 fps (acquired 6/11/2024 9:31:40 AM)|
+Gain map 0:|0.576, dev 0.0497, 240 fravg, 4 fps (acquired 6/13/2024 9:44:48 AM)|
+Gain map 1:|0.293, dev 0.0254, 240 fravg, 4 fps (acquired 6/13/2024 9:45:53 AM)|
+Gain map 2:|0.15, dev 0.0131, 240 fravg, 4 fps (acquired 6/13/2024 9:46:57 AM)|
+Gain map 3:|0.0756, dev 0.00659, 240 fravg, 4 fps (acquired 6/13/2024 9:48:01 AM)|
+Gain map 4:|0.0473, dev 0.00414, 240 fravg, 4 fps (acquired 6/13/2024 9:49:05 AM)|
+||
+Distances:||
+Units:|Same unit as at acquisition|
+Source to detector:|799.999 [mm] (FDD)|
+Source to object:|132 [mm] (FOD)|
+Calculated Ug:|0.148 [mm](0.74 pixels)|
+Zoom factor:|x6.06|
+Effective pixel pitch:|0.033 [mm]|
+||
+Geometric Unsharpness Custom Formula:||
+Name:|IQI Hole [mm]|
+Expression:|0|
+Value:|0|
+||
+Name:|X Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Y Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Min Mag|
+Expression:|Math.Sqrt(Math.Pow($HPixelsIQI ,2) + Math.Pow($VPixelsIQI,2)) * $Srb /$IQI_Hole_Diameter|
+Value:|NaN|
+||
+Name:|Im Unsharpness [mm]|
+Expression:|Math.Pow(Math.Pow($Ug,3) + Math.Pow(2.0*$Srb,3 ),(double)1/3) / $v|
+Value:|0.02442|
+||
+||
+Motion Positions:||
+Table rotate:|0.000[deg], 50.000[deg]/s|
+Table left/right:|0.2[mm], 6.07[mm]/s|
+Table up/down:|-262[mm], 11.85[mm]/s|
+Detector up/down:|-0.00055[mm], 20.01[mm]/s|
+Table mag:|132[mm], 8.07[mm]/s|
+Detector mag:|799.999[mm], 27.09[mm]/s|
+Detector left/right:|0[mm], 10.01[mm]/s|
+||
+Setup:||
+Fixturing:|n/a|
+Filter:|aluminum foil|
+||
+CT Scan:||
+Project name:|USNM35717_|
+Project folder:|D:\Stanley\USNM35685|
+# Frames averaged:|4|
+# Skip frames:|none|
+Monitor xray down:|8% max image variation|
+Type:|continuous|
+# Projections:|3000|
+Start:|6/13/2024 11:11:12 AM|
+End:|6/13/2024 12:01:16 PM|
+Duration:|50m04s|
+||",,"|TX-DR|
+Machine Serial:|TX-DR|
+Operator ID:|efX-user|
+Date/Time:|6/13/2024 12:01:17 PM|
+||
+Xray Source:||
+Name:|Comet FXE [1796906]|
+Voltage:|130 kV|
+Current:|225 µA|
+Focal spot size:|29.25 microns|
+||
+Detector:||
+Name:|Perkin Elmer [XRD 1620/1621 AM/AN][n/a]|
+Pixel pitch:|[200 x 200] microns|
+Gain:|0.5 pF|
+Binning:|none|
+Framerate:|4 fps|
+||
+Flip:|None|
+Rotation:|90 degree|
+Crop:|10 Left, 10 Top, 10 Right, 10 Bottom (pixels)|
+ROI:|2048x2048+0+0|
+||
+Defect map:|3824 defective pixels (0.1%) (saved)|
+Offset map:|0.0646, dev 0.00528, 360 fravg, 4 fps (acquired 6/11/2024 9:31:40 AM)|
+Gain map 0:|0.576, dev 0.0497, 240 fravg, 4 fps (acquired 6/13/2024 9:44:48 AM)|
+Gain map 1:|0.293, dev 0.0254, 240 fravg, 4 fps (acquired 6/13/2024 9:45:53 AM)|
+Gain map 2:|0.15, dev 0.0131, 240 fravg, 4 fps (acquired 6/13/2024 9:46:57 AM)|
+Gain map 3:|0.0756, dev 0.00659, 240 fravg, 4 fps (acquired 6/13/2024 9:48:01 AM)|
+Gain map 4:|0.0473, dev 0.00414, 240 fravg, 4 fps (acquired 6/13/2024 9:49:05 AM)|
+||
+Distances:||
+Units:|Same unit as at acquisition|
+Source to detector:|799.999 [mm] (FDD)|
+Source to object:|132 [mm] (FOD)|
+Calculated Ug:|0.148 [mm](0.74 pixels)|
+Zoom factor:|x6.06|
+Effective pixel pitch:|0.033 [mm]|
+||
+Geometric Unsharpness Custom Formula:||
+Name:|IQI Hole [mm]|
+Expression:|0|
+Value:|0|
+||
+Name:|X Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Y Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Min Mag|
+Expression:|Math.Sqrt(Math.Pow($HPixelsIQI ,2) + Math.Pow($VPixelsIQI,2)) * $Srb /$IQI_Hole_Diameter|
+Value:|NaN|
+||
+Name:|Im Unsharpness [mm]|
+Expression:|Math.Pow(Math.Pow($Ug,3) + Math.Pow(2.0*$Srb,3 ),(double)1/3) / $v|
+Value:|0.02442|
+||
+||
+Motion Positions:||
+Table rotate:|0.000[deg], 50.000[deg]/s|
+Table left/right:|0.2[mm], 6.07[mm]/s|
+Table up/down:|-262[mm], 11.85[mm]/s|
+Detector up/down:|-0.00055[mm], 20.01[mm]/s|
+Table mag:|132[mm], 8.07[mm]/s|
+Detector mag:|799.999[mm], 27.09[mm]/s|
+Detector left/right:|0[mm], 10.01[mm]/s|
+||
+Setup:||
+Fixturing:|n/a|
+Filter:|aluminum foil|
+||
+CT Scan:||
+Project name:|USNM35717_|
+Project folder:|D:\Stanley\USNM35685|
+# Frames averaged:|4|
+# Skip frames:|none|
+Monitor xray down:|8% max image variation|
+Type:|continuous|
+# Projections:|3000|
+Start:|6/13/2024 11:11:12 AM|
+End:|6/13/2024 12:01:16 PM|
+Duration:|50m04s|
+||","|TX-DR|
+Operator ID:|efX-user|
+Date/Time:|6/13/2024 12:01:17 PM|
+||
+Xray Source:||
+Name:|Comet FXE [1796906]|
+Voltage:|130 kV|
+Current:|225 µA|
+Focal spot size:|29.25 microns|
+||
+Detector:||
+Name:|Perkin Elmer [XRD 1620/1621 AM/AN][n/a]|
+Pixel pitch:|[200 x 200] microns|
+Gain:|0.5 pF|
+Binning:|none|
+Framerate:|4 fps|
+||
+Flip:|None|
+Rotation:|90 degree|
+Crop:|10 Left, 10 Top, 10 Right, 10 Bottom (pixels)|
+ROI:|2048x2048+0+0|
+||
+Defect map:|3824 defective pixels (0.1%) (saved)|
+Offset map:|0.0646, dev 0.00528, 360 fravg, 4 fps (acquired 6/11/2024 9:31:40 AM)|
+Gain map 0:|0.576, dev 0.0497, 240 fravg, 4 fps (acquired 6/13/2024 9:44:48 AM)|
+Gain map 1:|0.293, dev 0.0254, 240 fravg, 4 fps (acquired 6/13/2024 9:45:53 AM)|
+Gain map 2:|0.15, dev 0.0131, 240 fravg, 4 fps (acquired 6/13/2024 9:46:57 AM)|
+Gain map 3:|0.0756, dev 0.00659, 240 fravg, 4 fps (acquired 6/13/2024 9:48:01 AM)|
+Gain map 4:|0.0473, dev 0.00414, 240 fravg, 4 fps (acquired 6/13/2024 9:49:05 AM)|
+||
+Distances:||
+Units:|Same unit as at acquisition|
+Source to detector:|799.999 [mm] (FDD)|
+Source to object:|132 [mm] (FOD)|
+Calculated Ug:|0.148 [mm](0.74 pixels)|
+Zoom factor:|x6.06|
+Effective pixel pitch:|0.033 [mm]|
+||
+Geometric Unsharpness Custom Formula:||
+Name:|IQI Hole [mm]|
+Expression:|0|
+Value:|0|
+||
+Name:|X Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Y Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Min Mag|
+Expression:|Math.Sqrt(Math.Pow($HPixelsIQI ,2) + Math.Pow($VPixelsIQI,2)) * $Srb /$IQI_Hole_Diameter|
+Value:|NaN|
+||
+Name:|Im Unsharpness [mm]|
+Expression:|Math.Pow(Math.Pow($Ug,3) + Math.Pow(2.0*$Srb,3 ),(double)1/3) / $v|
+Value:|0.02442|
+||
+||
+Motion Positions:||
+Table rotate:|0.000[deg], 50.000[deg]/s|
+Table left/right:|0.2[mm], 6.07[mm]/s|
+Table up/down:|-262[mm], 11.85[mm]/s|
+Detector up/down:|-0.00055[mm], 20.01[mm]/s|
+Table mag:|132[mm], 8.07[mm]/s|
+Detector mag:|799.999[mm], 27.09[mm]/s|
+Detector left/right:|0[mm], 10.01[mm]/s|
+||
+Setup:||
+Fixturing:|n/a|
+Filter:|aluminum foil|
+||
+CT Scan:||
+Project name:|USNM35717_|
+Project folder:|D:\Stanley\USNM35685|
+# Frames averaged:|4|
+# Skip frames:|none|
+Monitor xray down:|8% max image variation|
+Type:|continuous|
+# Projections:|3000|
+Start:|6/13/2024 11:11:12 AM|
+End:|6/13/2024 12:01:16 PM|
+Duration:|50m04s|
+||","|efX-user|
+Date/Time:|6/13/2024 12:01:17 PM|
+||
+Xray Source:||
+Name:|Comet FXE [1796906]|
+Voltage:|130 kV|
+Current:|225 µA|
+Focal spot size:|29.25 microns|
+||
+Detector:||
+Name:|Perkin Elmer [XRD 1620/1621 AM/AN][n/a]|
+Pixel pitch:|[200 x 200] microns|
+Gain:|0.5 pF|
+Binning:|none|
+Framerate:|4 fps|
+||
+Flip:|None|
+Rotation:|90 degree|
+Crop:|10 Left, 10 Top, 10 Right, 10 Bottom (pixels)|
+ROI:|2048x2048+0+0|
+||
+Defect map:|3824 defective pixels (0.1%) (saved)|
+Offset map:|0.0646, dev 0.00528, 360 fravg, 4 fps (acquired 6/11/2024 9:31:40 AM)|
+Gain map 0:|0.576, dev 0.0497, 240 fravg, 4 fps (acquired 6/13/2024 9:44:48 AM)|
+Gain map 1:|0.293, dev 0.0254, 240 fravg, 4 fps (acquired 6/13/2024 9:45:53 AM)|
+Gain map 2:|0.15, dev 0.0131, 240 fravg, 4 fps (acquired 6/13/2024 9:46:57 AM)|
+Gain map 3:|0.0756, dev 0.00659, 240 fravg, 4 fps (acquired 6/13/2024 9:48:01 AM)|
+Gain map 4:|0.0473, dev 0.00414, 240 fravg, 4 fps (acquired 6/13/2024 9:49:05 AM)|
+||
+Distances:||
+Units:|Same unit as at acquisition|
+Source to detector:|799.999 [mm] (FDD)|
+Source to object:|132 [mm] (FOD)|
+Calculated Ug:|0.148 [mm](0.74 pixels)|
+Zoom factor:|x6.06|
+Effective pixel pitch:|0.033 [mm]|
+||
+Geometric Unsharpness Custom Formula:||
+Name:|IQI Hole [mm]|
+Expression:|0|
+Value:|0|
+||
+Name:|X Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Y Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Min Mag|
+Expression:|Math.Sqrt(Math.Pow($HPixelsIQI ,2) + Math.Pow($VPixelsIQI,2)) * $Srb /$IQI_Hole_Diameter|
+Value:|NaN|
+||
+Name:|Im Unsharpness [mm]|
+Expression:|Math.Pow(Math.Pow($Ug,3) + Math.Pow(2.0*$Srb,3 ),(double)1/3) / $v|
+Value:|0.02442|
+||
+||
+Motion Positions:||
+Table rotate:|0.000[deg], 50.000[deg]/s|
+Table left/right:|0.2[mm], 6.07[mm]/s|
+Table up/down:|-262[mm], 11.85[mm]/s|
+Detector up/down:|-0.00055[mm], 20.01[mm]/s|
+Table mag:|132[mm], 8.07[mm]/s|
+Detector mag:|799.999[mm], 27.09[mm]/s|
+Detector left/right:|0[mm], 10.01[mm]/s|
+||
+Setup:||
+Fixturing:|n/a|
+Filter:|aluminum foil|
+||
+CT Scan:||
+Project name:|USNM35717_|
+Project folder:|D:\Stanley\USNM35685|
+# Frames averaged:|4|
+# Skip frames:|none|
+Monitor xray down:|8% max image variation|
+Type:|continuous|
+# Projections:|3000|
+Start:|6/13/2024 11:11:12 AM|
+End:|6/13/2024 12:01:16 PM|
+Duration:|50m04s|
+||",,,"|225 µA|
+Focal spot size:|29.25 microns|
+||
+Detector:||
+Name:|Perkin Elmer [XRD 1620/1621 AM/AN][n/a]|
+Pixel pitch:|[200 x 200] microns|
+Gain:|0.5 pF|
+Binning:|none|
+Framerate:|4 fps|
+||
+Flip:|None|
+Rotation:|90 degree|
+Crop:|10 Left, 10 Top, 10 Right, 10 Bottom (pixels)|
+ROI:|2048x2048+0+0|
+||
+Defect map:|3824 defective pixels (0.1%) (saved)|
+Offset map:|0.0646, dev 0.00528, 360 fravg, 4 fps (acquired 6/11/2024 9:31:40 AM)|
+Gain map 0:|0.576, dev 0.0497, 240 fravg, 4 fps (acquired 6/13/2024 9:44:48 AM)|
+Gain map 1:|0.293, dev 0.0254, 240 fravg, 4 fps (acquired 6/13/2024 9:45:53 AM)|
+Gain map 2:|0.15, dev 0.0131, 240 fravg, 4 fps (acquired 6/13/2024 9:46:57 AM)|
+Gain map 3:|0.0756, dev 0.00659, 240 fravg, 4 fps (acquired 6/13/2024 9:48:01 AM)|
+Gain map 4:|0.0473, dev 0.00414, 240 fravg, 4 fps (acquired 6/13/2024 9:49:05 AM)|
+||
+Distances:||
+Units:|Same unit as at acquisition|
+Source to detector:|799.999 [mm] (FDD)|
+Source to object:|132 [mm] (FOD)|
+Calculated Ug:|0.148 [mm](0.74 pixels)|
+Zoom factor:|x6.06|
+Effective pixel pitch:|0.033 [mm]|
+||
+Geometric Unsharpness Custom Formula:||
+Name:|IQI Hole [mm]|
+Expression:|0|
+Value:|0|
+||
+Name:|X Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Y Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Min Mag|
+Expression:|Math.Sqrt(Math.Pow($HPixelsIQI ,2) + Math.Pow($VPixelsIQI,2)) * $Srb /$IQI_Hole_Diameter|
+Value:|NaN|
+||
+Name:|Im Unsharpness [mm]|
+Expression:|Math.Pow(Math.Pow($Ug,3) + Math.Pow(2.0*$Srb,3 ),(double)1/3) / $v|
+Value:|0.02442|
+||
+||
+Motion Positions:||
+Table rotate:|0.000[deg], 50.000[deg]/s|
+Table left/right:|0.2[mm], 6.07[mm]/s|
+Table up/down:|-262[mm], 11.85[mm]/s|
+Detector up/down:|-0.00055[mm], 20.01[mm]/s|
+Table mag:|132[mm], 8.07[mm]/s|
+Detector mag:|799.999[mm], 27.09[mm]/s|
+Detector left/right:|0[mm], 10.01[mm]/s|
+||
+Setup:||
+Fixturing:|n/a|
+Filter:|aluminum foil|
+||
+CT Scan:||
+Project name:|USNM35717_|
+Project folder:|D:\Stanley\USNM35685|
+# Frames averaged:|4|
+# Skip frames:|none|
+Monitor xray down:|8% max image variation|
+Type:|continuous|
+# Projections:|3000|
+Start:|6/13/2024 11:11:12 AM|
+End:|6/13/2024 12:01:16 PM|
+Duration:|50m04s|
+||","|29.25 microns|
+||
+Detector:||
+Name:|Perkin Elmer [XRD 1620/1621 AM/AN][n/a]|
+Pixel pitch:|[200 x 200] microns|
+Gain:|0.5 pF|
+Binning:|none|
+Framerate:|4 fps|
+||
+Flip:|None|
+Rotation:|90 degree|
+Crop:|10 Left, 10 Top, 10 Right, 10 Bottom (pixels)|
+ROI:|2048x2048+0+0|
+||
+Defect map:|3824 defective pixels (0.1%) (saved)|
+Offset map:|0.0646, dev 0.00528, 360 fravg, 4 fps (acquired 6/11/2024 9:31:40 AM)|
+Gain map 0:|0.576, dev 0.0497, 240 fravg, 4 fps (acquired 6/13/2024 9:44:48 AM)|
+Gain map 1:|0.293, dev 0.0254, 240 fravg, 4 fps (acquired 6/13/2024 9:45:53 AM)|
+Gain map 2:|0.15, dev 0.0131, 240 fravg, 4 fps (acquired 6/13/2024 9:46:57 AM)|
+Gain map 3:|0.0756, dev 0.00659, 240 fravg, 4 fps (acquired 6/13/2024 9:48:01 AM)|
+Gain map 4:|0.0473, dev 0.00414, 240 fravg, 4 fps (acquired 6/13/2024 9:49:05 AM)|
+||
+Distances:||
+Units:|Same unit as at acquisition|
+Source to detector:|799.999 [mm] (FDD)|
+Source to object:|132 [mm] (FOD)|
+Calculated Ug:|0.148 [mm](0.74 pixels)|
+Zoom factor:|x6.06|
+Effective pixel pitch:|0.033 [mm]|
+||
+Geometric Unsharpness Custom Formula:||
+Name:|IQI Hole [mm]|
+Expression:|0|
+Value:|0|
+||
+Name:|X Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Y Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Min Mag|
+Expression:|Math.Sqrt(Math.Pow($HPixelsIQI ,2) + Math.Pow($VPixelsIQI,2)) * $Srb /$IQI_Hole_Diameter|
+Value:|NaN|
+||
+Name:|Im Unsharpness [mm]|
+Expression:|Math.Pow(Math.Pow($Ug,3) + Math.Pow(2.0*$Srb,3 ),(double)1/3) / $v|
+Value:|0.02442|
+||
+||
+Motion Positions:||
+Table rotate:|0.000[deg], 50.000[deg]/s|
+Table left/right:|0.2[mm], 6.07[mm]/s|
+Table up/down:|-262[mm], 11.85[mm]/s|
+Detector up/down:|-0.00055[mm], 20.01[mm]/s|
+Table mag:|132[mm], 8.07[mm]/s|
+Detector mag:|799.999[mm], 27.09[mm]/s|
+Detector left/right:|0[mm], 10.01[mm]/s|
+||
+Setup:||
+Fixturing:|n/a|
+Filter:|aluminum foil|
+||
+CT Scan:||
+Project name:|USNM35717_|
+Project folder:|D:\Stanley\USNM35685|
+# Frames averaged:|4|
+# Skip frames:|none|
+Monitor xray down:|8% max image variation|
+Type:|continuous|
+# Projections:|3000|
+Start:|6/13/2024 11:11:12 AM|
+End:|6/13/2024 12:01:16 PM|
+Duration:|50m04s|
+||","|Comet FXE [1796906]|
+Voltage:|130 kV|
+Current:|225 µA|
+Focal spot size:|29.25 microns|
+||
+Detector:||
+Name:|Perkin Elmer [XRD 1620/1621 AM/AN][n/a]|
+Pixel pitch:|[200 x 200] microns|
+Gain:|0.5 pF|
+Binning:|none|
+Framerate:|4 fps|
+||
+Flip:|None|
+Rotation:|90 degree|
+Crop:|10 Left, 10 Top, 10 Right, 10 Bottom (pixels)|
+ROI:|2048x2048+0+0|
+||
+Defect map:|3824 defective pixels (0.1%) (saved)|
+Offset map:|0.0646, dev 0.00528, 360 fravg, 4 fps (acquired 6/11/2024 9:31:40 AM)|
+Gain map 0:|0.576, dev 0.0497, 240 fravg, 4 fps (acquired 6/13/2024 9:44:48 AM)|
+Gain map 1:|0.293, dev 0.0254, 240 fravg, 4 fps (acquired 6/13/2024 9:45:53 AM)|
+Gain map 2:|0.15, dev 0.0131, 240 fravg, 4 fps (acquired 6/13/2024 9:46:57 AM)|
+Gain map 3:|0.0756, dev 0.00659, 240 fravg, 4 fps (acquired 6/13/2024 9:48:01 AM)|
+Gain map 4:|0.0473, dev 0.00414, 240 fravg, 4 fps (acquired 6/13/2024 9:49:05 AM)|
+||
+Distances:||
+Units:|Same unit as at acquisition|
+Source to detector:|799.999 [mm] (FDD)|
+Source to object:|132 [mm] (FOD)|
+Calculated Ug:|0.148 [mm](0.74 pixels)|
+Zoom factor:|x6.06|
+Effective pixel pitch:|0.033 [mm]|
+||
+Geometric Unsharpness Custom Formula:||
+Name:|IQI Hole [mm]|
+Expression:|0|
+Value:|0|
+||
+Name:|X Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Y Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Min Mag|
+Expression:|Math.Sqrt(Math.Pow($HPixelsIQI ,2) + Math.Pow($VPixelsIQI,2)) * $Srb /$IQI_Hole_Diameter|
+Value:|NaN|
+||
+Name:|Im Unsharpness [mm]|
+Expression:|Math.Pow(Math.Pow($Ug,3) + Math.Pow(2.0*$Srb,3 ),(double)1/3) / $v|
+Value:|0.02442|
+||
+||
+Motion Positions:||
+Table rotate:|0.000[deg], 50.000[deg]/s|
+Table left/right:|0.2[mm], 6.07[mm]/s|
+Table up/down:|-262[mm], 11.85[mm]/s|
+Detector up/down:|-0.00055[mm], 20.01[mm]/s|
+Table mag:|132[mm], 8.07[mm]/s|
+Detector mag:|799.999[mm], 27.09[mm]/s|
+Detector left/right:|0[mm], 10.01[mm]/s|
+||
+Setup:||
+Fixturing:|n/a|
+Filter:|aluminum foil|
+||
+CT Scan:||
+Project name:|USNM35717_|
+Project folder:|D:\Stanley\USNM35685|
+# Frames averaged:|4|
+# Skip frames:|none|
+Monitor xray down:|8% max image variation|
+Type:|continuous|
+# Projections:|3000|
+Start:|6/13/2024 11:11:12 AM|
+End:|6/13/2024 12:01:16 PM|
+Duration:|50m04s|
+||","|130 kV|
+Current:|225 µA|
+Focal spot size:|29.25 microns|
+||
+Detector:||
+Name:|Perkin Elmer [XRD 1620/1621 AM/AN][n/a]|
+Pixel pitch:|[200 x 200] microns|
+Gain:|0.5 pF|
+Binning:|none|
+Framerate:|4 fps|
+||
+Flip:|None|
+Rotation:|90 degree|
+Crop:|10 Left, 10 Top, 10 Right, 10 Bottom (pixels)|
+ROI:|2048x2048+0+0|
+||
+Defect map:|3824 defective pixels (0.1%) (saved)|
+Offset map:|0.0646, dev 0.00528, 360 fravg, 4 fps (acquired 6/11/2024 9:31:40 AM)|
+Gain map 0:|0.576, dev 0.0497, 240 fravg, 4 fps (acquired 6/13/2024 9:44:48 AM)|
+Gain map 1:|0.293, dev 0.0254, 240 fravg, 4 fps (acquired 6/13/2024 9:45:53 AM)|
+Gain map 2:|0.15, dev 0.0131, 240 fravg, 4 fps (acquired 6/13/2024 9:46:57 AM)|
+Gain map 3:|0.0756, dev 0.00659, 240 fravg, 4 fps (acquired 6/13/2024 9:48:01 AM)|
+Gain map 4:|0.0473, dev 0.00414, 240 fravg, 4 fps (acquired 6/13/2024 9:49:05 AM)|
+||
+Distances:||
+Units:|Same unit as at acquisition|
+Source to detector:|799.999 [mm] (FDD)|
+Source to object:|132 [mm] (FOD)|
+Calculated Ug:|0.148 [mm](0.74 pixels)|
+Zoom factor:|x6.06|
+Effective pixel pitch:|0.033 [mm]|
+||
+Geometric Unsharpness Custom Formula:||
+Name:|IQI Hole [mm]|
+Expression:|0|
+Value:|0|
+||
+Name:|X Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Y Srb-Pixels (Hole) [mm]|
+Expression:|3|
+Value:|3|
+||
+Name:|Min Mag|
+Expression:|Math.Sqrt(Math.Pow($HPixelsIQI ,2) + Math.Pow($VPixelsIQI,2)) * $Srb /$IQI_Hole_Diameter|
+Value:|NaN|
+||
+Name:|Im Unsharpness [mm]|
+Expression:|Math.Pow(Math.Pow($Ug,3) + Math.Pow(2.0*$Srb,3 ),(double)1/3) / $v|
+Value:|0.02442|
+||
+||
+Motion Positions:||
+Table rotate:|0.000[deg], 50.000[deg]/s|
+Table left/right:|0.2[mm], 6.07[mm]/s|
+Table up/down:|-262[mm], 11.85[mm]/s|
+Detector up/down:|-0.00055[mm], 20.01[mm]/s|
+Table mag:|132[mm], 8.07[mm]/s|
+Detector mag:|799.999[mm], 27.09[mm]/s|
+Detector left/right:|0[mm], 10.01[mm]/s|
+||
+Setup:||
+Fixturing:|n/a|
+Filter:|aluminum foil|
+||
+CT Scan:||
+Project name:|USNM35717_|
+Project folder:|D:\Stanley\USNM35685|
+# Frames averaged:|4|
+# Skip frames:|none|
+Monitor xray down:|8% max image variation|
+Type:|continuous|
+# Projections:|3000|
+Start:|6/13/2024 11:11:12 AM|
+End:|6/13/2024 12:01:16 PM|
+Duration:|50m04s|
+||",,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,estanley@ufl.edu
+JAG_Aip-lae-FMNH-213864-head_4I2E70EtOH_4wk.xtekct,file:////home/runner/work/Rosetta/Rosetta/data/JAG_Aip-lae-FMNH-213864-head_4I2E70EtOH_4wk.xtekct,/home/runner/work/Rosetta/Rosetta/data/JAG_Aip-lae-FMNH-213864-head_4I2E70EtOH_4wk.xtekct,N/A,2025-09-02T18:30:44.631712,2025-09-02T18:30:46.135912,49.751000,N/A,2500,216.000,229.000,49.464,1.0 mm Copper,1150,1939,N/A,,data/parsed/JAG_Aip-lae-FMNH-213864-head_4I2E70EtOH_4wk.xtekct.json,,4.019996,,,,735.707500,183.012000,,,,,Yes,,,,,,,,,,,,,N/A,N/A,N/A,N/A,N/A,96.467189,57.213650,0.0,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,N/A,
+Technique-USNM35717_Stanley29.rtf,file:////Users/m4macmini/Documents/GitHub/Rosetta/data/Technique-USNM35717_Stanley29.rtf,D:\Stanley\USNM35685,N/A,2024-06-13T11:11:12,2024-06-13T12:01:16,33,N/A,3000,130,225,29.25,aluminum foil,2048,2048,50m04s,584ac822c00cc52a81f202ea517837c1a919aca5c1799f56fc874af71dfffd2b,data/parsed/Technique-USNM35717_Stanley29.rtf.json,,6.060598,,,,799.999,132,,,,,Yes,,,,,,,,,,,,,N/A,0.5 pF,1x1,4 fps,N/A,67.584,67.584,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,N/A,4,3000,none,50m04s,6/13/2024 12:01:16 PM,8% max image variation,D:\Stanley\USNM35685,USNM35717_,6/13/2024 11:11:12 AM,continuous,none,"10 Left, 10 Top, 10 Right, 10 Bottom (pixels)",3824 defective pixels (0.1%) (saved),None,4 fps,0.5 pF,"0.576, dev 0.0497, 240 fravg, 4 fps (acquired 6/13/2024 9:44:48 AM)","0.293, dev 0.0254, 240 fravg, 4 fps (acquired 6/13/2024 9:45:53 AM)","0.15, dev 0.0131, 240 fravg, 4 fps (acquired 6/13/2024 9:46:57 AM)","0.0756, dev 0.00659, 240 fravg, 4 fps (acquired 6/13/2024 9:48:01 AM)","0.0473, dev 0.00414, 240 fravg, 4 fps (acquired 6/13/2024 9:49:05 AM)",Perkin Elmer [XRD 1620/1621 AM/AN][n/a],"0.0646, dev 0.00528, 360 fravg, 4 fps (acquired 6/11/2024 9:31:40 AM)",[200 x 200] microns,2048x2048+0+0,90 degree,0.148 [mm](0.74 pixels),0.033 [mm],799.999 [mm] (FDD),132 [mm] (FOD),Same unit as at acquisition,x6.06,"Math.Pow(Math.Pow($Ug,3) + Math.Pow(2.0*$Srb,3 ),(double)1/3) / $v",Im Unsharpness [mm],0.02442,"0[mm], 10.01[mm]/s","799.999[mm], 27.09[mm]/s","-0.00055[mm], 20.01[mm]/s","0.2[mm], 6.07[mm]/s","132[mm], 8.07[mm]/s","0.000[deg], 50.000[deg]/s","-262[mm], 11.85[mm]/s",aluminum foil,n/a,225 µA,29.25 microns,Comet FXE [1796906],130 kV,6/13/2024 12:01:17 PM,TX-DR,TX-DR,efX-user,Comet FXE [1796906],estanley@ufl.edu
