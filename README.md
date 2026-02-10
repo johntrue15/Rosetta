@@ -9,6 +9,29 @@ https://github.com/user-attachments/assets/71d9d673-6079-481e-a734-627c618beeae
 
 A comprehensive pipeline that transforms heterogeneous scan metadata files into clean, structured JSON and CSV formats with automated processing and user attribution.
 
+## Quick Start – Drag & Drop Upload
+
+The easiest way to add metadata files is through the **[Rosetta Upload Page](https://johntrue15.github.io/Rosetta/)** (GitHub Pages):
+
+1. **Open** the [upload page](https://johntrue15.github.io/Rosetta/).
+2. **Sign in** with a GitHub Personal Access Token that has `repo` scope.  
+   - You must be a **collaborator** on this repository.
+   - Create a token at [github.com/settings/tokens/new](https://github.com/settings/tokens/new).
+3. **Drag & drop** your `.rtf`, `.pca`, `.xtekct`, or other metadata files onto the upload area (or click to browse).
+4. Files are committed directly to the `data/` directory via the GitHub API.
+5. **GitHub Actions** automatically parses, aggregates, and exports your data — no local setup required.
+
+> **Note:** Your token is stored only in the browser tab's session and is never sent to any third-party service.
+
+### Alternative: Manual Drag & Drop via GitHub.com
+
+You can also upload files directly through the GitHub web interface:
+
+1. Navigate to the [`data/`](https://github.com/johntrue15/Rosetta/tree/main/data) directory on GitHub.
+2. Click **Add file → Upload files**.
+3. Drag and drop your metadata files and commit.
+4. The CI/CD pipeline will process them automatically.
+
 ## Overview
 
 This pipeline processes various metadata file formats from X-ray and CT scanning equipment, extracting structured information and maintaining a cumulative database of all processed files.
@@ -60,6 +83,9 @@ scripts/
 .github/workflows/
 ├── parse-and-aggregate.yml # Auto-parsing and aggregation
 └── metadata-to-csv.yml     # CSV generation workflow
+
+docs/
+└── index.html        # GitHub Pages drag-and-drop upload UI
 ```
 
 ## User Mapping Configuration
