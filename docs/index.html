@@ -273,7 +273,7 @@
       try {
         /* Fetch authenticated user */
         const userRes = await fetch("https://api.github.com/user", {
-          headers: { Authorization: "token " + token }
+          headers: { Authorization: "Bearer " + token }
         });
         if (!userRes.ok) throw new Error("Invalid token");
         const user = await userRes.json();
@@ -281,7 +281,7 @@
         /* Check collaborator permission */
         const permRes = await fetch(
           "https://api.github.com/repos/" + OWNER + "/" + REPO + "/collaborators/" + encodeURIComponent(user.login) + "/permission",
-          { headers: { Authorization: "token " + token } }
+          { headers: { Authorization: "Bearer " + token } }
         );
         if (!permRes.ok) throw new Error("Unable to verify permissions");
         const perm = await permRes.json();
@@ -290,15 +290,23 @@
           throw new Error("You need write access to this repository. Current permission: " + perm.permission);
         }
 
-        /* Show the upload UI */
-        userInfo.innerHTML =
-          '<img src="' + user.avatar_url + '" alt="avatar" />' +
-          '<span>' + user.login + '</span>' +
-          '<button class="btn" id="logout-btn" style="padding:0.3rem 0.8rem;font-size:0.8rem;">Sign out</button>';
-        document.getElementById("logout-btn").addEventListener("click", () => {
+        /* Show the upload UI (built with DOM APIs to avoid XSS) */
+        userInfo.textContent = "";
+        const avatar = document.createElement("img");
+        avatar.src = user.avatar_url;
+        avatar.alt = "avatar";
+        const username = document.createElement("span");
+        username.textContent = user.login;
+        const logoutBtn = document.createElement("button");
+        logoutBtn.className = "btn";
+        logoutBtn.id = "logout-btn";
+        logoutBtn.style.cssText = "padding:0.3rem 0.8rem;font-size:0.8rem;";
+        logoutBtn.textContent = "Sign out";
+        userInfo.append(avatar, username, logoutBtn);
+        logoutBtn.addEventListener("click", () => {
           sessionStorage.removeItem("gh_token");
           token = null;
-          userInfo.innerHTML = "";
+          userInfo.textContent = "";
           showAuth();
         });
         showUpload();
@@ -362,7 +370,7 @@
           try {
             const existing = await fetch(
               "https://api.github.com/repos/" + OWNER + "/" + REPO + "/contents/" + encodeURIComponent(path) + "?ref=" + BRANCH,
-              { headers: { Authorization: "token " + token } }
+              { headers: { Authorization: "Bearer " + token } }
             );
             if (existing.ok) {
               const data = await existing.json();
@@ -378,11 +386,11 @@
           if (sha) body.sha = sha;
 
           const putRes = await fetch(
-            "https://api.github.com/repos/" + OWNER + "/" + REPO + "/contents/" + path,
+            "https://api.github.com/repos/" + OWNER + "/" + REPO + "/contents/" + encodeURIComponent(path),
             {
               method: "PUT",
               headers: {
-                Authorization: "token " + token,
+                Authorization: "Bearer " + token,
                 "Content-Type": "application/json"
               },
               body: JSON.stringify(body)
