@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rosetta – Drag &amp; Drop Upload</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --success: #3fb950;
+      --danger: #f85149;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      width: 100%;
+      padding: 1.5rem 2rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    header h1 { font-size: 1.4rem; font-weight: 600; }
+    header h1 span { color: var(--accent); }
+
+    #user-info {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    #user-info img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+    }
+
+    main {
+      width: 100%;
+      max-width: 720px;
+      padding: 2rem 1rem;
+      flex: 1;
+    }
+
+    /* Auth section */
+    #auth-section {
+      text-align: center;
+      margin-top: 4rem;
+    }
+
+    #auth-section p {
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 0.65rem 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 0.95rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.15s;
+    }
+
+    .btn:hover { border-color: var(--accent); }
+    .btn-primary { background: #238636; border-color: #238636; }
+    .btn-primary:hover { background: #2ea043; border-color: #2ea043; }
+
+    /* Drop zone */
+    #drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      text-align: center;
+      transition: border-color 0.2s, background 0.2s;
+      cursor: pointer;
+      position: relative;
+    }
+
+    #drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(88, 166, 255, 0.06);
+    }
+
+    #drop-zone svg {
+      width: 48px;
+      height: 48px;
+      fill: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    #drop-zone p { color: var(--muted); margin-top: 0.5rem; }
+    #drop-zone .formats { font-size: 0.8rem; margin-top: 0.75rem; color: var(--muted); }
+    #file-input { display: none; }
+
+    /* Status log */
+    #status-log {
+      margin-top: 1.5rem;
+      max-height: 360px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .log-entry {
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+
+    .log-entry.info { background: rgba(88, 166, 255, 0.08); color: var(--accent); }
+    .log-entry.success { background: rgba(63, 185, 80, 0.08); color: var(--success); }
+    .log-entry.error { background: rgba(248, 81, 73, 0.08); color: var(--danger); }
+
+    /* Instructions */
+    .instructions {
+      margin-top: 2rem;
+      padding: 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .instructions h3 {
+      font-size: 0.95rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .instructions ol {
+      padding-left: 1.25rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.8;
+    }
+
+    footer {
+      padding: 1.5rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🪨 <span>Rosetta</span> Upload</h1>
+    <div id="user-info"></div>
+  </header>
+
+  <main>
+    <!-- Auth prompt (shown when not logged in) -->
+    <div id="auth-section">
+      <p>
+        Sign in with your GitHub account to upload metadata files.<br />
+        You must be a <strong>collaborator</strong> on the
+        <a href="https://github.com/johntrue15/Rosetta" style="color:var(--accent)">Rosetta</a> repository.
+      </p>
+      <button class="btn btn-primary" id="login-btn">Sign in with GitHub</button>
+    </div>
+
+    <!-- Upload area (shown when authenticated) -->
+    <div id="upload-section" style="display:none;">
+      <div id="drop-zone">
+        <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
+        <p><strong>Drag &amp; drop files here</strong> or click to browse</p>
+        <p class="formats">Supported: .rtf, .pca, .xtekct, and other metadata files</p>
+        <input type="file" id="file-input" multiple />
+      </div>
+
+      <div id="status-log"></div>
+
+      <div class="instructions">
+        <h3>How it works</h3>
+        <ol>
+          <li>Drop your metadata files above (or click to browse).</li>
+          <li>Each file is committed to the <code>data/</code> directory in the repository.</li>
+          <li>GitHub Actions automatically parses, aggregates, and exports your data.</li>
+          <li>Results appear in <code>data/parsed/</code>, <code>data/metadata.json</code>, and <code>data/metadata.csv</code>.</li>
+        </ol>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    Powered by <a href="https://github.com/johntrue15/Rosetta">Rosetta</a> &middot;
+    Files are committed via the GitHub API
+  </footer>
+
+  <script>
+    /* ------------------------------------------------------------------ */
+    /*  Configuration                                                      */
+    /* ------------------------------------------------------------------ */
+    const OWNER = "johntrue15";
+    const REPO  = "Rosetta";
+    const BRANCH = "main";
+    const UPLOAD_PATH = "data/";
+
+    /* ------------------------------------------------------------------ */
+    /*  DOM references                                                     */
+    /* ------------------------------------------------------------------ */
+    const authSection   = document.getElementById("auth-section");
+    const uploadSection = document.getElementById("upload-section");
+    const loginBtn      = document.getElementById("login-btn");
+    const userInfo      = document.getElementById("user-info");
+    const dropZone      = document.getElementById("drop-zone");
+    const fileInput     = document.getElementById("file-input");
+    const statusLog     = document.getElementById("status-log");
+
+    /* ------------------------------------------------------------------ */
+    /*  Token management (Personal Access Token – stored in sessionStorage)*/
+    /* ------------------------------------------------------------------ */
+    let token = sessionStorage.getItem("gh_token");
+
+    function showAuth() {
+      authSection.style.display = "";
+      uploadSection.style.display = "none";
+    }
+
+    function showUpload() {
+      authSection.style.display = "none";
+      uploadSection.style.display = "";
+    }
+
+    loginBtn.addEventListener("click", () => {
+      const pat = prompt(
+        "Paste a GitHub Personal Access Token (classic) with 'repo' scope.\n\n" +
+        "Create one at: https://github.com/settings/tokens/new\n" +
+        "The token is stored only in this browser tab's session."
+      );
+      if (pat && pat.trim()) {
+        token = pat.trim();
+        sessionStorage.setItem("gh_token", token);
+        initUser();
+      }
+    });
+
+    /* ------------------------------------------------------------------ */
+    /*  Verify token & check collaborator status                           */
+    /* ------------------------------------------------------------------ */
+    async function initUser() {
+      if (!token) { showAuth(); return; }
+
+      try {
+        /* Fetch authenticated user */
+        const userRes = await fetch("https://api.github.com/user", {
+          headers: { Authorization: "Bearer " + token }
+        });
+        if (!userRes.ok) throw new Error("Invalid token");
+        const user = await userRes.json();
+
+        /* Check collaborator permission */
+        const permRes = await fetch(
+          "https://api.github.com/repos/" + OWNER + "/" + REPO + "/collaborators/" + encodeURIComponent(user.login) + "/permission",
+          { headers: { Authorization: "Bearer " + token } }
+        );
+        if (!permRes.ok) throw new Error("Unable to verify permissions");
+        const perm = await permRes.json();
+        const allowed = ["admin", "write"];
+        if (!allowed.includes(perm.permission)) {
+          throw new Error("You need write access to this repository. Current permission: " + perm.permission);
+        }
+
+        /* Show the upload UI (built with DOM APIs to avoid XSS) */
+        userInfo.textContent = "";
+        const avatar = document.createElement("img");
+        avatar.src = user.avatar_url;
+        avatar.alt = "avatar";
+        const username = document.createElement("span");
+        username.textContent = user.login;
+        const logoutBtn = document.createElement("button");
+        logoutBtn.className = "btn";
+        logoutBtn.id = "logout-btn";
+        logoutBtn.style.cssText = "padding:0.3rem 0.8rem;font-size:0.8rem;";
+        logoutBtn.textContent = "Sign out";
+        userInfo.append(avatar, username, logoutBtn);
+        logoutBtn.addEventListener("click", () => {
+          sessionStorage.removeItem("gh_token");
+          token = null;
+          userInfo.textContent = "";
+          showAuth();
+        });
+        showUpload();
+      } catch (err) {
+        sessionStorage.removeItem("gh_token");
+        token = null;
+        showAuth();
+        alert(err.message);
+      }
+    }
+
+    initUser();
+
+    /* ------------------------------------------------------------------ */
+    /*  Drag-and-drop & file selection                                     */
+    /* ------------------------------------------------------------------ */
+    dropZone.addEventListener("click", () => fileInput.click());
+
+    dropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropZone.classList.add("drag-over");
+    });
+
+    dropZone.addEventListener("dragleave", () => {
+      dropZone.classList.remove("drag-over");
+    });
+
+    dropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropZone.classList.remove("drag-over");
+      handleFiles(e.dataTransfer.files);
+    });
+
+    fileInput.addEventListener("change", () => {
+      handleFiles(fileInput.files);
+      fileInput.value = "";
+    });
+
+    /* ------------------------------------------------------------------ */
+    /*  Upload files via the GitHub Contents API                           */
+    /* ------------------------------------------------------------------ */
+    function log(message, type) {
+      const el = document.createElement("div");
+      el.className = "log-entry " + type;
+      el.textContent = message;
+      statusLog.prepend(el);
+    }
+
+    async function handleFiles(fileList) {
+      if (!token) { alert("Please sign in first."); return; }
+
+      for (const file of fileList) {
+        log("Uploading " + file.name + " …", "info");
+
+        try {
+          const content = await readFileAsBase64(file);
+          const path = UPLOAD_PATH + file.name;
+
+          /* Check if file already exists (to get its SHA for update) */
+          let sha;
+          try {
+            const existing = await fetch(
+              "https://api.github.com/repos/" + OWNER + "/" + REPO + "/contents/" + encodeURIComponent(path) + "?ref=" + BRANCH,
+              { headers: { Authorization: "Bearer " + token } }
+            );
+            if (existing.ok) {
+              const data = await existing.json();
+              sha = data.sha;
+            }
+          } catch (_) { /* file does not exist yet – OK */ }
+
+          const body = {
+            message: "Upload " + file.name + " via Rosetta drag-and-drop",
+            content: content,
+            branch: BRANCH
+          };
+          if (sha) body.sha = sha;
+
+          const putRes = await fetch(
+            "https://api.github.com/repos/" + OWNER + "/" + REPO + "/contents/" + encodeURIComponent(path),
+            {
+              method: "PUT",
+              headers: {
+                Authorization: "Bearer " + token,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify(body)
+            }
+          );
+
+          if (!putRes.ok) {
+            const err = await putRes.json();
+            throw new Error(err.message || putRes.statusText);
+          }
+
+          log("✓ " + file.name + " uploaded successfully.", "success");
+        } catch (err) {
+          log("✗ " + file.name + " – " + err.message, "error");
+        }
+      }
+    }
+
+    function readFileAsBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = reader.result.split(",")[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+  </script>
+</body>
+</html>
