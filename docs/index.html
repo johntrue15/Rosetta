@@ -567,8 +567,7 @@
               body:  "**@" + currentUser.login + "** is requesting write access to upload files via the Rosetta web interface.\n\n" +
                      "- GitHub profile: https://github.com/" + currentUser.login + "\n" +
                      "- Requested at: " + new Date().toUTCString() + "\n\n" +
-                     "_To approve: add this user as a repository collaborator, then close this issue._",
-              labels: ["access-request"]
+                     "_To approve: add this user as a repository collaborator, then close this issue._"
             })
           }
         );
