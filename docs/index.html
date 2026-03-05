@@ -439,36 +439,58 @@
     /* ================================================================== */
     async function verifyAndRoute(t) {
       try {
+        /* Step 1: verify the token is valid */
         const userRes = await fetch("https://api.github.com/user", {
           headers: { Authorization: "Bearer " + t }
         });
-        if (!userRes.ok) throw new Error("token_invalid");
-        const user = await userRes.json();
-        currentUser = user;
-
-        const permRes = await fetch(
-          "https://api.github.com/repos/" + OWNER + "/" + REPO +
-          "/collaborators/" + encodeURIComponent(user.login) + "/permission",
-          { headers: { Authorization: "Bearer " + t } }
-        );
-
-        if (permRes.status === 404 || permRes.status === 403) {
-          showRequest(user);
+        if (!userRes.ok) {
+          console.error("Token invalid, status:", userRes.status);
+          localStorage.removeItem("gh_token");
+          token = null;
+          showAuth();
           return;
         }
-        if (!permRes.ok) throw new Error("perm_check_failed");
+        const user = await userRes.json();
+        currentUser = user;
+        console.log("Authenticated as:", user.login);
 
-        const perm = await permRes.json();
-        if (["admin", "write"].includes(perm.permission)) {
+        /* Step 2: check collaborator permission */
+        try {
+          const permRes = await fetch(
+            "https://api.github.com/repos/" + OWNER + "/" + REPO +
+            "/collaborators/" + encodeURIComponent(user.login) + "/permission",
+            { headers: { Authorization: "Bearer " + t } }
+          );
+          console.log("Permission check status:", permRes.status);
+
+          if (permRes.ok) {
+            const perm = await permRes.json();
+            console.log("Permission level:", perm.permission);
+            if (["admin", "write"].includes(perm.permission)) {
+              showUpload(user);
+              return;
+            }
+          }
+
+          if (permRes.status === 404 || permRes.status === 403) {
+            showRequest(user);
+            return;
+          }
+        } catch (permErr) {
+          console.warn("Permission check failed, falling back to upload view:", permErr);
+        }
+
+        /* Fallback: if the user is the repo owner, show upload directly.
+           Otherwise show the request access view. */
+        if (user.login.toLowerCase() === OWNER.toLowerCase()) {
           showUpload(user);
         } else {
           showRequest(user);
         }
       } catch (err) {
-        if (err.message === "token_invalid") {
-          localStorage.removeItem("gh_token");
-          token = null;
-        }
+        console.error("verifyAndRoute error:", err);
+        localStorage.removeItem("gh_token");
+        token = null;
         showAuth();
       }
     }
