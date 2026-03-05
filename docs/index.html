@@ -454,36 +454,26 @@
         currentUser = user;
         console.log("Authenticated as:", user.login);
 
-        /* Step 2: check collaborator permission */
-        try {
-          const permRes = await fetch(
-            "https://api.github.com/repos/" + OWNER + "/" + REPO +
-            "/collaborators/" + encodeURIComponent(user.login) + "/permission",
-            { headers: { Authorization: "Bearer " + t } }
-          );
-          console.log("Permission check status:", permRes.status);
+        /* Step 2: check if user has push (write) access to the repo.
+           Uses GET /repos/{owner}/{repo} which returns a permissions object
+           for the authenticated user. Works with GitHub App OAuth tokens. */
+        const repoRes = await fetch(
+          "https://api.github.com/repos/" + OWNER + "/" + REPO,
+          { headers: { Authorization: "Bearer " + t } }
+        );
+        console.log("Repo access check status:", repoRes.status);
 
-          if (permRes.ok) {
-            const perm = await permRes.json();
-            console.log("Permission level:", perm.permission);
-            if (["admin", "write"].includes(perm.permission)) {
-              showUpload(user);
-              return;
-            }
-            showRequest(user);
+        if (repoRes.ok) {
+          const repo = await repoRes.json();
+          console.log("Repo permissions:", repo.permissions);
+          if (repo.permissions && repo.permissions.push) {
+            showUpload(user);
             return;
           }
-        } catch (permErr) {
-          console.warn("Permission check failed, falling back to upload view:", permErr);
         }
 
-        /* Fallback: if the user is the repo owner, show upload directly.
-           Otherwise show the request access view. */
-        if (user.login.toLowerCase() === OWNER.toLowerCase()) {
-          showUpload(user);
-        } else {
-          showRequest(user);
-        }
+        /* User is authenticated but doesn't have write access */
+        showRequest(user);
       } catch (err) {
         console.error("verifyAndRoute error:", err);
         localStorage.removeItem("gh_token");
