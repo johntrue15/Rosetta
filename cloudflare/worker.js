@@ -94,7 +94,7 @@ export default {
     // The auth page on the same origin writes it to localStorage and closes the popup.
     const token = tokenData.access_token;
     const pagesAuth = (env.ALLOWED_ORIGIN || PAGES_ORIGIN)
-      + "/Rosetta/auth#token=" + encodeURIComponent(token);
+      + "/Rosetta/docs/auth#token=" + encodeURIComponent(token);
 
     return new Response(null, {
       status: 302,
