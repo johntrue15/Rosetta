@@ -8,7 +8,7 @@
  * Environment variables to set in the Cloudflare dashboard:
  *   GITHUB_CLIENT_ID     = Iv23liekYxnX8xk9amRo
  *   GITHUB_CLIENT_SECRET = 449868d349085ae1088646f146864f4b85e0c2f7
- *   GITHUB_REDIRECT_URI  = https://<your-worker>.workers.dev  (this Worker's URL)
+ *   GITHUB_REDIRECT_URI  = https://rosetta.jtrue15.workers.dev  (this Worker's URL)
  *   ALLOWED_ORIGIN       = https://johntrue15.github.io
  *
  * GitHub App callback URL must be set to this Worker's URL.
