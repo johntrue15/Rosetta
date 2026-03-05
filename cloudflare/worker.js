@@ -89,25 +89,20 @@ export default {
       );
     }
 
-    // ── Step 3: Write token to opener (the Rosetta Pages tab) and close ──
+    // ── Step 3: Redirect back to Pages auth page with token in hash fragment ──
+    // Hash fragments are never sent to any server, so the token stays client-side.
+    // The auth page on the same origin writes it to localStorage and closes the popup.
     const token = tokenData.access_token;
-    return htmlPage(
-      "Authorized",
-      `<h2>Authorized!</h2><p>Closing this window…</p>
-       <script>
-         try {
-           if (window.opener && !window.opener.closed) {
-             window.opener.localStorage.setItem('gh_token', ${JSON.stringify(token)});
-             window.opener.dispatchEvent(new Event('gh_token_ready'));
-           }
-         } catch (e) {
-           document.body.innerHTML += '<p>Done — you can close this tab.</p>';
-         }
-         window.close();
-       </script>`,
-      false,
-      clearCookieHeader
-    );
+    const pagesAuth = (env.ALLOWED_ORIGIN || PAGES_ORIGIN)
+      + "/Rosetta/auth#token=" + encodeURIComponent(token);
+
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: pagesAuth,
+        ...clearCookieHeader,
+      },
+    });
   },
 };
 

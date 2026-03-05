@@ -7,13 +7,13 @@
   <style>
     :root {
       --bg: #0d1117;
-      --surface: #161b22;
-      --border: #30363d;
       --text: #e6edf3;
       --muted: #8b949e;
       --accent: #58a6ff;
       --success: #3fb950;
       --danger: #f85149;
+      --surface: #161b22;
+      --border: #30363d;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -22,7 +22,6 @@
       color: var(--text);
       min-height: 100vh;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
     }
@@ -37,7 +36,9 @@
     }
     .logo { font-size: 2.5rem; margin-bottom: 1rem; }
     h2 { font-size: 1.1rem; margin-bottom: 0.5rem; }
-    p  { color: var(--muted); font-size: 0.88rem; line-height: 1.6; margin-top: 0.5rem; }
+    p { color: var(--muted); font-size: 0.88rem; line-height: 1.6; margin-top: 0.5rem; }
+    .success { color: var(--success); }
+    .error { color: var(--danger); }
     .spinner {
       display: inline-block;
       width: 24px; height: 24px;
@@ -48,74 +49,59 @@
       margin: 1.25rem auto 0;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    #status { margin-top: 1rem; font-size: 0.82rem; color: var(--muted); }
-    #error-box {
-      display: none;
-      margin-top: 1rem;
-      padding: 0.75rem;
-      background: rgba(248,81,73,0.08);
-      border: 1px solid rgba(248,81,73,0.3);
-      border-radius: 6px;
-      color: var(--danger);
-      font-size: 0.82rem;
-    }
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="logo">🪨</div>
-    <h2>Completing sign-in…</h2>
-    <p>You are being authenticated with GitHub.<br />This window will close automatically.</p>
+    <h2 id="title">Completing sign-in…</h2>
+    <p id="message">Finishing authorization with GitHub.</p>
     <div class="spinner" id="spinner"></div>
-    <div id="status">Exchanging authorization code…</div>
-    <div id="error-box"></div>
   </div>
 
   <script>
-    /**
-     * This page is the GitHub OAuth callback.
-     * GitHub redirects here with ?code=xxx&state=xxx
-     * We immediately forward the full URL to the Cloudflare Worker,
-     * which does the server-side code→token exchange and writes
-     * the token to window.opener's localStorage.
-     *
-     * If the page was opened as a popup the Worker's response
-     * script closes it. If opened as a redirect (no opener),
-     * we redirect back to the main page with the token in
-     * sessionStorage instead.
-     */
+    const title   = document.getElementById("title");
+    const message = document.getElementById("message");
+    const spinner = document.getElementById("spinner");
 
-    const WORKER_URL = "https://rosetta.jtrue15.workers.dev";
+    (function () {
+      /* The Cloudflare Worker redirects here with #token=<access_token>
+         Hash fragments are never sent to the server — the token stays client-side. */
+      const hash   = window.location.hash.substring(1);
+      const params = new URLSearchParams(hash);
+      const token  = params.get("token");
 
-    (async () => {
-      const status   = document.getElementById("status");
-      const errorBox = document.getElementById("error-box");
-      const spinner  = document.getElementById("spinner");
+      /* Clear the hash from the URL immediately */
+      if (window.history.replaceState) {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
 
-      const params = new URLSearchParams(window.location.search);
-      const code   = params.get("code");
-      const state  = params.get("state");
-
-      if (!code) {
-        showError("No authorization code received. Please close this window and try again.");
+      if (!token) {
+        spinner.style.display = "none";
+        title.textContent   = "Sign-in failed";
+        title.className     = "error";
+        message.textContent = "No token received. Please close this window and try again.";
         return;
       }
 
-      // Redirect to Worker — it handles the exchange and writes to localStorage
-      status.textContent = "Redirecting to token exchange…";
-      const workerUrl = WORKER_URL + "?code=" + encodeURIComponent(code) + "&state=" + encodeURIComponent(state ?? "");
-      window.location.href = workerUrl;
-    })();
+      /* Write token to localStorage (same origin as the main Rosetta page) */
+      localStorage.setItem("gh_token", token);
 
-    function showError(msg) {
-      document.getElementById("spinner").style.display = "none";
-      document.getElementById("status").style.display  = "none";
-      const box = document.getElementById("error-box");
-      box.style.display = "";
-      box.textContent   = msg;
-    }
+      spinner.style.display = "none";
+      title.textContent   = "Authorized!";
+      title.className     = "success";
+      message.textContent = "Closing this window…";
+
+      /* Notify the opener if it exists */
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.dispatchEvent(new Event("gh_token_ready"));
+        }
+      } catch (e) { /* cross-origin — the poll in the main page will pick it up */ }
+
+      /* Close the popup after a brief moment */
+      setTimeout(function () { window.close(); }, 500);
+    })();
   </script>
 </body>
 </html>
