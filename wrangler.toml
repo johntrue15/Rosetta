@@ -1,4 +1,4 @@
-name = "rosetta-auth"
+name = "rosetta-upload"
 main = "cloudflare/worker.js"
 compatibility_date = "2024-01-01"
 
