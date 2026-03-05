@@ -113,10 +113,11 @@
 
     /* ---- Request access section ---- */
     #request-section {
-      display: none;
+      display: none !important;
       text-align: center;
       margin-top: 3rem;
     }
+    #request-section.visible { display: block !important; }
     #request-section h2 { font-size: 1.1rem; margin-bottom: 0.75rem; }
     #request-section p {
       color: var(--muted);
@@ -128,7 +129,8 @@
     #request-status { margin-top: 1rem; font-size: 0.85rem; color: var(--muted); }
 
     /* ---- Upload section ---- */
-    #upload-section { display: none; }
+    #upload-section { display: none !important; }
+    #upload-section.visible { display: block !important; }
 
     /* Supported formats grid */
     .formats-grid {
@@ -398,21 +400,21 @@
     /* ================================================================== */
     function showAuth() {
       authSection.style.display    = "block";
-      requestSection.style.display = "none";
-      uploadSection.style.display  = "none";
+      requestSection.classList.remove("visible");
+      uploadSection.classList.remove("visible");
     }
 
     function showRequest(user) {
       authSection.style.display    = "none";
-      requestSection.style.display = "block";
-      uploadSection.style.display  = "none";
+      requestSection.classList.add("visible");
+      uploadSection.classList.remove("visible");
       reqUsername.textContent      = user.login;
     }
 
     function showUpload(user) {
       authSection.style.display    = "none";
-      requestSection.style.display = "none";
-      uploadSection.style.display  = "block";
+      requestSection.classList.remove("visible");
+      uploadSection.classList.add("visible");
 
       userInfo.textContent = "";
       const avatar = document.createElement("img");
