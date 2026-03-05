@@ -397,14 +397,14 @@
     /*  View helpers                                                       */
     /* ================================================================== */
     function showAuth() {
-      authSection.style.display    = "";
+      authSection.style.display    = "block";
       requestSection.style.display = "none";
       uploadSection.style.display  = "none";
     }
 
     function showRequest(user) {
       authSection.style.display    = "none";
-      requestSection.style.display = "";
+      requestSection.style.display = "block";
       uploadSection.style.display  = "none";
       reqUsername.textContent      = user.login;
     }
@@ -412,7 +412,7 @@
     function showUpload(user) {
       authSection.style.display    = "none";
       requestSection.style.display = "none";
-      uploadSection.style.display  = "";
+      uploadSection.style.display  = "block";
 
       userInfo.textContent = "";
       const avatar = document.createElement("img");
@@ -489,7 +489,7 @@
 
     function startOAuth() {
       loginBtn.disabled    = true;
-      authWaiting.style.display = "";
+      authWaiting.style.display = "block";
 
       /* Open the Cloudflare Worker in a popup — it redirects to GitHub,
          then exchanges the code and writes gh_token to this page's
