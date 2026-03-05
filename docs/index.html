@@ -38,7 +38,6 @@
       justify-content: space-between;
       align-items: center;
     }
-
     header h1 { font-size: 1.3rem; font-weight: 600; }
     header h1 span { color: var(--accent); }
 
@@ -49,12 +48,7 @@
       color: var(--muted);
       font-size: 0.9rem;
     }
-
-    #user-info img {
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-    }
+    #user-info img { width: 30px; height: 30px; border-radius: 50%; }
 
     main {
       width: 100%;
@@ -84,8 +78,9 @@
     .btn-warning { background: #9e6a03; border-color: var(--warning); color: #fff; }
     .btn-warning:hover { background: #b07a04; }
     .btn-sm { padding: 0.3rem 0.8rem; font-size: 0.8rem; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* ---- Auth section (not logged in) ---- */
+    /* ---- Auth section ---- */
     #auth-section {
       text-align: center;
       margin-top: 5rem;
@@ -98,30 +93,23 @@
       margin-left: auto;
       margin-right: auto;
     }
-
-    /* ---- Device flow dialog ---- */
-    #device-dialog {
+    #auth-waiting {
       display: none;
-      margin-top: 1.5rem;
-      padding: 1.5rem;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      text-align: center;
-      max-width: 420px;
-      margin-left: auto;
-      margin-right: auto;
+      margin-top: 1.25rem;
+      color: var(--muted);
+      font-size: 0.85rem;
     }
-    #device-dialog p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; margin-bottom: 1rem; }
-    #user-code-display {
-      font-family: "SFMono-Regular", Consolas, monospace;
-      font-size: 2rem;
-      font-weight: 700;
-      letter-spacing: 0.25em;
-      color: var(--accent);
-      margin: 0.75rem 0;
+    .spinner-inline {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.4rem;
     }
-    #device-spinner { color: var(--muted); font-size: 0.82rem; margin-top: 0.75rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ---- Request access section ---- */
     #request-section {
@@ -130,16 +118,22 @@
       margin-top: 3rem;
     }
     #request-section h2 { font-size: 1.1rem; margin-bottom: 0.75rem; }
-    #request-section p { color: var(--muted); font-size: 0.9rem; line-height: 1.7; max-width: 460px; margin: 0 auto 1.5rem; }
+    #request-section p {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.7;
+      max-width: 460px;
+      margin: 0 auto 1.5rem;
+    }
     #request-status { margin-top: 1rem; font-size: 0.85rem; color: var(--muted); }
 
     /* ---- Upload section ---- */
     #upload-section { display: none; }
 
-    /* Supported formats */
+    /* Supported formats grid */
     .formats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
       gap: 0.75rem;
       margin-bottom: 1.75rem;
     }
@@ -152,7 +146,7 @@
       flex-direction: column;
       gap: 0.2rem;
     }
-    .format-card.supported { border-color: rgba(63,185,80,0.4); }
+    .format-card.supported { border-color: rgba(63,185,80,0.35); }
     .format-card.coming-soon { opacity: 0.5; }
     .format-ext {
       font-family: "SFMono-Regular", Consolas, monospace;
@@ -169,7 +163,7 @@
       border-radius: 3px;
       display: inline-block;
       width: fit-content;
-      margin-top: 0.25rem;
+      margin-top: 0.3rem;
     }
     .badge-live { background: rgba(63,185,80,0.15); color: var(--success); }
     .badge-soon { background: rgba(139,148,158,0.12); color: var(--muted); }
@@ -185,7 +179,7 @@
     }
     #drop-zone.drag-over {
       border-color: var(--accent);
-      background: rgba(88, 166, 255, 0.06);
+      background: rgba(88,166,255,0.06);
     }
     #drop-zone svg { width: 44px; height: 44px; fill: var(--muted); margin-bottom: 0.75rem; }
     #drop-zone p { color: var(--muted); margin-top: 0.4rem; font-size: 0.9rem; }
@@ -218,8 +212,19 @@
       border: 1px solid var(--border);
       border-radius: 8px;
     }
-    .instructions h3 { font-size: 0.9rem; margin-bottom: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
-    .instructions ol { padding-left: 1.25rem; color: var(--muted); font-size: 0.88rem; line-height: 1.9; }
+    .instructions h3 {
+      font-size: 0.82rem;
+      margin-bottom: 0.6rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .instructions ol {
+      padding-left: 1.25rem;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.9;
+    }
 
     footer {
       padding: 1.25rem;
@@ -239,52 +244,55 @@
 
   <main>
 
-    <!-- ① Not logged in -->
+    <!-- ① Not signed in -->
     <div id="auth-section">
       <p>
         Sign in with your GitHub account to upload CT scanner metadata files.<br />
         You must be an approved collaborator on the
-        <a href="https://github.com/johntrue15/Rosetta" style="color:var(--accent)">Rosetta</a> repository.
+        <a href="https://github.com/johntrue15/Rosetta" style="color:var(--accent)">Rosetta</a>
+        repository.
       </p>
       <button class="btn btn-primary" id="login-btn">
-        <svg height="16" viewBox="0 0 16 16" width="16" style="fill:currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        <svg height="16" viewBox="0 0 16 16" width="16" style="fill:currentColor">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+            0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13
+            -.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66
+            .07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15
+            -.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0
+            1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82
+            1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01
+            1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
         Sign in with GitHub
       </button>
-
-      <!-- Device flow prompt -->
-      <div id="device-dialog">
-        <p>Open the link below and enter the code to authorize this app.</p>
-        <div id="user-code-display">––––––</div>
-        <a id="device-link" class="btn btn-primary" href="https://github.com/login/device" target="_blank" rel="noopener">
-          Open github.com/login/device ↗
-        </a>
-        <div id="device-spinner">Waiting for authorization…</div>
+      <div id="auth-waiting">
+        <span class="spinner-inline"></span>
+        Waiting for authorization… (you can close the popup once done)
       </div>
     </div>
 
-    <!-- ② Logged in but not a collaborator -->
+    <!-- ② Signed in but not a collaborator -->
     <div id="request-section">
       <h2>Access Required</h2>
       <p>
-        You're signed in as <strong id="req-username"></strong>, but you don't yet have
-        write access to the Rosetta repository.<br />
-        Click below to submit an access request — the maintainer will be notified via a GitHub Issue.
+        You're signed in as <strong id="req-username"></strong>, but you don't yet
+        have write access to the Rosetta repository.<br />
+        Click below to submit an access request — a GitHub Issue will be opened
+        and the maintainer will be notified.
       </p>
       <button class="btn btn-warning" id="request-btn">Request Access</button>
       <div id="request-status"></div>
     </div>
 
-    <!-- ③ Logged in and approved collaborator -->
+    <!-- ③ Signed in and approved -->
     <div id="upload-section">
 
-      <!-- Supported formats -->
       <div class="formats-grid" id="formats-grid"></div>
 
-      <!-- Drop zone -->
       <div id="drop-zone">
         <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
         <p><strong>Drag &amp; drop files here</strong> or click to browse</p>
-        <p style="font-size:0.78rem;margin-top:0.5rem">Supported: .pca, .rtf, .xtekct</p>
+        <p style="font-size:0.78rem;margin-top:0.5rem">Supported: .pca &nbsp;·&nbsp; .rtf &nbsp;·&nbsp; .xtekct</p>
         <input type="file" id="file-input" multiple />
       </div>
 
@@ -295,8 +303,10 @@
         <ol>
           <li>Drop your CT scanner metadata files above (or click to browse).</li>
           <li>Each file is committed to <code>data/</code> in the repository.</li>
-          <li>GitHub Actions parses it, moves the original to <code>data/completed/</code>, and writes JSON to <code>data/parsed/</code>.</li>
-          <li>Aggregated results are exported to <code>data/metadata.json</code> and <code>data/metadata.csv</code>.</li>
+          <li>GitHub Actions parses it, moves the original to <code>data/completed/</code>,
+              and writes JSON to <code>data/parsed/</code>.</li>
+          <li>Results are aggregated into <code>data/metadata.json</code> and
+              <code>data/metadata.csv</code>.</li>
         </ol>
       </div>
     </div>
@@ -316,25 +326,28 @@
     const REPO        = "Rosetta";
     const BRANCH      = "main";
     const UPLOAD_PATH = "data/";
-    const CLIENT_ID   = "Ov23li6CXQbaPTsud13C";   // GitHub OAuth App (Device Flow)
 
-    /* Supported file formats shown as cards */
+    /**
+     * WORKER_URL: your Cloudflare Worker URL.
+     * After deploying the Worker, paste its URL here (no trailing slash).
+     * Example: "https://rosetta-auth.yourname.workers.dev"
+     */
+    const WORKER_URL  = "https://rosetta-auth.workers.dev";
+
+    /* Supported file formats */
     const FORMATS = [
-      { ext: ".pca",    name: "Phoenix / Waygate",        status: "live" },
-      { ext: ".rtf",    name: "North Star Imaging",        status: "live" },
-      { ext: ".xtekct", name: "Nikon / XTek CT",           status: "live" },
-      { ext: ".vgi",    name: "Volume Graphics",           status: "soon" },
-      { ext: ".xml",    name: "Generic XML metadata",      status: "soon" },
+      { ext: ".pca",    name: "Phoenix / Waygate",   status: "live" },
+      { ext: ".rtf",    name: "North Star Imaging",   status: "live" },
+      { ext: ".xtekct", name: "Nikon / XTek CT",      status: "live" },
+      { ext: ".vgi",    name: "Volume Graphics",      status: "soon" },
+      { ext: ".xml",    name: "Generic XML metadata", status: "soon" },
     ];
 
     /* ================================================================== */
     /*  DOM refs                                                           */
     /* ================================================================== */
     const authSection    = document.getElementById("auth-section");
-    const deviceDialog   = document.getElementById("device-dialog");
-    const userCodeEl     = document.getElementById("user-code-display");
-    const deviceLink     = document.getElementById("device-link");
-    const deviceSpinner  = document.getElementById("device-spinner");
+    const authWaiting    = document.getElementById("auth-waiting");
     const requestSection = document.getElementById("request-section");
     const uploadSection  = document.getElementById("upload-section");
     const loginBtn       = document.getElementById("login-btn");
@@ -348,16 +361,10 @@
     const formatsGrid    = document.getElementById("formats-grid");
 
     /* ================================================================== */
-    /*  State                                                              */
-    /* ================================================================== */
-    let token = sessionStorage.getItem("gh_token");
-    let currentUser = null;
-
-    /* ================================================================== */
     /*  Render format cards                                                */
     /* ================================================================== */
     FORMATS.forEach(f => {
-      const card = document.createElement("div");
+      const card  = document.createElement("div");
       card.className = "format-card " + (f.status === "live" ? "supported" : "coming-soon");
       const ext   = document.createElement("div"); ext.className = "format-ext"; ext.textContent = f.ext;
       const name  = document.createElement("div"); name.className = "format-name"; name.textContent = f.name;
@@ -369,48 +376,66 @@
     });
 
     /* ================================================================== */
+    /*  State                                                              */
+    /* ================================================================== */
+    let token       = localStorage.getItem("gh_token");
+    let currentUser = null;
+    let pollTimer   = null;
+
+    /* ================================================================== */
+    /*  Boot                                                               */
+    /* ================================================================== */
+    (async () => {
+      if (token) {
+        await verifyAndRoute(token);
+      } else {
+        showAuth();
+      }
+    })();
+
+    /* ================================================================== */
     /*  View helpers                                                       */
     /* ================================================================== */
-    function showAuth()    { authSection.style.display = ""; requestSection.style.display = "none"; uploadSection.style.display = "none"; }
-    function showRequest(user) {
-      authSection.style.display = "none";
-      uploadSection.style.display = "none";
-      requestSection.style.display = "";
-      reqUsername.textContent = user.login;
-    }
-    function showUpload(user) {
-      authSection.style.display = "none";
+    function showAuth() {
+      authSection.style.display    = "";
       requestSection.style.display = "none";
-      uploadSection.style.display = "";
+      uploadSection.style.display  = "none";
+    }
+
+    function showRequest(user) {
+      authSection.style.display    = "none";
+      requestSection.style.display = "";
+      uploadSection.style.display  = "none";
+      reqUsername.textContent      = user.login;
+    }
+
+    function showUpload(user) {
+      authSection.style.display    = "none";
+      requestSection.style.display = "none";
+      uploadSection.style.display  = "";
 
       userInfo.textContent = "";
       const avatar = document.createElement("img");
       avatar.src = user.avatar_url; avatar.alt = "avatar";
-      const uname = document.createElement("span"); uname.textContent = user.login;
+      const uname = document.createElement("span");
+      uname.textContent = user.login;
       const logoutBtn = document.createElement("button");
-      logoutBtn.className = "btn btn-sm"; logoutBtn.textContent = "Sign out";
+      logoutBtn.className = "btn btn-sm";
+      logoutBtn.textContent = "Sign out";
       logoutBtn.addEventListener("click", signOut);
       userInfo.append(avatar, uname, logoutBtn);
     }
 
     function signOut() {
-      sessionStorage.removeItem("gh_token");
+      clearPoll();
+      localStorage.removeItem("gh_token");
       token = null; currentUser = null;
       userInfo.textContent = "";
-      deviceDialog.style.display = "none";
       showAuth();
     }
 
     /* ================================================================== */
-    /*  Boot: try existing token                                           */
-    /* ================================================================== */
-    (async () => {
-      if (token) await verifyAndRoute(token);
-      else showAuth();
-    })();
-
-    /* ================================================================== */
-    /*  Verify token, check collaborator permission, route to view        */
+    /*  Verify token & route to correct view                              */
     /* ================================================================== */
     async function verifyAndRoute(t) {
       try {
@@ -441,7 +466,7 @@
         }
       } catch (err) {
         if (err.message === "token_invalid") {
-          sessionStorage.removeItem("gh_token");
+          localStorage.removeItem("gh_token");
           token = null;
         }
         showAuth();
@@ -449,82 +474,70 @@
     }
 
     /* ================================================================== */
-    /*  Device Flow login                                                  */
+    /*  OAuth popup login                                                  */
     /* ================================================================== */
-    loginBtn.addEventListener("click", startDeviceFlow);
+    loginBtn.addEventListener("click", startOAuth);
 
-    async function startDeviceFlow() {
-      loginBtn.disabled = true;
-      deviceDialog.style.display = "";
-      userCodeEl.textContent = "…";
-      deviceSpinner.textContent = "Requesting code…";
+    function startOAuth() {
+      loginBtn.disabled    = true;
+      authWaiting.style.display = "";
 
-      try {
-        /* Step 1: request device + user codes */
-        const codeRes = await fetch("https://github.com/login/device/code", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ client_id: CLIENT_ID, scope: "repo" })
-        });
-        if (!codeRes.ok) throw new Error("Failed to start Device Flow (" + codeRes.status + ")");
-        const codeData = await codeRes.json();
+      /* Open the Cloudflare Worker in a popup — it redirects to GitHub,
+         then exchanges the code and writes gh_token to this page's
+         localStorage, then fires a 'gh_token_ready' event. */
+      const popup = window.open(
+        WORKER_URL,
+        "rosetta_oauth",
+        "width=600,height=720,menubar=no,toolbar=no,location=yes"
+      );
 
-        userCodeEl.textContent = codeData.user_code;
-        deviceLink.href = codeData.verification_uri || "https://github.com/login/device";
-        deviceSpinner.textContent = "Waiting for you to authorize in the opened tab…";
+      /* Listen for the event the Worker's success page fires */
+      window.addEventListener("gh_token_ready", onTokenReady, { once: true });
 
-        /* Step 2: poll for access token */
-        const interval = (codeData.interval || 5) * 1000;
-        const expires  = Date.now() + (codeData.expires_in || 900) * 1000;
+      /* Fallback: poll localStorage every second in case the event
+         doesn't cross the popup boundary */
+      pollTimer = setInterval(() => {
+        const t = localStorage.getItem("gh_token");
+        if (t && t !== token) onTokenReady();
+      }, 1000);
 
-        const poll = async () => {
-          if (Date.now() > expires) {
-            deviceDialog.style.display = "none";
+      /* If popup is closed without authorizing, clean up */
+      const popupCheck = setInterval(() => {
+        if (popup && popup.closed) {
+          clearInterval(popupCheck);
+          if (!localStorage.getItem("gh_token")) {
             loginBtn.disabled = false;
-            alert("Authorization timed out. Please try again.");
-            return;
+            authWaiting.style.display = "none";
+            clearPoll();
           }
+        }
+      }, 500);
+    }
 
-          const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Accept: "application/json" },
-            body: JSON.stringify({
-              client_id: CLIENT_ID,
-              device_code: codeData.device_code,
-              grant_type: "urn:ietf:params:oauth:grant-type:device_code"
-            })
-          });
-          const tokenData = await tokenRes.json();
-
-          if (tokenData.access_token) {
-            token = tokenData.access_token;
-            sessionStorage.setItem("gh_token", token);
-            deviceDialog.style.display = "none";
-            loginBtn.disabled = false;
-            await verifyAndRoute(token);
-          } else if (tokenData.error === "authorization_pending" || tokenData.error === "slow_down") {
-            const wait = tokenData.error === "slow_down" ? interval + 5000 : interval;
-            setTimeout(poll, wait);
-          } else {
-            deviceDialog.style.display = "none";
-            loginBtn.disabled = false;
-            alert("Authorization failed: " + (tokenData.error_description || tokenData.error));
-          }
-        };
-
-        setTimeout(poll, interval);
-      } catch (err) {
-        deviceDialog.style.display = "none";
+    async function onTokenReady() {
+      clearPoll();
+      token = localStorage.getItem("gh_token");
+      if (!token) {
         loginBtn.disabled = false;
-        alert("Login error: " + err.message);
+        authWaiting.style.display = "none";
+        showAuth();
+        return;
       }
+      loginBtn.disabled = false;
+      authWaiting.style.display = "none";
+      await verifyAndRoute(token);
+    }
+
+    function clearPoll() {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      window.removeEventListener("gh_token_ready", onTokenReady);
     }
 
     /* ================================================================== */
     /*  Access request (creates GitHub Issue)                             */
     /* ================================================================== */
     requestBtn.addEventListener("click", async () => {
-      if (!currentUser) return;
+      if (!currentUser || !token) return;
       requestBtn.disabled = true;
       requestStatus.textContent = "Submitting request…";
 
@@ -534,16 +547,16 @@
           {
             method: "POST",
             headers: {
-              Authorization: "Bearer " + token,
+              Authorization:  "Bearer " + token,
               "Content-Type": "application/json",
-              Accept: "application/vnd.github+json"
+              Accept:         "application/vnd.github+json"
             },
             body: JSON.stringify({
               title: "Access request: @" + currentUser.login,
-              body: "**@" + currentUser.login + "** is requesting write access to upload files via the Rosetta web interface.\n\n" +
-                    "- GitHub profile: https://github.com/" + currentUser.login + "\n" +
-                    "- Requested at: " + new Date().toUTCString() + "\n\n" +
-                    "_To approve, add this user as a repository collaborator, then close this issue._",
+              body:  "**@" + currentUser.login + "** is requesting write access to upload files via the Rosetta web interface.\n\n" +
+                     "- GitHub profile: https://github.com/" + currentUser.login + "\n" +
+                     "- Requested at: " + new Date().toUTCString() + "\n\n" +
+                     "_To approve: add this user as a repository collaborator, then close this issue._",
               labels: ["access-request"]
             })
           }
@@ -551,16 +564,23 @@
 
         if (res.ok) {
           const issue = await res.json();
-          requestStatus.innerHTML = "Request submitted! Issue <a href='" + issue.html_url + "' target='_blank' style='color:var(--accent)'>#" + issue.number + "</a> has been created. You'll be notified when access is granted.";
           requestStatus.style.color = "var(--success)";
+          const link = document.createElement("a");
+          link.href = issue.html_url;
+          link.target = "_blank";
+          link.style.color = "var(--accent)";
+          link.textContent = "#" + issue.number;
+          requestStatus.textContent = "Request submitted! Issue ";
+          requestStatus.appendChild(link);
+          requestStatus.append(" created. You'll be notified when access is granted.");
         } else {
           const err = await res.json();
           throw new Error(err.message || res.statusText);
         }
       } catch (err) {
-        requestStatus.textContent = "Failed to submit request: " + err.message;
-        requestStatus.style.color = "var(--danger)";
-        requestBtn.disabled = false;
+        requestStatus.style.color  = "var(--danger)";
+        requestStatus.textContent  = "Failed to submit: " + err.message;
+        requestBtn.disabled        = false;
       }
     });
 
@@ -568,28 +588,21 @@
     /*  Drag-and-drop & file input                                        */
     /* ================================================================== */
     dropZone.addEventListener("click", () => fileInput.click());
-
-    dropZone.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      dropZone.classList.add("drag-over");
-    });
+    dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
     dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
-    dropZone.addEventListener("drop", (e) => {
+    dropZone.addEventListener("drop", e => {
       e.preventDefault();
       dropZone.classList.remove("drag-over");
       handleFiles(e.dataTransfer.files);
     });
-    fileInput.addEventListener("change", () => {
-      handleFiles(fileInput.files);
-      fileInput.value = "";
-    });
+    fileInput.addEventListener("change", () => { handleFiles(fileInput.files); fileInput.value = ""; });
 
     /* ================================================================== */
     /*  Upload via GitHub Contents API                                    */
     /* ================================================================== */
     function log(msg, type) {
       const el = document.createElement("div");
-      el.className = "log-entry " + type;
+      el.className  = "log-entry " + type;
       el.textContent = msg;
       statusLog.prepend(el);
     }
@@ -603,7 +616,7 @@
           const content = await readAsBase64(file);
           const path    = UPLOAD_PATH + file.name;
 
-          /* Check if file already exists to get its SHA */
+          /* Get existing SHA if the file already exists */
           let sha;
           try {
             const existing = await fetch(
@@ -617,7 +630,7 @@
           const body = {
             message: "Upload " + file.name + " via Rosetta drag-and-drop",
             content,
-            branch: BRANCH
+            branch: BRANCH,
           };
           if (sha) body.sha = sha;
 
@@ -625,12 +638,12 @@
             "https://api.github.com/repos/" + OWNER + "/" + REPO +
             "/contents/" + encodeURIComponent(path),
             {
-              method: "PUT",
+              method:  "PUT",
               headers: {
-                Authorization: "Bearer " + token,
-                "Content-Type": "application/json"
+                Authorization:  "Bearer " + token,
+                "Content-Type": "application/json",
               },
-              body: JSON.stringify(body)
+              body: JSON.stringify(body),
             }
           );
 
