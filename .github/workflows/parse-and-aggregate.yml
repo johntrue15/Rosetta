@@ -4,8 +4,6 @@ on:
   push:
     paths:
       - "data/**"
-    paths-ignore:
-      - "docs/**"
   workflow_dispatch:
 
 permissions:
