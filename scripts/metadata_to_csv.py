@@ -4,6 +4,7 @@ metadata_to_csv.py
 
 - Reads data/metadata.json (list of dicts; may include nested dicts like calib_images)
 - Reads data/users.csv (Folder,User name,Email) — delimiter can be tab or comma (auto-detected)
+- Reads standard_format.json (optional) — controls column order, display names, and inclusion
 - Produces data/metadata.csv with all flattened fields + an appended "X-ray User" column.
 
 Matching strategy (most-specific wins):
@@ -18,11 +19,12 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-METADATA_JSON = "data/metadata.json"
-USERS_CSV     = "users.csv"
-OUTPUT_CSV    = "data/metadata.csv"
+METADATA_JSON  = "data/metadata.json"
+USERS_CSV      = "users.csv"
+OUTPUT_CSV     = "data/metadata.csv"
+FORMAT_JSON    = "standard_format.json"
 
 DEBUG = os.getenv("LOG_MATCHES", "0") == "1"
 
@@ -70,6 +72,77 @@ def flatten_dict(d: dict, prefix: str = "", out: dict = None) -> dict:
             out[key] = v
     return out
 
+# -------------------- standard_format.json handling --------------------
+
+class ColumnFormat:
+    """Parsed representation of standard_format.json."""
+    def __init__(self, columns: List[Dict[str, Any]], include_unmapped: bool):
+        self.columns = columns
+        self.include_unmapped = include_unmapped
+        self._source_to_name = {
+            c["source"]: c["name"]
+            for c in columns
+            if c.get("include", True)
+        }
+        self._included_sources = [
+            c["source"]
+            for c in columns
+            if c.get("include", True)
+        ]
+
+    def build_fieldnames(self, all_keys: set) -> List[str]:
+        """Return ordered CSV header names, applying renames and ordering."""
+        ordered = []
+        seen_sources = set()
+        for src in self._included_sources:
+            if src in all_keys:
+                ordered.append(self._source_to_name.get(src, src))
+                seen_sources.add(src)
+
+        if self.include_unmapped:
+            unmapped = sorted(k for k in all_keys if k not in seen_sources)
+            ordered.extend(unmapped)
+
+        return ordered
+
+    def build_source_order(self, all_keys: set) -> List[str]:
+        """Return ordered source field names (pre-rename)."""
+        ordered = []
+        seen = set()
+        for src in self._included_sources:
+            if src in all_keys:
+                ordered.append(src)
+                seen.add(src)
+
+        if self.include_unmapped:
+            unmapped = sorted(k for k in all_keys if k not in seen)
+            ordered.extend(unmapped)
+
+        return ordered
+
+    def rename(self, source_key: str) -> str:
+        """Map internal field name to display name."""
+        return self._source_to_name.get(source_key, source_key)
+
+
+def load_column_format(path: str = FORMAT_JSON) -> Optional[ColumnFormat]:
+    """Load standard_format.json if it exists. Returns None if missing."""
+    if not os.path.exists(path):
+        if DEBUG:
+            print(f"[format] {path} not found — using default column order.")
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        columns = data.get("columns", [])
+        include_unmapped = data.get("include_unmapped", True)
+        if DEBUG:
+            print(f"[format] Loaded {len(columns)} column definitions from {path}")
+        return ColumnFormat(columns, include_unmapped)
+    except Exception as e:
+        print(f"[format] WARNING: Failed to parse {path}: {e} — using defaults.")
+        return None
+
 # -------------------- users.csv handling --------------------
 
 class UsersIndex:
@@ -83,15 +156,6 @@ class UsersIndex:
         self.path_list = path_list
 
 def read_users_index(path: str) -> UsersIndex:
-    """
-    Reads data/users.csv and builds:
-      component_map: keys are normalized short tokens (e.g., 'stanley', 'fics')
-      path_list: normalized full paths for substring matches (e.g., 's:/ct_data/stanley/...')
-    Assumptions:
-      - First row may be a header (expects 'folder' and 'email' if present; case-insensitive)
-      - Otherwise: col0 = folder, last col = email
-      - Delimiter auto-detected (tab or comma, etc.)
-    """
     if not os.path.exists(path):
         if DEBUG:
             print(f"[users.csv] Not found at {path}. No X-ray User mapping will be applied.")
@@ -131,20 +195,17 @@ def read_users_index(path: str) -> UsersIndex:
         if not folder_raw or not email:
             continue
 
-        # Add component keys for each component in the folder_raw (handles short tokens and long paths)
         for c in split_path_components(folder_raw):
             comp = normalize_component(c)
             if comp:
                 component_map[comp] = email
 
-        # Add full-path normalized entry for substring matches
         path_norm = normalize_path(folder_raw)
         if path_norm:
             path_list.append((path_norm, email))
 
     if DEBUG:
         print(f"[users.csv] Loaded: rows={len(rows) - start}, delimiter='{delim}', header={has_header}")
-        # show a few examples of component keys and path keys
         comp_preview = sorted(list(component_map.keys()))[:15]
         path_preview = [p for p, _ in path_list[:5]]
         print(f"[users.csv] component_map keys (sample): {comp_preview}")
@@ -177,12 +238,10 @@ def gather_candidate_paths(meta: dict) -> List[str]:
             if v and v.lower() != "n/a":
                 candidates.append(v)
 
-    # top-level
     for k in CANDIDATE_TOP_LEVEL_FIELDS:
         if k in meta:
             maybe_add(meta[k])
 
-    # nested calib_images
     calib = meta.get("calib_images", {})
     if isinstance(calib, dict):
         for k in CANDIDATE_CALIB_FIELDS:
@@ -192,11 +251,6 @@ def gather_candidate_paths(meta: dict) -> List[str]:
     return candidates
 
 def find_user_email_for_record(meta: dict, users: UsersIndex) -> str:
-    """
-    Match order (highest specificity wins):
-      1) Component equals user 'Folder' component  -> weight = len(component)
-      2) Full-path contains user 'Folder' normalized path -> weight = len(folder_path_norm)
-    """
     if not users.component_map and not users.path_list:
         return ""
 
@@ -211,7 +265,6 @@ def find_user_email_for_record(meta: dict, users: UsersIndex) -> str:
         full_norm = normalize_path(raw)
         comps = [normalize_component(c) for c in split_path_components(raw)]
 
-        # 1) component matches
         for c in comps:
             email = users.component_map.get(c)
             if email:
@@ -220,7 +273,6 @@ def find_user_email_for_record(meta: dict, users: UsersIndex) -> str:
                     best_weight = w
                     best_email = email
 
-        # 2) full-path substring matches
         for key_norm_path, email in users.path_list:
             if key_norm_path and key_norm_path in full_norm:
                 w = len(key_norm_path)
@@ -243,16 +295,19 @@ def find_user_email_for_record(meta: dict, users: UsersIndex) -> str:
 
 # -------------------- main conversion --------------------
 
-def main():
-    data = read_json(METADATA_JSON)
+def convert(metadata_path: str = METADATA_JSON,
+            users_path: str = USERS_CSV,
+            format_path: str = FORMAT_JSON,
+            output_path: str = OUTPUT_CSV) -> None:
+    data = read_json(metadata_path)
     if not isinstance(data, list):
         raise ValueError("metadata.json must contain a list of objects")
 
-    users = read_users_index(USERS_CSV)
+    users = read_users_index(users_path)
+    fmt = load_column_format(format_path)
 
-    # Flatten and collect rows
     rows = []
-    fieldnames = set()
+    fieldnames: set = set()
     for rec in data:
         flat = flatten_dict(rec)
         email = find_user_email_for_record(rec, users)
@@ -260,36 +315,34 @@ def main():
         rows.append(flat)
         fieldnames.update(flat.keys())
 
-    # Preferred order for readability if present
-    preferred = [
-        "file_name",
-        "file_hyperlink",
-        "file_path",
-        "txrm_file_path",
-        "start_time",
-        "end_time",
-        "ct_voxel_size_um",
-        "ct_objective",
-        "ct_number_images",
-        "xray_tube_voltage",
-        "xray_tube_current",
-        "xray_tube_power",
-        "xray_filter",
-        "image_width_pixels",
-        "image_height_pixels",
-        "scan_time",
-        "sha256",
-        "source_path",
-    ]
-    remaining = sorted(fn for fn in fieldnames if fn not in preferred and fn != "X-ray User")
-    ordered = [fn for fn in preferred if fn in fieldnames] + remaining + ["X-ray User"]
+    if fmt:
+        source_order = fmt.build_source_order(fieldnames)
+        csv_headers = fmt.build_fieldnames(fieldnames)
+        source_to_header = {src: fmt.rename(src) for src in source_order}
+    else:
+        preferred = [
+            "file_name", "file_hyperlink", "file_path", "txrm_file_path",
+            "start_time", "end_time", "ct_voxel_size_um", "ct_objective",
+            "ct_number_images", "xray_tube_voltage", "xray_tube_current",
+            "xray_tube_power", "xray_filter", "image_width_pixels",
+            "image_height_pixels", "scan_time", "sha256", "source_path",
+        ]
+        remaining = sorted(fn for fn in fieldnames if fn not in preferred and fn != "X-ray User")
+        source_order = [fn for fn in preferred if fn in fieldnames] + remaining + ["X-ray User"]
+        csv_headers = list(source_order)
+        source_to_header = {s: s for s in source_order}
 
-    Path(OUTPUT_CSV).parent.mkdir(parents=True, exist_ok=True)
-    with open(OUTPUT_CSV, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=ordered, quoting=csv.QUOTE_MINIMAL)
-        writer.writeheader()
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f, quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(csv_headers)
         for r in rows:
-            writer.writerow({k: r.get(k, "") for k in ordered})
+            writer.writerow([r.get(src, "") for src in source_order])
+
+
+def main():
+    convert()
+
 
 if __name__ == "__main__":
     main()

@@ -372,3 +372,87 @@ metadata_to_csv.main()
         # Should create a renamed file
         moved_files = list(completed_dir.glob("test*.pca"))
         assert len(moved_files) == 2  # Original and moved with suffix
+
+    def test_uploaded_by_flag(self, temp_dir, mock_pca_content):
+        """Test that --uploaded-by injects the uploader into parsed JSON."""
+        data_dir = temp_dir / "data"
+        parsed_dir = data_dir / "parsed"
+        completed_dir = data_dir / "completed"
+        data_dir.mkdir()
+        parsed_dir.mkdir()
+        completed_dir.mkdir()
+
+        test_file = data_dir / "test.pca"
+        test_file.write_text(mock_pca_content)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPTS_DIR / "parse_any.py"),
+                str(test_file),
+                "-o",
+                str(parsed_dir),
+                "--completed-dir",
+                str(completed_dir),
+                "--pretty",
+                "--uploaded-by",
+                "johntrue15",
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0
+        assert "Tagged uploaded_by: johntrue15" in result.stdout
+
+        parsed_json = parsed_dir / "test.pca.json"
+        assert parsed_json.exists()
+
+        with open(parsed_json, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        assert data["uploaded_by"] == "johntrue15"
+        assert data["file_name"] == "test.pca"
+
+    def test_skyscan_file_pipeline(self, temp_dir, sample_skyscan_path):
+        """Test full pipeline with a SkyScan .log file."""
+        if not sample_skyscan_path.exists():
+            pytest.skip(f"Sample SkyScan file not found: {sample_skyscan_path}")
+
+        data_dir = temp_dir / "data"
+        parsed_dir = data_dir / "parsed"
+        completed_dir = data_dir / "completed"
+        data_dir.mkdir()
+        parsed_dir.mkdir()
+        completed_dir.mkdir()
+
+        test_file = data_dir / sample_skyscan_path.name
+        shutil.copy(sample_skyscan_path, test_file)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPTS_DIR / "parse_any.py"),
+                str(test_file),
+                "-o",
+                str(parsed_dir),
+                "--completed-dir",
+                str(completed_dir),
+                "--pretty",
+                "--uploaded-by",
+                "test_user",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"SkyScan parsing failed: {result.stderr}"
+
+        parsed_json = parsed_dir / f"{sample_skyscan_path.name}.json"
+        assert parsed_json.exists()
+
+        with open(parsed_json, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        assert data["file_name"] == sample_skyscan_path.name
+        assert data["uploaded_by"] == "test_user"
+        assert data["ct_objective"] == "SkyScan2211"

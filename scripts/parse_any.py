@@ -7,11 +7,12 @@ based on extension and ensures the original file is MOVED to --completed-dir
 after a successful parse.
 
 Usage:
-  python scripts/parse_any.py <input_path> -o <out_dir> [--completed-dir <dir>] [--pretty]
+  python scripts/parse_any.py <input_path> -o <out_dir> [--completed-dir <dir>] [--pretty] [--uploaded-by USER]
 """
 
 from __future__ import annotations
 import argparse
+import json
 import sys
 import shutil
 from pathlib import Path
@@ -20,6 +21,7 @@ from pathlib import Path
 from rtf_to_json import parse_rtf_file
 from pca_to_json import parse_pca_file
 from xtekct_to_json import parse_xtekct_file
+from skyscan_to_json import parse_skyscan_file
 
 
 def decide_output_path(out_dir: Path, source: Path) -> Path:
@@ -54,12 +56,23 @@ def move_to_completed(source: Path, completed_dir: Path) -> Path:
     return dest
 
 
+def inject_uploaded_by(json_path: Path, uploaded_by: str) -> None:
+    """Inject 'uploaded_by' into the parsed JSON file after the parser writes it."""
+    with json_path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+    data["uploaded_by"] = uploaded_by
+    with json_path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("input", type=str, help="Path to a single file to parse")
     ap.add_argument("-o", "--out-dir", required=True, type=str, help="Directory to write parsed JSON")
     ap.add_argument("--completed-dir", type=str, default="data/completed", help="Where to move originals after parse")
     ap.add_argument("--pretty", action="store_true", help="Pretty-print JSON")
+    ap.add_argument("--uploaded-by", type=str, default=None,
+                    help="GitHub username or identity of the uploader (injected into output JSON)")
     args = ap.parse_args()
 
     src = Path(args.input)
@@ -81,9 +94,16 @@ def main():
         parse_pca_file(src, out_path, pretty=pretty)
     elif ext == ".xtekct":
         parse_xtekct_file(src, out_path, pretty=pretty)
+    elif ext == ".log":
+        parse_skyscan_file(src, out_path, pretty=pretty)
     else:
         print(f"[parse_any] Unsupported file extension: {ext} ({src})", file=sys.stderr)
         sys.exit(2)
+
+    # Inject uploader identity if provided
+    if args.uploaded_by:
+        inject_uploaded_by(out_path, args.uploaded_by)
+        print(f"[parse_any] Tagged uploaded_by: {args.uploaded_by}")
 
     # If we get here, parse succeeded -> move source to completed
     try:

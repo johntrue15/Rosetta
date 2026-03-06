@@ -1,5 +1,5 @@
 """
-Tests for CSV conversion and user attribution.
+Tests for CSV conversion, user attribution, and standard_format.json mapping.
 """
 
 import csv
@@ -20,6 +20,9 @@ from metadata_to_csv import (
     find_user_email_for_record,
     gather_candidate_paths,
     read_users_index,
+    load_column_format,
+    ColumnFormat,
+    convert,
 )
 
 
@@ -285,3 +288,303 @@ metadata_to_csv.main()
         # Nested fields should be flattened with dot notation
         assert "calib_images.MGainImg" in row
         assert row["calib_images.MGainImg"] == "path/to/gain.tif"
+
+
+class TestColumnFormat:
+    """Test standard_format.json loading and column mapping."""
+
+    def test_load_missing_format_returns_none(self, temp_dir):
+        """When the format file doesn't exist, return None (use defaults)."""
+        fmt = load_column_format(str(temp_dir / "nonexistent.json"))
+        assert fmt is None
+
+    def test_load_valid_format(self, temp_dir):
+        """Load a valid standard_format.json and verify structure."""
+        fmt_data = {
+            "version": 1,
+            "include_unmapped": True,
+            "columns": [
+                {"source": "file_name", "name": "File Name"},
+                {"source": "xray_tube_voltage", "name": "Voltage (kV)"},
+            ],
+        }
+        fmt_path = temp_dir / "format.json"
+        fmt_path.write_text(json.dumps(fmt_data))
+
+        fmt = load_column_format(str(fmt_path))
+        assert fmt is not None
+        assert fmt.rename("file_name") == "File Name"
+        assert fmt.rename("xray_tube_voltage") == "Voltage (kV)"
+
+    def test_rename_unmapped_field_returns_source(self, temp_dir):
+        """Fields not in the format config keep their original names."""
+        fmt_data = {
+            "columns": [{"source": "file_name", "name": "File Name"}],
+            "include_unmapped": True,
+        }
+        fmt_path = temp_dir / "format.json"
+        fmt_path.write_text(json.dumps(fmt_data))
+
+        fmt = load_column_format(str(fmt_path))
+        assert fmt.rename("some_other_field") == "some_other_field"
+
+    def test_build_fieldnames_order(self, temp_dir):
+        """Columns appear in the order defined in the format config."""
+        fmt_data = {
+            "columns": [
+                {"source": "xray_tube_voltage", "name": "Voltage"},
+                {"source": "file_name", "name": "File"},
+            ],
+            "include_unmapped": False,
+        }
+        fmt_path = temp_dir / "format.json"
+        fmt_path.write_text(json.dumps(fmt_data))
+
+        fmt = load_column_format(str(fmt_path))
+        all_keys = {"file_name", "xray_tube_voltage", "sha256"}
+        headers = fmt.build_fieldnames(all_keys)
+
+        assert headers == ["Voltage", "File"]
+
+    def test_include_unmapped_true(self, temp_dir):
+        """Unmapped fields are appended at the end when include_unmapped is true."""
+        fmt_data = {
+            "columns": [{"source": "file_name", "name": "File Name"}],
+            "include_unmapped": True,
+        }
+        fmt_path = temp_dir / "format.json"
+        fmt_path.write_text(json.dumps(fmt_data))
+
+        fmt = load_column_format(str(fmt_path))
+        all_keys = {"file_name", "extra_a", "extra_b"}
+        headers = fmt.build_fieldnames(all_keys)
+
+        assert headers[0] == "File Name"
+        assert "extra_a" in headers
+        assert "extra_b" in headers
+
+    def test_include_unmapped_false(self, temp_dir):
+        """Unmapped fields are excluded when include_unmapped is false."""
+        fmt_data = {
+            "columns": [{"source": "file_name", "name": "File Name"}],
+            "include_unmapped": False,
+        }
+        fmt_path = temp_dir / "format.json"
+        fmt_path.write_text(json.dumps(fmt_data))
+
+        fmt = load_column_format(str(fmt_path))
+        all_keys = {"file_name", "extra_a", "extra_b"}
+        headers = fmt.build_fieldnames(all_keys)
+
+        assert headers == ["File Name"]
+
+    def test_include_false_excludes_column(self, temp_dir):
+        """Columns with include:false are excluded."""
+        fmt_data = {
+            "columns": [
+                {"source": "file_name", "name": "File Name"},
+                {"source": "sha256", "name": "Hash", "include": False},
+                {"source": "xray_tube_voltage", "name": "Voltage"},
+            ],
+            "include_unmapped": False,
+        }
+        fmt_path = temp_dir / "format.json"
+        fmt_path.write_text(json.dumps(fmt_data))
+
+        fmt = load_column_format(str(fmt_path))
+        all_keys = {"file_name", "sha256", "xray_tube_voltage"}
+        headers = fmt.build_fieldnames(all_keys)
+
+        assert "Hash" not in headers
+        assert headers == ["File Name", "Voltage"]
+
+    def test_build_source_order_matches_headers(self, temp_dir):
+        """Source order and header order are aligned."""
+        fmt_data = {
+            "columns": [
+                {"source": "xray_tube_voltage", "name": "Voltage (kV)"},
+                {"source": "file_name", "name": "File Name"},
+            ],
+            "include_unmapped": True,
+        }
+        fmt_path = temp_dir / "format.json"
+        fmt_path.write_text(json.dumps(fmt_data))
+
+        fmt = load_column_format(str(fmt_path))
+        all_keys = {"file_name", "xray_tube_voltage", "extra"}
+        sources = fmt.build_source_order(all_keys)
+        headers = fmt.build_fieldnames(all_keys)
+
+        assert len(sources) == len(headers)
+        assert sources[0] == "xray_tube_voltage"
+        assert headers[0] == "Voltage (kV)"
+
+
+class TestConvertWithFormat:
+    """Test the full convert() function with standard_format.json."""
+
+    def test_convert_with_format_renames_headers(self, temp_dir, mock_metadata_json):
+        """CSV headers should use the display names from standard_format.json."""
+        data_dir = temp_dir / "data"
+        data_dir.mkdir()
+
+        (data_dir / "metadata.json").write_text(json.dumps(mock_metadata_json))
+        (temp_dir / "users.csv").write_text("")
+
+        fmt = {
+            "version": 1,
+            "include_unmapped": True,
+            "columns": [
+                {"source": "file_name", "name": "File Name"},
+                {"source": "xray_tube_voltage", "name": "Voltage (kV)"},
+                {"source": "X-ray User", "name": "X-ray User"},
+            ],
+        }
+        fmt_path = temp_dir / "standard_format.json"
+        fmt_path.write_text(json.dumps(fmt))
+
+        out_csv = data_dir / "metadata.csv"
+        convert(
+            metadata_path=str(data_dir / "metadata.json"),
+            users_path=str(temp_dir / "users.csv"),
+            format_path=str(fmt_path),
+            output_path=str(out_csv),
+        )
+
+        with open(out_csv, "r", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+
+        assert "File Name" in headers
+        assert "Voltage (kV)" in headers
+        assert "file_name" not in headers
+
+    def test_convert_without_format_uses_defaults(self, temp_dir, mock_metadata_json):
+        """Without standard_format.json, original field names are used."""
+        data_dir = temp_dir / "data"
+        data_dir.mkdir()
+
+        (data_dir / "metadata.json").write_text(json.dumps(mock_metadata_json))
+        (temp_dir / "users.csv").write_text("")
+
+        out_csv = data_dir / "metadata.csv"
+        convert(
+            metadata_path=str(data_dir / "metadata.json"),
+            users_path=str(temp_dir / "users.csv"),
+            format_path=str(temp_dir / "nonexistent.json"),
+            output_path=str(out_csv),
+        )
+
+        with open(out_csv, "r", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+
+        assert "file_name" in headers
+        assert "xray_tube_voltage" in headers
+
+    def test_convert_respects_column_order(self, temp_dir, mock_metadata_json):
+        """CSV columns appear in the order specified by standard_format.json."""
+        data_dir = temp_dir / "data"
+        data_dir.mkdir()
+
+        (data_dir / "metadata.json").write_text(json.dumps(mock_metadata_json))
+        (temp_dir / "users.csv").write_text("")
+
+        fmt = {
+            "columns": [
+                {"source": "xray_tube_voltage", "name": "Voltage"},
+                {"source": "file_name", "name": "File"},
+                {"source": "ct_number_images", "name": "Images"},
+            ],
+            "include_unmapped": False,
+        }
+        fmt_path = temp_dir / "format.json"
+        fmt_path.write_text(json.dumps(fmt))
+
+        out_csv = data_dir / "metadata.csv"
+        convert(
+            metadata_path=str(data_dir / "metadata.json"),
+            users_path=str(temp_dir / "users.csv"),
+            format_path=str(fmt_path),
+            output_path=str(out_csv),
+        )
+
+        with open(out_csv, "r", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+
+        assert headers == ["Voltage", "File", "Images"]
+
+    def test_convert_uploaded_by_appears_in_csv(self, temp_dir):
+        """The uploaded_by field from parsed JSON shows up in CSV output."""
+        data_dir = temp_dir / "data"
+        data_dir.mkdir()
+
+        metadata = [
+            {
+                "file_name": "test.pca",
+                "uploaded_by": "johntrue15",
+                "xray_tube_voltage": "200",
+            }
+        ]
+        (data_dir / "metadata.json").write_text(json.dumps(metadata))
+        (temp_dir / "users.csv").write_text("")
+
+        fmt = {
+            "columns": [
+                {"source": "file_name", "name": "File Name"},
+                {"source": "uploaded_by", "name": "Uploaded By"},
+                {"source": "X-ray User", "name": "X-ray User"},
+            ],
+            "include_unmapped": True,
+        }
+        fmt_path = temp_dir / "format.json"
+        fmt_path.write_text(json.dumps(fmt))
+
+        out_csv = data_dir / "metadata.csv"
+        convert(
+            metadata_path=str(data_dir / "metadata.json"),
+            users_path=str(temp_dir / "users.csv"),
+            format_path=str(fmt_path),
+            output_path=str(out_csv),
+        )
+
+        with open(out_csv, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            row = next(reader)
+
+        assert row["Uploaded By"] == "johntrue15"
+
+
+class TestUploadedByInjection:
+    """Test uploaded_by injection in parse_any.py."""
+
+    def test_inject_uploaded_by(self, temp_dir):
+        """inject_uploaded_by should add the field to existing JSON."""
+        from parse_any import inject_uploaded_by
+
+        json_path = temp_dir / "test.json"
+        json_path.write_text(json.dumps({"file_name": "test.pca", "sha256": "abc"}))
+
+        inject_uploaded_by(json_path, "johntrue15")
+
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        assert data["uploaded_by"] == "johntrue15"
+        assert data["file_name"] == "test.pca"
+        assert data["sha256"] == "abc"
+
+    def test_inject_uploaded_by_overwrites(self, temp_dir):
+        """If uploaded_by already exists, it gets overwritten."""
+        from parse_any import inject_uploaded_by
+
+        json_path = temp_dir / "test.json"
+        json_path.write_text(json.dumps({"file_name": "a.pca", "uploaded_by": "old_user"}))
+
+        inject_uploaded_by(json_path, "new_user")
+
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        assert data["uploaded_by"] == "new_user"

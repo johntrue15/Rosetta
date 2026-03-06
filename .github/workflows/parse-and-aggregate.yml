@@ -87,10 +87,29 @@ jobs:
             [ -z "${f:-}" ] && continue
             [ ! -f "$f" ] && continue
             echo "Parsing: $f"
+
+            # Extract uploader identity from the commit that added this file.
+            # For web UI uploads the commit is authored by the GitHub user;
+            # the commit message also contains [uploader:<login>].
+            UPLOADER=""
+            COMMIT_MSG=$(git log -1 --format='%s' -- "$f" 2>/dev/null || true)
+            if echo "$COMMIT_MSG" | grep -qoP '\[uploader:\K[^\]]+'; then
+              UPLOADER=$(echo "$COMMIT_MSG" | grep -oP '\[uploader:\K[^\]]+')
+            fi
+            if [ -z "$UPLOADER" ]; then
+              UPLOADER=$(git log -1 --format='%an' -- "$f" 2>/dev/null || true)
+            fi
+
+            UPLOADER_FLAG=""
+            if [ -n "$UPLOADER" ] && [ "$UPLOADER" != "github-actions[bot]" ]; then
+              UPLOADER_FLAG="--uploaded-by $UPLOADER"
+            fi
+
             python scripts/parse_any.py "$f" \
               -o data/parsed \
               --completed-dir data/completed \
-              --pretty
+              --pretty \
+              $UPLOADER_FLAG
           done < "$LIST_FILE"
 
           # Safety cleanup: remove any leftover metadata sources outside parsed/completed/tests
@@ -98,7 +117,7 @@ jobs:
             ! -path "data/parsed/*" \
             ! -path "data/completed/*" \
             ! -path "data/tests/*" \
-            \( -iname "*.rtf" -o -iname "*.pca" -o -iname "*.xtekct" -o -iname "*.xml" \) \
+            \( -iname "*.rtf" -o -iname "*.pca" -o -iname "*.xtekct" -o -iname "*.xml" -o -iname "*.log" \) \
             -print -exec rm -f {} +
 
       - name: Aggregate & de-duplicate metadata

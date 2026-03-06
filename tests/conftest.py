@@ -154,6 +154,69 @@ Filter_Material=Copper
 
 
 @pytest.fixture
+def sample_skyscan_path():
+    """Path to a sample SkyScan .log file in the repo (check data/tests/ first)."""
+    candidates = [
+        REPO_ROOT / "data" / "tests" / "cisco_70kv_450ua_3.9_w_IR_rec.log",
+        REPO_ROOT / "data" / "completed" / "cisco_70kv_450ua_3.9_w_IR_rec.log",
+    ]
+    for path in candidates:
+        if path.exists():
+            return path
+    return candidates[0]
+
+
+@pytest.fixture
+def mock_skyscan_content():
+    """Minimal valid Bruker SkyScan .log file content for testing."""
+    return """[System]
+Scanner=SkyScan2211
+Instrument S/N=15A13010
+Software=1.5.3
+Source Type=Xray-Worx
+Camera=FlatPanel Sensor
+Camera Pixel Size (um)=74.800
+[Acquisition]
+Data directory=D:\\Data\\tanjid\\cisco\\cisco_sample_1
+Filename prefix=cisco_70kv_450ua_3.9_w
+Number of Files=  601
+Source Voltage (kV)=  70
+Source Current (uA)= 450
+Source target type=Tungsten (W)
+Number of Rows= 1536
+Number of Columns= 3776
+Image Pixel Size (um)=   40.00
+Object to Source (mm)=151.006
+Camera to Source (mm)=282.376
+Camera binning=1x1
+Exposure (ms)=   111
+Filter=0.5 mm Al
+Frame Averaging=ON (2)
+Rotation Step (deg)=0.600
+Use 360 Rotation=YES
+Scan duration=0h:18m:3s
+Study Date and Time=Dec 06, 2018  13:31:56
+Image Rotation=-0.3610
+Vertical Object Position (mm)=64.000
+Scanning Trajectory=ROUND
+Type Of Motion=STEP AND SHOOT
+[Reconstruction]
+Reconstruction Program=NRecon
+Program Version=Version: 1.7.0.4
+Reconstruction engine=InstaRecon
+Pixel Size (um)=40.00000
+Result File Type=TIF
+Result Image Width (pixels)=3124
+Result Image Height (pixels)=632
+Ring Artifact Correction=14
+Beam Hardening Correction (%)=51
+Time and Date=Dec 14, 2018  16:03:20
+[File name convention]
+Filename Prefix=cisco_70kv_450ua_3.9_w_IR_rec
+"""
+
+
+@pytest.fixture
 def mock_metadata_json():
     """Sample metadata.json content for testing aggregation and CSV conversion."""
     return [

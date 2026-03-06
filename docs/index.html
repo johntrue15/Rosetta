@@ -294,7 +294,7 @@
       <div id="drop-zone">
         <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
         <p><strong>Drag &amp; drop files here</strong> or click to browse</p>
-        <p style="font-size:0.78rem;margin-top:0.5rem">Supported: .pca &nbsp;·&nbsp; .rtf &nbsp;·&nbsp; .xtekct</p>
+        <p style="font-size:0.78rem;margin-top:0.5rem">Supported: .pca &nbsp;·&nbsp; .rtf &nbsp;·&nbsp; .xtekct &nbsp;·&nbsp; .log</p>
         <input type="file" id="file-input" multiple />
       </div>
 
@@ -341,6 +341,7 @@
       { ext: ".pca",    name: "Phoenix / Waygate",   status: "live" },
       { ext: ".rtf",    name: "North Star Imaging",   status: "live" },
       { ext: ".xtekct", name: "Nikon / XTek CT",      status: "live" },
+      { ext: ".log",    name: "Bruker SkyScan",       status: "live" },
       { ext: ".vgi",    name: "Volume Graphics",      status: "soon" },
       { ext: ".xml",    name: "Generic XML metadata", status: "soon" },
     ];
@@ -637,8 +638,9 @@
             if (existing.ok) sha = (await existing.json()).sha;
           } catch (_) {}
 
+          const uploaderTag = currentUser ? " [uploader:" + currentUser.login + "]" : "";
           const body = {
-            message: "Upload " + file.name + " via Rosetta drag-and-drop",
+            message: "Upload " + file.name + " via Rosetta" + uploaderTag,
             content,
             branch: BRANCH,
           };
