@@ -13,7 +13,7 @@ A comprehensive pipeline that transforms heterogeneous scan metadata files into 
 
 ## Quick Start – Drag & Drop Upload
 
-The easiest way to add metadata files is through the **[Rosetta Upload Page](https://johntrue15.github.io/Rosetta/)** (GitHub Pages):
+The easiest way to add metadata files is through the **[Rosetta Upload Page](https://johntrue15.github.io/Rosetta/docs)** (GitHub Pages):
 
 1. **Open** the [upload page](https://johntrue15.github.io/Rosetta/).
 2. **Sign in** with a GitHub Personal Access Token that has `repo` scope.  
