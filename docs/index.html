@@ -317,7 +317,7 @@
 
   <footer>
     Powered by <a href="https://github.com/johntrue15/Rosetta">Rosetta</a> &middot;
-    Files are committed via the GitHub Contents API
+    Files are committed via the GitHub API
   </footer>
 
   <script>
@@ -609,7 +609,7 @@
     fileInput.addEventListener("change", () => { handleFiles(fileInput.files); fileInput.value = ""; });
 
     /* ================================================================== */
-    /*  Upload via GitHub Contents API                                    */
+    /*  Upload via GitHub API                                             */
     /* ================================================================== */
     function log(msg, type) {
       const el = document.createElement("div");
@@ -621,53 +621,157 @@
     async function handleFiles(fileList) {
       if (!token) { alert("Please sign in first."); return; }
 
-      for (const file of fileList) {
-        log("Uploading " + file.name + " …", "info");
+      const files = Array.from(fileList);
+      if (files.length === 0) return;
+
+      /* Single-file: use the simpler Contents API */
+      if (files.length === 1) {
+        await uploadSingleFile(files[0]);
+        return;
+      }
+
+      /* Multi-file: batch via Git Trees API (1 commit = 1 workflow trigger, no SHA conflicts) */
+      await uploadBatch(files);
+    }
+
+    /* Single-file upload via Contents API */
+    async function uploadSingleFile(file) {
+      log("Uploading " + file.name + " …", "info");
+      try {
+        const content = await readAsBase64(file);
+        const path    = UPLOAD_PATH + file.name;
+
+        /* Get existing SHA if the file already exists */
+        let sha;
         try {
-          const content = await readAsBase64(file);
-          const path    = UPLOAD_PATH + file.name;
-
-          /* Get existing SHA if the file already exists */
-          let sha;
-          try {
-            const existing = await fetch(
-              "https://api.github.com/repos/" + OWNER + "/" + REPO +
-              "/contents/" + encodeURIComponent(path) + "?ref=" + BRANCH,
-              { headers: { Authorization: "Bearer " + token } }
-            );
-            if (existing.ok) sha = (await existing.json()).sha;
-          } catch (_) {}
-
-          const uploaderTag = currentUser ? " [uploader:" + currentUser.login + "]" : "";
-          const body = {
-            message: "Upload " + file.name + " via Rosetta" + uploaderTag,
-            content,
-            branch: BRANCH,
-          };
-          if (sha) body.sha = sha;
-
-          const putRes = await fetch(
+          const existing = await fetch(
             "https://api.github.com/repos/" + OWNER + "/" + REPO +
-            "/contents/" + encodeURIComponent(path),
-            {
-              method:  "PUT",
-              headers: {
-                Authorization:  "Bearer " + token,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(body),
-            }
+            "/contents/" + encodeURIComponent(path) + "?ref=" + BRANCH,
+            { headers: { Authorization: "Bearer " + token } }
           );
+          if (existing.ok) sha = (await existing.json()).sha;
+        } catch (_) {}
 
-          if (!putRes.ok) {
-            const err = await putRes.json();
-            throw new Error(err.message || putRes.statusText);
+        const uploaderTag = currentUser ? " [uploader:" + currentUser.login + "]" : "";
+        const body = {
+          message: "Upload " + file.name + " via Rosetta" + uploaderTag,
+          content,
+          branch: BRANCH,
+        };
+        if (sha) body.sha = sha;
+
+        const putRes = await fetch(
+          "https://api.github.com/repos/" + OWNER + "/" + REPO +
+          "/contents/" + encodeURIComponent(path),
+          {
+            method:  "PUT",
+            headers: {
+              Authorization:  "Bearer " + token,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
           }
+        );
 
-          log("✓ " + file.name + " uploaded successfully.", "success");
-        } catch (err) {
-          log("✗ " + file.name + " – " + err.message, "error");
+        if (!putRes.ok) {
+          const err = await putRes.json();
+          throw new Error(err.message || putRes.statusText);
         }
+
+        log("✓ " + file.name + " uploaded successfully.", "success");
+      } catch (err) {
+        log("✗ " + file.name + " – " + err.message, "error");
+      }
+    }
+
+    /* Multi-file batch upload via Git Trees API */
+    async function uploadBatch(files) {
+      const names = files.map(f => f.name).join(", ");
+      log("Uploading " + files.length + " files in one commit: " + names + " …", "info");
+      try {
+        const apiBase = "https://api.github.com/repos/" + OWNER + "/" + REPO;
+        const headers = {
+          Authorization:  "Bearer " + token,
+          "Content-Type": "application/json",
+          Accept:         "application/vnd.github+json",
+        };
+
+        /* Step 1: Get the current branch HEAD commit SHA and its tree SHA */
+        const refRes = await fetch(apiBase + "/git/ref/heads/" + BRANCH, { headers });
+        if (!refRes.ok) throw new Error("Failed to get branch ref: " + refRes.statusText);
+        const refData = await refRes.json();
+        const headCommitSha = refData.object.sha;
+
+        const commitRes = await fetch(apiBase + "/git/commits/" + headCommitSha, { headers });
+        if (!commitRes.ok) throw new Error("Failed to get commit: " + commitRes.statusText);
+        const commitData = await commitRes.json();
+        const baseTreeSha = commitData.tree.sha;
+
+        /* Step 2: Read all files and create blobs in parallel.
+           Parallel blob creation is safe for typical batch sizes (handful of
+           scanner metadata files). GitHub authenticated rate limit is 5000
+           req/hr, so a few dozen blobs per upload is well within limits. */
+        log("Creating blobs for " + files.length + " files…", "info");
+        const blobPromises = files.map(async file => {
+          const content = await readAsBase64(file);
+          const blobRes = await fetch(apiBase + "/git/blobs", {
+            method:  "POST",
+            headers,
+            body: JSON.stringify({ content, encoding: "base64" }),
+          });
+          if (!blobRes.ok) {
+            const err = await blobRes.json();
+            throw new Error("Blob creation failed for " + file.name + ": " + (err.message || blobRes.statusText));
+          }
+          const blob = await blobRes.json();
+          return { path: UPLOAD_PATH + file.name, mode: "100644", type: "blob", sha: blob.sha };
+        });
+        const treeItems = await Promise.all(blobPromises);
+
+        /* Step 3: Create a new tree with all files */
+        const treeRes = await fetch(apiBase + "/git/trees", {
+          method:  "POST",
+          headers,
+          body: JSON.stringify({ base_tree: baseTreeSha, tree: treeItems }),
+        });
+        if (!treeRes.ok) {
+          const err = await treeRes.json();
+          throw new Error("Tree creation failed: " + (err.message || treeRes.statusText));
+        }
+        const newTree = await treeRes.json();
+
+        /* Step 4: Create a single commit pointing to the new tree */
+        const uploaderTag = currentUser ? " [uploader:" + currentUser.login + "]" : "";
+        const fileList    = files.map(f => f.name).join(", ");
+        const newCommitRes = await fetch(apiBase + "/git/commits", {
+          method:  "POST",
+          headers,
+          body: JSON.stringify({
+            message: "Upload " + fileList + " via Rosetta" + uploaderTag,
+            tree:    newTree.sha,
+            parents: [headCommitSha],
+          }),
+        });
+        if (!newCommitRes.ok) {
+          const err = await newCommitRes.json();
+          throw new Error("Commit creation failed: " + (err.message || newCommitRes.statusText));
+        }
+        const newCommit = await newCommitRes.json();
+
+        /* Step 5: Update the branch ref to point to the new commit */
+        const updateRefRes = await fetch(apiBase + "/git/refs/heads/" + BRANCH, {
+          method:  "PATCH",
+          headers,
+          body: JSON.stringify({ sha: newCommit.sha }),
+        });
+        if (!updateRefRes.ok) {
+          const err = await updateRefRes.json();
+          throw new Error("Ref update failed: " + (err.message || updateRefRes.statusText));
+        }
+
+        log("✓ All " + files.length + " files uploaded in a single commit.", "success");
+      } catch (err) {
+        log("✗ Batch upload failed – " + err.message, "error");
       }
     }
 
