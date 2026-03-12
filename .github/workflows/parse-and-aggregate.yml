@@ -151,13 +151,21 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Stage ALL changes in data/ (including deletions of original files)
           git add -A data/
-
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
-
           git commit -m "Parse & aggregate data [skip ci]"
-          git push
+
+          MAX_RETRIES=5
+          for i in $(seq 1 $MAX_RETRIES); do
+            if git push; then
+              echo "Push succeeded on attempt $i"
+              exit 0
+            fi
+            echo "Push failed (attempt $i/$MAX_RETRIES), pulling with rebase..."
+            git pull --rebase origin "$GITHUB_REF_NAME"
+          done
+          echo "Failed after $MAX_RETRIES attempts"
+          exit 1
