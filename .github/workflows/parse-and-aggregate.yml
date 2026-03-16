@@ -144,6 +144,14 @@ jobs:
             exit 1
           fi
 
+      - name: Upload combined CSV as artifact
+        if: ${{ hashFiles('data/metadata.csv') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-metadata-csv
+          path: data/metadata.csv
+          retention-days: 60
+
       - name: Commit & push results
         shell: bash
         run: |

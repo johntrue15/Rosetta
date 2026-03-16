@@ -206,6 +206,49 @@
     .log-entry.success { background: rgba(63,185,80,0.08);   color: var(--success); }
     .log-entry.error   { background: rgba(248,81,73,0.08);   color: var(--danger); }
 
+    /* Artifact download */
+    #artifact-section {
+      margin-top: 1.75rem;
+      padding: 1.1rem 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    #artifact-section h3 {
+      font-size: 0.92rem;
+      margin-bottom: 0.75rem;
+    }
+    #artifact-section h3 svg {
+      width: 16px; height: 16px; fill: var(--accent);
+      vertical-align: middle;
+      margin-right: 0.3rem;
+    }
+    .artifact-info {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+      line-height: 1.6;
+    }
+    .artifact-info code {
+      background: rgba(88,166,255,0.1);
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.8rem;
+    }
+    #artifact-error {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .btn-download {
+      background: #1f6feb;
+      border-color: #388bfd;
+      color: #fff;
+    }
+    .btn-download:hover { background: #388bfd; }
+    .btn-download svg {
+      width: 16px; height: 16px; fill: currentColor;
+    }
+
     /* How it works */
     .instructions {
       margin-top: 1.75rem;
@@ -300,6 +343,16 @@
 
       <div id="status-log"></div>
 
+      <!-- Artifact download -->
+      <div id="artifact-section">
+        <h3>
+          <svg viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 011 12.25v-2.5a.75.75 0 011.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 00.25-.25v-2.5a.75.75 0 011.5 0v2.5A1.75 1.75 0 0113.25 14H2.75zm6.56-4.72l2.72-2.72a.75.75 0 00-1.06-1.06L8.75 7.72V1.75a.75.75 0 00-1.5 0v5.97L5.03 5.5a.75.75 0 00-1.06 1.06l2.72 2.72a.75.75 0 001.06 0z"/></svg>
+          Download Combined CSV
+        </h3>
+        <div id="artifact-info" class="artifact-info"></div>
+        <div id="artifact-error"></div>
+      </div>
+
       <div class="instructions">
         <h3>How it works</h3>
         <ol>
@@ -309,6 +362,7 @@
               and writes JSON to <code>data/parsed/</code>.</li>
           <li>Results are aggregated into <code>data/metadata.json</code> and
               <code>data/metadata.csv</code>.</li>
+          <li>The combined CSV is published as a downloadable artifact (available for 60 days).</li>
         </ol>
       </div>
     </div>
@@ -362,6 +416,8 @@
     const requestBtn     = document.getElementById("request-btn");
     const requestStatus  = document.getElementById("request-status");
     const formatsGrid    = document.getElementById("formats-grid");
+    const artifactInfo   = document.getElementById("artifact-info");
+    const artifactError  = document.getElementById("artifact-error");
 
     /* ================================================================== */
     /*  Render format cards                                                */
@@ -427,6 +483,8 @@
       logoutBtn.textContent = "Sign out";
       logoutBtn.addEventListener("click", signOut);
       userInfo.append(avatar, uname, logoutBtn);
+
+      loadLatestArtifact();
     }
 
     function signOut() {
@@ -782,6 +840,89 @@
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
+    }
+
+    /* ================================================================== */
+    /*  Artifact download                                                  */
+    /* ================================================================== */
+    async function loadLatestArtifact() {
+      artifactInfo.textContent  = "";
+      artifactError.textContent = "";
+
+      try {
+        const headers = {};
+        if (token) headers.Authorization = "Bearer " + token;
+
+        const res = await fetch(
+          "https://api.github.com/repos/" + OWNER + "/" + REPO +
+          "/actions/artifacts?name=combined-metadata-csv&per_page=1",
+          { headers }
+        );
+
+        if (!res.ok) {
+          artifactError.textContent = "Could not fetch artifacts.";
+          return;
+        }
+
+        const data = await res.json();
+        if (!data.artifacts || data.artifacts.length === 0) {
+          artifactError.textContent = "No combined CSV artifact found yet. Upload files to generate one.";
+          return;
+        }
+
+        const artifact = data.artifacts[0];
+        const created  = new Date(artifact.created_at);
+        const expires  = new Date(artifact.expires_at);
+        const sizeKB   = (artifact.size_in_bytes / 1024).toFixed(1);
+
+        const infoText = document.createElement("span");
+        infoText.innerHTML =
+          "Latest artifact: <code>" + artifact.name + "</code> &middot; " +
+          sizeKB + " KB &middot; created " + created.toLocaleDateString() +
+          " &middot; expires " + expires.toLocaleDateString();
+        artifactInfo.appendChild(infoText);
+        artifactInfo.appendChild(document.createElement("br"));
+
+        const btn = document.createElement("button");
+        btn.className = "btn btn-download";
+        btn.style.marginTop = "0.5rem";
+        btn.innerHTML =
+          '<svg viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 011 12.25v-2.5a.75.75 0 011.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 00.25-.25v-2.5a.75.75 0 011.5 0v2.5A1.75 1.75 0 0113.25 14H2.75zm6.56-4.72l2.72-2.72a.75.75 0 00-1.06-1.06L8.75 7.72V1.75a.75.75 0 00-1.5 0v5.97L5.03 5.5a.75.75 0 00-1.06 1.06l2.72 2.72a.75.75 0 001.06 0z"/></svg> ' +
+          "Download " + artifact.name + ".zip";
+        btn.addEventListener("click", function () { downloadArtifact(artifact.id, artifact.name); });
+        artifactInfo.appendChild(btn);
+      } catch (err) {
+        artifactError.textContent = "Error loading artifacts: " + err.message;
+      }
+    }
+
+    async function downloadArtifact(artifactId, artifactName) {
+      if (!token) {
+        alert("Please sign in to download artifacts.");
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          "https://api.github.com/repos/" + OWNER + "/" + REPO +
+          "/actions/artifacts/" + artifactId + "/zip",
+          { headers: { Authorization: "Bearer " + token } }
+        );
+
+        if (!res.ok) throw new Error("Download failed: " + res.statusText);
+
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement("a");
+        a.href     = url;
+        a.download = artifactName + ".zip";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        alert("Download failed: " + err.message);
+      }
     }
   </script>
 </body>
