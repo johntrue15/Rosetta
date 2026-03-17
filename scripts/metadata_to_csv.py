@@ -341,7 +341,23 @@ def convert(metadata_path: str = METADATA_JSON,
 
 
 def main():
-    convert()
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Convert metadata JSON to CSV with user attribution.",
+    )
+    parser.add_argument(
+        "--input",
+        default=METADATA_JSON,
+        help=f"Input metadata JSON path (default: {METADATA_JSON})",
+    )
+    parser.add_argument(
+        "--output",
+        default=OUTPUT_CSV,
+        help=f"Output CSV path (default: {OUTPUT_CSV})",
+    )
+    args = parser.parse_args()
+    convert(metadata_path=args.input, output_path=args.output)
 
 
 if __name__ == "__main__":
