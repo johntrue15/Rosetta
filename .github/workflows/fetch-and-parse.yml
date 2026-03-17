@@ -132,7 +132,7 @@ jobs:
             -print -exec rm -f {} +
 
           echo "Remaining files to commit:"
-          find data -type f | head -40
+          find data -type f | head -40 || true
 
       - name: Aggregate & de-duplicate metadata
         run: python scripts/aggregate_json.py
