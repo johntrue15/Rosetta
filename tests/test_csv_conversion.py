@@ -556,6 +556,75 @@ class TestConvertWithFormat:
         assert row["Uploaded By"] == "johntrue15"
 
 
+class TestConvertCLI:
+    """Test CLI argument handling for metadata_to_csv.py."""
+
+    def test_convert_with_custom_input_output(self, temp_dir, mock_metadata_json):
+        """convert() should accept custom input and output paths."""
+        input_json = temp_dir / "custom-input.json"
+        output_csv = temp_dir / "custom-output.csv"
+        input_json.write_text(json.dumps(mock_metadata_json))
+        (temp_dir / "users.csv").write_text("")
+
+        convert(
+            metadata_path=str(input_json),
+            users_path=str(temp_dir / "users.csv"),
+            output_path=str(output_csv),
+        )
+
+        assert output_csv.exists()
+        with open(output_csv, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        assert len(rows) == 2
+
+    def test_convert_upload_only_subset(self, temp_dir):
+        """convert() on a subset JSON produces CSV with only those records."""
+        # Simulate upload-only JSON with a single record
+        upload_only = [
+            {
+                "file_name": "only-this.pca",
+                "ct_voxel_size_um": "50.0",
+                "source_path": "data/parsed/only-this.pca.json",
+            }
+        ]
+        input_json = temp_dir / "upload-metadata.json"
+        output_csv = temp_dir / "upload-metadata.csv"
+        input_json.write_text(json.dumps(upload_only))
+        (temp_dir / "users.csv").write_text("")
+
+        convert(
+            metadata_path=str(input_json),
+            users_path=str(temp_dir / "users.csv"),
+            output_path=str(output_csv),
+        )
+
+        assert output_csv.exists()
+        with open(output_csv, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        assert len(rows) == 1
+
+    def test_convert_empty_upload(self, temp_dir):
+        """convert() on an empty JSON list produces CSV with only a header."""
+        input_json = temp_dir / "empty.json"
+        output_csv = temp_dir / "empty.csv"
+        input_json.write_text("[]")
+        (temp_dir / "users.csv").write_text("")
+
+        convert(
+            metadata_path=str(input_json),
+            users_path=str(temp_dir / "users.csv"),
+            output_path=str(output_csv),
+        )
+
+        assert output_csv.exists()
+        with open(output_csv, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        # Should have just a header row (no data rows, so empty header)
+        assert len(lines) <= 1
+
+
 class TestUploadedByInjection:
     """Test uploaded_by injection in parse_any.py."""
 

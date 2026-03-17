@@ -120,6 +120,46 @@ jobs:
             \( -iname "*.rtf" -o -iname "*.pca" -o -iname "*.xtekct" -o -iname "*.xml" -o -iname "*.log" -o -iname "*.txrm" \) \
             -print -exec rm -f {} +
 
+      - name: Build upload-only metadata JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          LIST_FILE="${{ steps.changed.outputs.list }}"
+          python3 -c "
+          import json, os, sys
+          list_file = os.environ['LIST_FILE']
+          records = []
+          if os.path.isfile(list_file):
+              with open(list_file) as f:
+                  for line in f:
+                      src = line.strip()
+                      if not src:
+                          continue
+                      parsed = os.path.join('data', 'parsed', os.path.basename(src) + '.json')
+                      if os.path.isfile(parsed):
+                          with open(parsed, 'r', encoding='utf-8') as pf:
+                              data = json.load(pf)
+                          if isinstance(data, list):
+                              records.extend(data)
+                          elif isinstance(data, dict):
+                              records.append(data)
+          with open('upload-metadata.json', 'w', encoding='utf-8') as out:
+              json.dump(records, out, ensure_ascii=False, indent=2)
+          print(f'Collected {len(records)} upload-only records')
+          "
+        env:
+          LIST_FILE: ${{ steps.changed.outputs.list }}
+
+      - name: Convert upload-only JSON to CSV
+        if: ${{ hashFiles('upload-metadata.json') != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/metadata_to_csv.py \
+            --input upload-metadata.json \
+            --output upload-metadata.csv
+          echo "Generated upload-metadata.csv"
+
       - name: Aggregate & de-duplicate metadata
         shell: bash
         run: |
@@ -150,6 +190,14 @@ jobs:
         with:
           name: combined-metadata-csv
           path: data/metadata.csv
+          retention-days: 60
+
+      - name: Upload upload-only CSV as artifact
+        if: ${{ hashFiles('upload-metadata.csv') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload-metadata-csv
+          path: upload-metadata.csv
           retention-days: 60
 
       - name: Commit & push results
