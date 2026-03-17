@@ -1,0 +1,116 @@
+"""CLI entry point for the Rosetta edge watchdog."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import logging
+import sys
+from pathlib import Path
+
+from . import __version__
+from .config import load_config
+from .push.github_api import GitHubPusher
+from .watcher import DirectoryWatcher
+
+
+def _setup_logging(level: str, log_file: str | None) -> None:
+    fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
+    if log_file:
+        handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
+    logging.basicConfig(level=getattr(logging, level.upper(), logging.INFO),
+                        format=fmt, handlers=handlers)
+
+
+def _get_parser(backend: str):
+    """Resolve the parser backend based on config ('auto', 'xradiaPy', 'olefile')."""
+    if backend in ("auto", "xradiaPy"):
+        try:
+            from .parsers.xradiaPy_parser import XradiaPyParser
+            return XradiaPyParser()
+        except ImportError:
+            if backend == "xradiaPy":
+                logging.getLogger(__name__).error(
+                    "XradiaPy not available — install the Zeiss Xradia Software Suite")
+                sys.exit(1)
+            logging.getLogger(__name__).info(
+                "XradiaPy not available, falling back to olefile backend")
+
+    from .parsers.olefile_parser import OlefileParser
+    return OlefileParser()
+
+
+def main(argv: list[str] | None = None) -> None:
+    ap = argparse.ArgumentParser(
+        prog="rosetta-watchdog",
+        description="Rosetta edge watchdog — monitors Xradia scan directories "
+                    "and pushes metadata to GitHub",
+    )
+    ap.add_argument("-c", "--config", required=True,
+                    help="Path to config YAML file")
+    ap.add_argument("--once", action="store_true",
+                    help="Run one scan cycle then exit (useful for cron)")
+    ap.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    args = ap.parse_args(argv)
+
+    config = load_config(Path(args.config))
+    _setup_logging(config.logging.level, config.logging.file)
+    log = logging.getLogger(__name__)
+
+    parser = _get_parser(config.parser_backend)
+    log.info("Using parser backend: %s", type(parser).__name__)
+
+    pusher = None
+    if config.github.token and config.github.repo:
+        pusher = GitHubPusher(config.github)
+        log.info("GitHub push enabled → %s (%s)", config.github.repo, config.github.branch)
+    else:
+        log.warning("GitHub push disabled (no token or repo configured)")
+
+    def process_file(file_path: str, machine_name: str) -> bool:
+        log.info("Parsing %s (machine: %s)", file_path, machine_name)
+        metadata = parser.parse(file_path)
+        if metadata is None:
+            return False
+
+        metadata["machine_name"] = machine_name
+
+        sha256 = hashlib.sha256(Path(file_path).read_bytes()).hexdigest()
+        metadata["sha256"] = sha256
+
+        json_bytes = json.dumps(metadata, ensure_ascii=False, indent=2).encode("utf-8")
+        filename = Path(file_path).name + ".json"
+
+        if pusher:
+            ok = pusher.push_file(
+                content=json_bytes,
+                remote_path=config.github.upload_path + filename,
+                commit_message=(
+                    f"{config.github.commit_prefix} {Path(file_path).name} "
+                    f"[uploader:edge-watchdog-{machine_name}]"
+                ),
+            )
+            if not ok:
+                log.error("Failed to push %s to GitHub", filename)
+                return False
+        else:
+            out_dir = Path("watchdog_output")
+            out_dir.mkdir(exist_ok=True)
+            (out_dir / filename).write_bytes(json_bytes)
+            log.info("Wrote local file: %s", out_dir / filename)
+
+        return True
+
+    watcher = DirectoryWatcher(config, process_file)
+
+    if args.once:
+        count = watcher.run_once()
+        log.info("Single scan complete — processed %d file(s)", count)
+    else:
+        watcher.run_forever()
+
+
+if __name__ == "__main__":
+    main()

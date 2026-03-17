@@ -1,0 +1,104 @@
+# X-radia Metadata Extractor - Git Ignore
+# ========================================
+
+# Environment and configuration (contains secrets)
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# IDE - PyCharm
+.idea/
+*.iml
+*.ipr
+*.iws
+.idea_modules/
+
+# IDE - VS Code
+.vscode/
+*.code-workspace
+
+# IDE - Other
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# Testing
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Logs
+*.log
+logs/
+
+# Output files (generated metadata)
+*_metadata.txt
+*_config.txt
+cumulative_metadata_*.csv
+metadata_output/
+
+# Watch mode configuration (user-specific)
+watch_config.json
+
+# OS-specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# TXRM files (data - don't commit)
+*.txrm
+*.TXRM
+*.xrm
+*.XRM

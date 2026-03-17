@@ -1,0 +1,40 @@
+# Rosetta Edge Watchdog — example configuration
+# Copy this file to config.yml and edit for your environment.
+
+# Directories to monitor for new .txrm files.
+# Each entry has a path and a machine_name used for attribution.
+watch_directories:
+  - path: "D:/XradiaData/Scans"
+    machine_name: "Xradia-520-Versa"
+  # Add more machines as needed:
+  # - path: "E:/CT_Output"
+  #   machine_name: "Xradia-620-Versa"
+
+# How often to scan for new files (seconds)
+polling_interval_seconds: 30
+
+# Set to true to also process drift scan files
+include_drift_files: false
+
+# Parser backend:
+#   "auto"      — try XradiaPy first, fall back to olefile
+#   "xradiaPy"  — require XradiaPy (fails if not installed)
+#   "olefile"   — always use olefile (no proprietary deps)
+parser_backend: "auto"
+
+# Where processed-file state is persisted (survives restarts)
+state_file: "processed_files.json"
+
+# GitHub integration — pushes parsed JSON to the Rosetta repository.
+# Set the PAT in an environment variable for security.
+github:
+  token_env: "ROSETTA_GITHUB_TOKEN"
+  repo: "johntrue15/Rosetta"
+  branch: "main"
+  upload_path: "data/"
+  commit_prefix: "[edge-watchdog]"
+
+# Logging
+logging:
+  level: "INFO"
+  file: "rosetta-watchdog.log"

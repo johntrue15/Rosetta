@@ -1,0 +1,64 @@
+# X-radia Metadata Extractor - Docker Ignore
+# ==========================================
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.iml
+
+# Python
+__pycache__
+*.py[cod]
+*.egg-info
+.eggs
+dist
+build
+*.egg
+
+# Environment
+.env
+.env.local
+venv
+env
+.venv
+
+# Output files (don't include in image)
+*_metadata.txt
+*_config.txt
+cumulative_metadata_*.csv
+output/
+sample_data/
+metadata_output/
+
+# TXRM files (data)
+*.txrm
+*.TXRM
+*.xrm
+*.XRM
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+docker-run.*
+.dockerignore
+
+# Documentation (not needed in image)
+*.md
+!requirements.txt
+
+# Tests
+tests/
+.pytest_cache
+.coverage

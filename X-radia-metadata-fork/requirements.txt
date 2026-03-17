@@ -1,0 +1,23 @@
+# X-radia Metadata Extractor - Dependencies
+# ==========================================
+# 
+# Note: XradiaPy is a proprietary library from Zeiss/Xradia and must be
+# installed separately via the Xradia Software Suite.
+#
+# Python 2.7 is required for XradiaPy compatibility.
+
+# Core dependencies
+numpy>=1.16.0,<1.17.0          # Last version supporting Python 2.7
+
+# Python 2.7 compatibility
+configparser>=3.5.0            # Backport of Python 3 configparser
+subprocess32>=3.5.0            # Backport of Python 3 subprocess
+future>=0.18.0                 # Python 2/3 compatibility layer
+six>=1.16.0                    # Python 2/3 compatibility utilities
+
+# Optional: GitHub integration
+# requests>=2.20.0             # Uncomment if using GitHub integration
+
+# Development dependencies (optional)
+# pylint==1.9.5                # Last version supporting Python 2.7
+# pytest>=4.6.0,<5.0.0         # Last version supporting Python 2.7

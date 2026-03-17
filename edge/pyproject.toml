@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rosetta-watchdog"
+version = "0.1.0"
+description = "Rosetta edge watchdog — monitors Xradia scan directories and pushes metadata to GitHub"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+
+dependencies = [
+    "olefile>=0.47",
+    "pyyaml>=6.0",
+    "requests>=2.28",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov"]
+
+[project.scripts]
+rosetta-watchdog = "rosetta_watchdog.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["rosetta_watchdog*"]

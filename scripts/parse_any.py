@@ -22,6 +22,7 @@ from rtf_to_json import parse_rtf_file
 from pca_to_json import parse_pca_file
 from xtekct_to_json import parse_xtekct_file
 from skyscan_to_json import parse_skyscan_file
+from txrm_to_json import parse_txrm_file
 
 
 def decide_output_path(out_dir: Path, source: Path) -> Path:
@@ -96,6 +97,8 @@ def main():
         parse_xtekct_file(src, out_path, pretty=pretty)
     elif ext == ".log":
         parse_skyscan_file(src, out_path, pretty=pretty)
+    elif ext == ".txrm":
+        parse_txrm_file(src, out_path, pretty=pretty)
     else:
         print(f"[parse_any] Unsupported file extension: {ext} ({src})", file=sys.stderr)
         sys.exit(2)

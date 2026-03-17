@@ -117,7 +117,7 @@ jobs:
             ! -path "data/parsed/*" \
             ! -path "data/completed/*" \
             ! -path "data/tests/*" \
-            \( -iname "*.rtf" -o -iname "*.pca" -o -iname "*.xtekct" -o -iname "*.xml" -o -iname "*.log" \) \
+            \( -iname "*.rtf" -o -iname "*.pca" -o -iname "*.xtekct" -o -iname "*.xml" -o -iname "*.log" -o -iname "*.txrm" \) \
             -print -exec rm -f {} +
 
       - name: Aggregate & de-duplicate metadata

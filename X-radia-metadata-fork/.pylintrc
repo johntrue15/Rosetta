@@ -1,0 +1,39 @@
+[MASTER]
+# Python 2.7 specific settings
+py-version = 2.7
+
+[MESSAGES CONTROL]
+# Disable some warnings that are too strict or not relevant for Python 2.7
+disable=
+    C0111, # missing-docstring
+    C0103, # invalid-name
+    C0303, # trailing-whitespace
+    W0311, # bad-indentation
+    W0603, # global-statement
+    W1505, # deprecated-method
+    F0401, # import-error
+    E1101, # no-member
+    R0903, # too-few-public-methods
+    R0913, # too-many-arguments
+    R0914, # too-many-locals
+    W0702, # bare-except
+    W0703, # broad-except
+    W0141, # bad-builtin
+    W0142, # star-args
+    W0403, # relative-import
+    W0511, # fixme
+    W0621, # redefined-outer-name
+    W0622, # redefined-builtin
+    W0703, # broad-except
+    R0801, # duplicate-code
+    C0325, # superfluous-parens
+    C0326, # bad-whitespace
+
+[FORMAT]
+# Maximum number of characters on a single line
+max-line-length=120
+
+[BASIC]
+# Regular expression which should only match function or class names
+function-rgx=[a-z_][a-z0-9_]{2,50}$
+class-rgx=[A-Z_][a-zA-Z0-9_]+$

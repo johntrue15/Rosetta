@@ -1,0 +1,45 @@
+# X-radia Metadata Extractor - Package Manifest
+# ==============================================
+# Files to include in source distribution
+
+# Include documentation
+include Readme.md
+include INSTALL.md
+include LICENSE
+
+# Include configuration files
+include requirements.txt
+include .env.example
+include contacts.csv
+include setup.py
+include MANIFEST.in
+
+# Include utility scripts
+include system_check.py
+include setup_wizard.py
+include main.py
+include run.bat
+include run.sh
+
+# Include all Python source files
+recursive-include new_enhanced_interactive *.py
+recursive-include scripts *.py
+
+# Include mock files for testing
+recursive-include new_enhanced_interactive/tests *.py
+
+# Exclude compiled files
+global-exclude __pycache__
+global-exclude *.py[cod]
+global-exclude *.so
+global-exclude .DS_Store
+global-exclude *.egg-info
+
+# Exclude IDE files
+global-exclude .idea
+global-exclude *.iml
+global-exclude .vscode
+
+# Exclude environment files
+global-exclude .env
+global-exclude *.env.local

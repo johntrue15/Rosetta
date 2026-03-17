@@ -1,0 +1,101 @@
+# X-radia Metadata Extractor - Docker Compose
+# ============================================
+#
+# IMPORTANT: XradiaPy requires the HOST system's Python!
+# You must mount your Python 2.7 installation with XradiaPy.
+#
+# Usage:
+#   1. Edit the volume paths below for YOUR system
+#   2. Run: docker-compose run --rm xradia-metadata
+#
+# Common Python paths:
+#   Windows:  C:\Python27
+#   macOS:    /usr/local/Cellar/python@2/2.7.18/Frameworks/Python.framework/Versions/2.7
+#   Linux:    /usr (uses /usr/bin/python2.7)
+
+version: '3.8'
+
+services:
+  xradia-metadata:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: xradia-metadata:latest
+    container_name: xradia-metadata
+    
+    # Interactive mode (required for user input)
+    stdin_open: true
+    tty: true
+    
+    # ================================================================
+    # VOLUME CONFIGURATION - EDIT THESE FOR YOUR SYSTEM
+    # ================================================================
+    volumes:
+      # --------------------------------------------------------------
+      # HOST PYTHON (REQUIRED for XradiaPy)
+      # --------------------------------------------------------------
+      # Mount your system Python 2.7 that has XradiaPy installed
+      # This is typically where Xradia Software Suite installed Python
+      #
+      # WINDOWS (uncomment and edit):
+      # - C:\Python27:/host_python:ro
+      #
+      # LINUX (uncomment and edit):
+      # - /usr:/host_python:ro
+      #
+      # macOS (uncomment and edit):
+      # - /usr/local/Cellar/python@2/2.7.18/Frameworks/Python.framework/Versions/2.7:/host_python:ro
+      
+      # --------------------------------------------------------------
+      # YOUR TXRM FILES (REQUIRED)
+      # --------------------------------------------------------------
+      # Change left side to your actual TXRM files location
+      - ./sample_data:/data
+      
+      # --------------------------------------------------------------
+      # OUTPUT DIRECTORY (RECOMMENDED)
+      # --------------------------------------------------------------
+      - ./output:/output
+      
+      # --------------------------------------------------------------
+      # CONTACTS FILE (OPTIONAL)
+      # --------------------------------------------------------------
+      - ./contacts.csv:/app/contacts.csv:ro
+    
+    # Working directory
+    working_dir: /app
+    
+    # Environment
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATA_DIR=/data
+      - OUTPUT_DIR=/output
+
+  # System check service
+  system-check:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: xradia-metadata:latest
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./sample_data:/data
+      # Uncomment and edit for your Python path:
+      # - C:\Python27:/host_python:ro
+    command: ["python", "system_check.py"]
+
+  # Interactive start menu
+  start-menu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: xradia-metadata:latest
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./sample_data:/data
+      - ./output:/output
+      # Uncomment and edit for your Python path:
+      # - C:\Python27:/host_python:ro
+    command: ["python", "start.py"]

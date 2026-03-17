@@ -34,6 +34,17 @@
     {"source": "acquisition_successful",   "name": "Acquisition Successful"},
     {"source": "sha256",                  "name": "SHA-256"},
     {"source": "source_path",             "name": "Source Path"},
-    {"source": "X-ray User",              "name": "X-ray User"}
+    {"source": "X-ray User",              "name": "X-ray User"},
+    {"source": "machine_name",            "name": "Machine Name"},
+    {"source": "sample_x_start",          "name": "Sample X Start"},
+    {"source": "sample_x_end",            "name": "Sample X End"},
+    {"source": "sample_x_range",          "name": "Sample X Range"},
+    {"source": "sample_y_start",          "name": "Sample Y Start"},
+    {"source": "sample_y_end",            "name": "Sample Y End"},
+    {"source": "sample_y_range",          "name": "Sample Y Range"},
+    {"source": "sample_z_start",          "name": "Sample Z Start"},
+    {"source": "sample_z_end",            "name": "Sample Z End"},
+    {"source": "sample_z_range",          "name": "Sample Z Range"},
+    {"source": "sample_theta_start",      "name": "Sample Theta Start"}
   ]
 }
