@@ -64,9 +64,14 @@ jobs:
           set -euo pipefail
           RAW_URL="${{ github.event.inputs.file_url }}"
 
-          # --- Dropbox: force direct download ---
+          # --- Dropbox: rewrite to direct-download content URL ---
+          # dl.dropboxusercontent.com serves the raw binary; www.dropbox.com
+          # serves an HTML interstitial for large files even with dl=1.
           if echo "$RAW_URL" | grep -q 'dropbox.com'; then
-            RAW_URL=$(echo "$RAW_URL" | sed 's/dl=0/dl=1/')
+            RAW_URL=$(echo "$RAW_URL" \
+              | sed 's|www\.dropbox\.com|dl.dropboxusercontent.com|' \
+              | sed 's/dl=0/dl=1/')
+            echo "Rewrote to Dropbox direct URL"
           fi
 
           # --- Determine output filename ---
@@ -90,8 +95,19 @@ jobs:
                       || stat -f%z "data/$FILENAME")
           echo "Downloaded $FILE_SIZE bytes"
 
-          # --- If the download is a zip, extract it ---
+          # --- Validate: reject HTML pages served instead of real files ---
           FILE_TYPE=$(file --brief "data/$FILENAME")
+          echo "Detected file type: $FILE_TYPE"
+
+          if echo "$FILE_TYPE" | grep -qi 'html\|text'; then
+            echo "::error::Downloaded file is HTML/text, not binary — the host likely served a landing page instead of the file."
+            echo "First 500 bytes:"
+            head -c 500 "data/$FILENAME"
+            rm -f "data/$FILENAME"
+            exit 1
+          fi
+
+          # --- If the download is a zip, extract it ---
           if echo "$FILE_TYPE" | grep -qi 'zip'; then
             echo "File appears to be a ZIP archive — extracting..."
             EXTRACT_DIR="data/_extracted_$$"

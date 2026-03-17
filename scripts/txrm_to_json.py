@@ -133,6 +133,15 @@ def parse_txrm_file(input_path: Path, output_path: Path, pretty: bool = False) -
     """Parse a .txrm / .xrm OLE file and write Rosetta-standard JSON."""
     rec = _init_record(input_path)
 
+    if not olefile.isOleFile(str(input_path)):
+        size = input_path.stat().st_size
+        header = input_path.read_bytes()[:32]
+        raise ValueError(
+            f"{input_path.name} is not a valid OLE2/TXRM file "
+            f"(size={size} bytes, header={header!r}). "
+            f"The download may have returned an HTML page instead of the binary."
+        )
+
     ole = olefile.OleFileIO(str(input_path))
     try:
         _extract_metadata(ole, rec)
