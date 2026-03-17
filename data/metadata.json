@@ -109,7 +109,8 @@
       }
     },
     "sha256": "584ac822c00cc52a81f202ea517837c1a919aca5c1799f56fc874af71dfffd2b",
-    "source_path": "data/parsed/Technique-USNM35717_Stanley29627.rtf.json"
+    "source_path": "data/parsed/Technique-USNM35717_Stanley29627.rtf.json",
+    "uploaded_by": "johntrue15"
   },
   {
     "file_name": "Amazon echo 40 micron29629.pca",
@@ -191,8 +192,8 @@
     "image_width_real": "82.28992991999999",
     "image_height_real": "82.28992991999999",
     "scan_time": "1800",
-    "start_time": "2026-03-06T21:06:10.839606",
-    "end_time": "2026-03-06T21:06:13.324793",
+    "start_time": "2026-03-17T21:53:46.828429",
+    "end_time": "2026-03-17T21:53:50.655846",
     "txrm_file_path": "N/A",
     "file_path": "S:\\CT_DATA\\FICS\\FA no band filter with aluminum",
     "acquisition_successful": "Yes",
@@ -221,7 +222,8 @@
       "calib_folder_path": "S:\\CT_DATA\\FICS\\FA no band filter with aluminum"
     },
     "sha256": "11da8f09861f8baa1294ae124dafb6eb9a753be45da066f6730f9de97ae57842",
-    "source_path": "data/parsed/Amazon echo 40 micron3626.pca.json"
+    "source_path": "data/parsed/Amazon echo 40 micron3626.pca.json",
+    "uploaded_by": "johntrue15"
   },
   {
     "file_name": "LSUHC-09553 14526 head.pca",
