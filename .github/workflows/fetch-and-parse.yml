@@ -47,7 +47,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install striprtf
+          pip install striprtf requests
           if [ -f scripts/requirements.txt ]; then
             pip install -r scripts/requirements.txt
           fi
@@ -62,70 +62,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          RAW_URL="${{ github.event.inputs.file_url }}"
 
-          # --- Dropbox: rewrite to direct-download content URL ---
-          # dl.dropboxusercontent.com serves the raw binary; www.dropbox.com
-          # serves an HTML interstitial for large files even with dl=1.
-          if echo "$RAW_URL" | grep -q 'dropbox.com'; then
-            RAW_URL=$(echo "$RAW_URL" \
-              | sed 's|www\.dropbox\.com|dl.dropboxusercontent.com|' \
-              | sed 's/dl=0/dl=1/')
-            echo "Rewrote to Dropbox direct URL"
+          NAME_FLAG=""
+          if [ -n "${{ github.event.inputs.file_name }}" ]; then
+            NAME_FLAG="--name ${{ github.event.inputs.file_name }}"
           fi
 
-          # --- Determine output filename ---
-          GIVEN_NAME="${{ github.event.inputs.file_name }}"
-          if [ -n "$GIVEN_NAME" ]; then
-            FILENAME="$GIVEN_NAME"
-          else
-            # Extract filename from URL path (strip query params)
-            FILENAME=$(basename "$(echo "$RAW_URL" | cut -d'?' -f1)")
-          fi
+          python scripts/fetch_remote.py \
+            "${{ github.event.inputs.file_url }}" \
+            -o data \
+            $NAME_FLAG \
+            | tee /tmp/fetch_output.txt
 
-          echo "Downloading: $RAW_URL"
-          echo "Saving as:   $FILENAME"
-
-          curl -L --retry 3 --retry-delay 5 \
-               --max-time 600 \
-               -o "data/$FILENAME" \
-               "$RAW_URL"
-
-          FILE_SIZE=$(stat --format=%s "data/$FILENAME" 2>/dev/null \
-                      || stat -f%z "data/$FILENAME")
-          echo "Downloaded $FILE_SIZE bytes"
-
-          # --- Validate: reject HTML pages served instead of real files ---
-          FILE_TYPE=$(file --brief "data/$FILENAME")
-          echo "Detected file type: $FILE_TYPE"
-
-          if echo "$FILE_TYPE" | grep -qi 'html\|text'; then
-            echo "::error::Downloaded file is HTML/text, not binary — the host likely served a landing page instead of the file."
-            echo "First 500 bytes:"
-            head -c 500 "data/$FILENAME"
-            rm -f "data/$FILENAME"
-            exit 1
-          fi
-
-          # --- If the download is a zip, extract it ---
-          if echo "$FILE_TYPE" | grep -qi 'zip'; then
-            echo "File appears to be a ZIP archive — extracting..."
-            EXTRACT_DIR="data/_extracted_$$"
-            mkdir -p "$EXTRACT_DIR"
-            unzip -o "data/$FILENAME" -d "$EXTRACT_DIR"
-            rm "data/$FILENAME"
-
-            # Move extracted files into data/
-            find "$EXTRACT_DIR" -type f | while read -r f; do
-              mv "$f" "data/$(basename "$f")"
-            done
-            rm -rf "$EXTRACT_DIR"
-
-            echo "Extracted files:"
-            ls -la data/
-          fi
-
-          # --- Collect files to parse ---
+          # Collect parseable files from data/
           PARSEABLE=""
           for f in data/*.txrm data/*.pca data/*.rtf data/*.xtekct data/*.log; do
             [ -f "$f" ] && PARSEABLE="$PARSEABLE $f"
