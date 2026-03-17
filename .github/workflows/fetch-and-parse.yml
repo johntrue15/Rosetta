@@ -115,11 +115,24 @@ jobs:
               $UPLOADER_FLAG
           done
 
-          # Clean up any remaining source files
+      - name: Remove large binaries before commit
+        shell: bash
+        run: |
+          echo "Removing original binaries (they live at the remote URL, not in git)..."
+
+          # Delete everything in data/completed/ — these are the originals
+          # moved there by parse_any.py.  For remote-fetched files we don't
+          # need them in the repo.
+          rm -rf data/completed/*
+
+          # Also clean up any source files left in data/
           find data -maxdepth 1 -type f \
             \( -iname "*.rtf" -o -iname "*.pca" -o -iname "*.xtekct" \
                -o -iname "*.xml" -o -iname "*.log" -o -iname "*.txrm" \) \
             -print -exec rm -f {} +
+
+          echo "Remaining files to commit:"
+          find data -type f | head -40
 
       - name: Aggregate & de-duplicate metadata
         run: python scripts/aggregate_json.py
@@ -135,14 +148,16 @@ jobs:
           path: data/metadata.csv
           retention-days: 60
 
-      - name: Commit & push results
+      - name: Commit & push parsed JSON only
         shell: bash
         run: |
           set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add -A data/
+          # Only stage the lightweight outputs — never large binaries
+          git add data/parsed/ data/metadata.json data/metadata.csv
+
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
