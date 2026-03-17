@@ -620,9 +620,11 @@ class TestConvertCLI:
 
         assert output_csv.exists()
         with open(output_csv, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-        # Should have just a header row (no data rows, so empty header)
-        assert len(lines) <= 1
+            reader = csv.reader(f)
+            rows = list(reader)
+        # Empty input produces a CSV with no data rows (header only or empty)
+        data_rows = rows[1:] if rows else []
+        assert len(data_rows) == 0
 
 
 class TestUploadedByInjection:
