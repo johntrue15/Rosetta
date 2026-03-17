@@ -1,0 +1,200 @@
+name: Fetch & Parse Remote File
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_url:
+        description: >
+          Direct download URL (Dropbox, Google Drive, etc.).
+          For Dropbox: change dl=0 to dl=1 in the share link.
+        required: true
+        type: string
+      file_name:
+        description: >
+          Filename to save as (e.g. "scan.txrm").
+          If left blank the name is extracted from the URL.
+        required: false
+        type: string
+        default: ""
+      uploaded_by:
+        description: "Who is uploading this file (for attribution)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch-and-parse-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fetch-parse:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install striprtf
+          if [ -f scripts/requirements.txt ]; then
+            pip install -r scripts/requirements.txt
+          fi
+
+      - name: Ensure output folders exist
+        run: |
+          mkdir -p data/parsed
+          mkdir -p data/completed
+
+      - name: Download remote file
+        id: download
+        shell: bash
+        run: |
+          set -euo pipefail
+          RAW_URL="${{ github.event.inputs.file_url }}"
+
+          # --- Dropbox: force direct download ---
+          if echo "$RAW_URL" | grep -q 'dropbox.com'; then
+            RAW_URL=$(echo "$RAW_URL" | sed 's/dl=0/dl=1/')
+          fi
+
+          # --- Determine output filename ---
+          GIVEN_NAME="${{ github.event.inputs.file_name }}"
+          if [ -n "$GIVEN_NAME" ]; then
+            FILENAME="$GIVEN_NAME"
+          else
+            # Extract filename from URL path (strip query params)
+            FILENAME=$(basename "$(echo "$RAW_URL" | cut -d'?' -f1)")
+          fi
+
+          echo "Downloading: $RAW_URL"
+          echo "Saving as:   $FILENAME"
+
+          curl -L --retry 3 --retry-delay 5 \
+               --max-time 600 \
+               -o "data/$FILENAME" \
+               "$RAW_URL"
+
+          FILE_SIZE=$(stat --format=%s "data/$FILENAME" 2>/dev/null \
+                      || stat -f%z "data/$FILENAME")
+          echo "Downloaded $FILE_SIZE bytes"
+
+          # --- If the download is a zip, extract it ---
+          FILE_TYPE=$(file --brief "data/$FILENAME")
+          if echo "$FILE_TYPE" | grep -qi 'zip'; then
+            echo "File appears to be a ZIP archive — extracting..."
+            EXTRACT_DIR="data/_extracted_$$"
+            mkdir -p "$EXTRACT_DIR"
+            unzip -o "data/$FILENAME" -d "$EXTRACT_DIR"
+            rm "data/$FILENAME"
+
+            # Move extracted files into data/
+            find "$EXTRACT_DIR" -type f | while read -r f; do
+              mv "$f" "data/$(basename "$f")"
+            done
+            rm -rf "$EXTRACT_DIR"
+
+            echo "Extracted files:"
+            ls -la data/
+          fi
+
+          # --- Collect files to parse ---
+          PARSEABLE=""
+          for f in data/*.txrm data/*.pca data/*.rtf data/*.xtekct data/*.log; do
+            [ -f "$f" ] && PARSEABLE="$PARSEABLE $f"
+          done
+
+          if [ -z "$PARSEABLE" ]; then
+            echo "::error::No parseable files found after download"
+            exit 1
+          fi
+
+          echo "files_to_parse=$PARSEABLE" >> "$GITHUB_OUTPUT"
+
+      - name: Parse downloaded files
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILES="${{ steps.download.outputs.files_to_parse }}"
+
+          UPLOADER="${{ github.event.inputs.uploaded_by }}"
+          if [ -z "$UPLOADER" ]; then
+            UPLOADER="${{ github.actor }}"
+          fi
+
+          for f in $FILES; do
+            [ -z "$f" ] && continue
+            [ ! -f "$f" ] && continue
+            echo "Parsing: $f"
+
+            UPLOADER_FLAG=""
+            if [ -n "$UPLOADER" ]; then
+              UPLOADER_FLAG="--uploaded-by $UPLOADER"
+            fi
+
+            python scripts/parse_any.py "$f" \
+              -o data/parsed \
+              --completed-dir data/completed \
+              --pretty \
+              $UPLOADER_FLAG
+          done
+
+          # Clean up any remaining source files
+          find data -maxdepth 1 -type f \
+            \( -iname "*.rtf" -o -iname "*.pca" -o -iname "*.xtekct" \
+               -o -iname "*.xml" -o -iname "*.log" -o -iname "*.txrm" \) \
+            -print -exec rm -f {} +
+
+      - name: Aggregate & de-duplicate metadata
+        run: python scripts/aggregate_json.py
+
+      - name: Convert metadata.json to metadata.csv
+        run: python scripts/metadata_to_csv.py
+
+      - name: Upload combined CSV as artifact
+        if: ${{ hashFiles('data/metadata.csv') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-metadata-csv
+          path: data/metadata.csv
+          retention-days: 60
+
+      - name: Commit & push results
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A data/
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          UPLOADER="${{ github.event.inputs.uploaded_by }}"
+          [ -z "$UPLOADER" ] && UPLOADER="${{ github.actor }}"
+          git commit -m "Fetch & parse remote file [skip ci] [uploader:${UPLOADER}]"
+
+          MAX_RETRIES=5
+          for i in $(seq 1 $MAX_RETRIES); do
+            if git push; then
+              echo "Push succeeded on attempt $i"
+              exit 0
+            fi
+            echo "Push failed (attempt $i/$MAX_RETRIES), pulling with rebase..."
+            git pull --rebase origin "$GITHUB_REF_NAME"
+          done
+          echo "Failed after $MAX_RETRIES attempts"
+          exit 1
