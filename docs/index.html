@@ -249,6 +249,62 @@
       width: 16px; height: 16px; fill: currentColor;
     }
 
+    /* Remote URL section */
+    #remote-url-section {
+      margin-top: 1.75rem;
+      padding: 1.1rem 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    #remote-url-section h3 {
+      font-size: 0.92rem;
+      margin-bottom: 0.5rem;
+    }
+    #remote-url-section h3 svg {
+      width: 16px; height: 16px; fill: var(--accent);
+      vertical-align: middle;
+      margin-right: 0.3rem;
+    }
+    .remote-url-desc {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+      line-height: 1.5;
+    }
+    .remote-url-form {
+      display: flex;
+      gap: 0.5rem;
+      align-items: stretch;
+    }
+    .remote-url-form input[type="url"] {
+      flex: 1;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.85rem;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .remote-url-form input[type="url"]:focus {
+      border-color: var(--accent);
+    }
+    .remote-url-form input[type="url"]::placeholder {
+      color: var(--muted);
+      opacity: 0.6;
+    }
+    #remote-url-status {
+      margin-top: 0.6rem;
+      font-size: 0.82rem;
+      font-family: "SFMono-Regular", Consolas, monospace;
+    }
+    #remote-url-status.info    { color: var(--accent); }
+    #remote-url-status.success { color: var(--success); }
+    #remote-url-status.error   { color: var(--danger); }
+
     /* How it works */
     .instructions {
       margin-top: 1.75rem;
@@ -342,6 +398,25 @@
       </div>
 
       <div id="status-log"></div>
+
+      <!-- Remote URL fetch (for large files like .txrm) -->
+      <div id="remote-url-section">
+        <h3>
+          <svg viewBox="0 0 16 16"><path d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"/></svg>
+          Fetch from URL
+        </h3>
+        <div class="remote-url-desc">
+          Paste a <strong>Dropbox</strong>, <strong>Google Drive</strong>, or direct download link to a large file
+          (e.g. <code>.txrm</code>). The file is downloaded and parsed server-side by GitHub Actions &mdash;
+          nothing is uploaded from your browser.
+        </div>
+        <div class="remote-url-form">
+          <input type="url" id="remote-url-input"
+                 placeholder="https://www.dropbox.com/scl/fi/..." />
+          <button class="btn btn-primary" id="remote-url-btn">Fetch &amp; Parse</button>
+        </div>
+        <div id="remote-url-status"></div>
+      </div>
 
       <!-- Artifact download -->
       <div id="artifact-section">
@@ -841,6 +916,80 @@
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
+    }
+
+    /* ================================================================== */
+    /*  Remote URL fetch (triggers fetch-and-parse workflow)               */
+    /* ================================================================== */
+    const remoteUrlInput  = document.getElementById("remote-url-input");
+    const remoteUrlBtn    = document.getElementById("remote-url-btn");
+    const remoteUrlStatus = document.getElementById("remote-url-status");
+
+    remoteUrlBtn.addEventListener("click", triggerRemoteFetch);
+    remoteUrlInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") triggerRemoteFetch();
+    });
+
+    async function triggerRemoteFetch() {
+      const url = remoteUrlInput.value.trim();
+      if (!url) { setUrlStatus("Please paste a URL first.", "error"); return; }
+      if (!token) { setUrlStatus("Please sign in first.", "error"); return; }
+
+      try {
+        new URL(url);
+      } catch (_) {
+        setUrlStatus("That doesn't look like a valid URL.", "error");
+        return;
+      }
+
+      remoteUrlBtn.disabled = true;
+      setUrlStatus("Triggering fetch-and-parse workflow…", "info");
+
+      try {
+        const uploaderName = currentUser ? currentUser.login : "";
+        const res = await fetch(
+          "https://api.github.com/repos/" + OWNER + "/" + REPO +
+          "/actions/workflows/fetch-and-parse.yml/dispatches",
+          {
+            method: "POST",
+            headers: {
+              Authorization:  "Bearer " + token,
+              "Content-Type": "application/json",
+              Accept:         "application/vnd.github+json",
+            },
+            body: JSON.stringify({
+              ref: BRANCH,
+              inputs: {
+                file_url:    url,
+                file_name:   "",
+                uploaded_by: uploaderName,
+              }
+            }),
+          }
+        );
+
+        if (res.status === 204 || res.ok) {
+          setUrlStatus(
+            "✓ Workflow triggered! The file will be downloaded and parsed on the server. " +
+            "Check the Actions tab for progress.",
+            "success"
+          );
+          remoteUrlInput.value = "";
+          log("Remote fetch triggered for: " + url, "info");
+        } else {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || "HTTP " + res.status);
+        }
+      } catch (err) {
+        setUrlStatus("✗ Failed to trigger workflow: " + err.message, "error");
+      } finally {
+        remoteUrlBtn.disabled = false;
+      }
+    }
+
+    function setUrlStatus(msg, type) {
+      remoteUrlStatus.textContent = msg;
+      remoteUrlStatus.className = type;
     }
 
     /* ================================================================== */
