@@ -16,7 +16,7 @@ import json
 import struct
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import olefile
 
@@ -31,7 +31,9 @@ COLUMN_ORDER = [
     'end_time', 'txrm_file_path', 'file_path', 'acquisition_successful',
     'sample_x_start', 'sample_x_end', 'sample_x_range', 'sample_y_start',
     'sample_y_end', 'sample_y_range', 'sample_z_start', 'sample_z_end',
-    'sample_z_range', 'sample_theta_start',
+    'sample_z_range', 'sample_theta_start', 'sample_theta_end',
+    'sample_theta_range', 'acquisition_mode', 'original_file_path',
+    'sample_name', 'camera_name',
 ]
 
 
@@ -69,6 +71,43 @@ def _ole_string(ole: olefile.OleFileIO, label: str, max_len: int = 260) -> Optio
     return raw.split('\x00', 1)[0].strip() or None
 
 
+def _ole_float_array(ole: olefile.OleFileIO, label: str) -> Optional[List[float]]:
+    """Read an array of little-endian floats from an OLE stream."""
+    if not ole.exists(label):
+        return None
+    data = ole.openstream(label).read()
+    count = len(data) // 4
+    if count == 0:
+        return None
+    try:
+        return list(struct.unpack(f'<{count}f', data[:count * 4]))
+    except struct.error:
+        return None
+
+
+def _ole_date_array(ole: olefile.OleFileIO, label: str,
+                    num_entries: int) -> Optional[List[str]]:
+    """Read an array of fixed-width date strings from an OLE stream.
+
+    Each entry is ``stream_size // num_entries`` bytes, null-terminated.
+    """
+    if not ole.exists(label) or num_entries <= 0:
+        return None
+    data = ole.openstream(label).read()
+    entry_size = len(data) // num_entries
+    if entry_size == 0:
+        return None
+    dates: List[str] = []
+    for i in range(num_entries):
+        raw = data[i * entry_size:(i + 1) * entry_size]
+        try:
+            s = raw.decode('latin-1').split('\x00', 1)[0].strip()
+        except Exception:
+            s = ''
+        dates.append(s)
+    return dates if dates else None
+
+
 # ---------------------------------------------------------------------------
 #  Record initialisation (mirrors pca_to_json.init_record)
 # ---------------------------------------------------------------------------
@@ -98,8 +137,8 @@ def _init_record(fp: Path) -> Dict[str, Any]:
         'image_width_real': 'N/A',
         'image_height_real': 'N/A',
         'scan_time': 'N/A',
-        'start_time': datetime.fromtimestamp(fp.stat().st_mtime).isoformat(),
-        'end_time': datetime.now().isoformat(),
+        'start_time': 'N/A',
+        'end_time': 'N/A',
         'txrm_file_path': str(fp.resolve()),
         'file_path': str(fp.resolve().parent),
         'acquisition_successful': 'Yes',
@@ -113,6 +152,12 @@ def _init_record(fp: Path) -> Dict[str, Any]:
         'sample_z_end': 'N/A',
         'sample_z_range': 'N/A',
         'sample_theta_start': 'N/A',
+        'sample_theta_end': 'N/A',
+        'sample_theta_range': 'N/A',
+        'acquisition_mode': 'N/A',
+        'original_file_path': 'N/A',
+        'sample_name': 'N/A',
+        'camera_name': 'N/A',
     }
 
 
@@ -159,6 +204,17 @@ def parse_txrm_file(input_path: Path, output_path: Path, pretty: bool = False) -
         json.dump(out, f, ensure_ascii=False, indent=2 if pretty else None)
 
 
+def _parse_txrm_date(date_str: str) -> Optional[datetime]:
+    """Parse a TXRM date string like ``MM/DD/YYYY HH:MM:SS.fff``."""
+    if not date_str:
+        return None
+    try:
+        base = date_str.split('.')[0]
+        return datetime.strptime(base, '%m/%d/%Y %H:%M:%S')
+    except (ValueError, IndexError):
+        return None
+
+
 def _extract_metadata(ole: olefile.OleFileIO, rec: Dict[str, Any]) -> None:
     num_images = _ole_value(ole, 'ImageInfo/NoOfImages', '<I')
     if num_images is not None:
@@ -186,7 +242,8 @@ def _extract_metadata(ole: olefile.OleFileIO, rec: Dict[str, Any]) -> None:
     obj_id = _ole_value(ole, 'AcquisitionSettings/ObjectiveID', '<I')
     if obj_mag is not None and obj_mag > 0:
         rec['ct_objective'] = f'{obj_mag:.1f}x'
-        if str(obj_mag).rstrip('0').rstrip('.') in ('4', '20', '40'):
+        rounded_mag = round(obj_mag)
+        if rounded_mag in (4, 20, 40):
             rec['ct_optical_magnification'] = 'yes'
         else:
             rec['ct_optical_magnification'] = 'no'
@@ -194,8 +251,12 @@ def _extract_metadata(ole: olefile.OleFileIO, rec: Dict[str, Any]) -> None:
         rec['ct_objective'] = f'ObjectiveID-{obj_id}'
 
     # --- Geometry (source / detector distances) ---
-    sto_ra = _safe_float(_ole_value(ole, 'ImageInfo/StoRADistance', '<f'))
-    dto_ra = _safe_float(_ole_value(ole, 'ImageInfo/DtoRADistance', '<f'))
+    # StoRA / DtoRA may be per-image arrays; take the first value.
+    # Values can be negative (coordinate convention), so use abs() for distances.
+    sto_arr = _ole_float_array(ole, 'ImageInfo/StoRADistance')
+    dto_arr = _ole_float_array(ole, 'ImageInfo/DtoRADistance')
+    sto_ra = abs(sto_arr[0]) if sto_arr else None
+    dto_ra = abs(dto_arr[0]) if dto_arr else None
 
     if sto_ra is not None and sto_ra > 0:
         rec['Source_sample_distance'] = str(round(sto_ra, 4))
@@ -233,10 +294,75 @@ def _extract_metadata(ole: olefile.OleFileIO, rec: Dict[str, Any]) -> None:
     if exp_time is not None:
         rec['detector_capture_time'] = str(exp_time)
 
+    # --- Detector averaging (images averaged per projection) ---
+    avg = _ole_value(ole, 'ImageInfo/NoOfImagesAveraged', '<I')
+    if avg is not None:
+        rec['detector_averaging'] = str(avg)
+
+    # --- Frames per image (acts as "skip" / accumulation count) ---
+    frames_per = _ole_value(ole, 'AcquisitionSettings/FramesPerImage', '<I')
+    if frames_per is not None:
+        rec['detector_skip'] = str(frames_per)
+
     # --- Facility as xray_tube_ID ---
     facility = _ole_string(ole, 'SampleInfo/Facility', max_len=50)
     if facility:
         rec['xray_tube_ID'] = facility
+
+    # --- Camera name ---
+    camera = _ole_string(ole, 'ImageInfo/CameraName', max_len=80)
+    if camera:
+        rec['camera_name'] = camera
+
+    # --- Acquisition mode ---
+    mode = _ole_string(ole, 'AcquisitionSettings/AcqModeString')
+    if mode:
+        rec['acquisition_mode'] = mode
+
+    # --- Original file path on acquisition workstation ---
+    orig_path = _ole_string(ole, 'AcquisitionSettings/AcqFileName')
+    if orig_path:
+        rec['original_file_path'] = orig_path
+
+    # --- Sample name from StatusString ("Sample: X\n\tTomo Point: Y") ---
+    status = _ole_string(ole, 'AcquisitionSettings/StatusString')
+    if status:
+        for line in status.replace('\t', '').split('\n'):
+            line = line.strip()
+            if line.lower().startswith('sample:'):
+                name = line.split(':', 1)[1].strip()
+                if name:
+                    rec['sample_name'] = name
+                break
+
+    # --- Per-image timestamps → real start_time, end_time, scan_time ---
+    n = num_images or 0
+    dates = _ole_date_array(ole, 'ImageInfo/Date', n)
+    if dates:
+        dt_first = _parse_txrm_date(dates[0])
+        dt_last = _parse_txrm_date(dates[-1])
+        if dt_first is not None:
+            rec['start_time'] = dt_first.isoformat()
+        if dt_last is not None:
+            rec['end_time'] = dt_last.isoformat()
+        if dt_first is not None and dt_last is not None:
+            rec['scan_time'] = str(round((dt_last - dt_first).total_seconds(), 2))
+
+    # --- Per-image angles → theta start / end / range ---
+    angles = _ole_float_array(ole, 'ImageInfo/Angles')
+    if angles:
+        rec['sample_theta_start'] = str(round(angles[0], 4))
+        rec['sample_theta_end'] = str(round(angles[-1], 4))
+        rec['sample_theta_range'] = str(round(abs(angles[-1] - angles[0]), 4))
+
+    # --- Per-image stage positions → X/Y/Z start / end / range ---
+    for axis, prefix in [('X', 'sample_x'), ('Y', 'sample_y'), ('Z', 'sample_z')]:
+        positions = _ole_float_array(ole, f'ImageInfo/{axis}Position')
+        if positions:
+            rec[f'{prefix}_start'] = str(round(positions[0], 4))
+            rec[f'{prefix}_end'] = str(round(positions[-1], 4))
+            rec[f'{prefix}_range'] = str(round(
+                abs(max(positions) - min(positions)), 4))
 
 
 def main():

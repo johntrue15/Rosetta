@@ -53,6 +53,12 @@ def init_rosetta_record(file_path: str) -> Dict[str, Any]:
         "sample_z_end": "N/A",
         "sample_z_range": "N/A",
         "sample_theta_start": "N/A",
+        "sample_theta_end": "N/A",
+        "sample_theta_range": "N/A",
+        "acquisition_mode": "N/A",
+        "original_file_path": "N/A",
+        "sample_name": "N/A",
+        "camera_name": "N/A",
     }
 
 
