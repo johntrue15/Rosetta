@@ -479,7 +479,7 @@
           <form id="facility-form" autocomplete="off">
             <div class="form-group">
               <label>Facility Name <span class="required">*</span></label>
-              <div class="hint">A short, unique name (used in branch names and config).</div>
+              <div class="hint">A short, unique name (used in directory names and config).</div>
               <input type="text" id="f-name" placeholder="e.g. AMNH-Xradia520" required />
             </div>
             <div class="form-group">
@@ -543,8 +543,9 @@
         <div class="step-card">
           <h2>Step 4 — Install the Rosetta Edge Watchdog</h2>
           <p class="subtitle">
-            Your facility has been approved and the branch is ready. Now install
-            the watchdog on the machine where your scanner writes data.
+            Your facility has been approved and its data directory is ready on
+            <code>main</code>. Now install the watchdog on the machine where
+            your scanner writes data.
           </p>
 
           <div class="code-label">1. Clone and install</div>
@@ -587,7 +588,7 @@ pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Cop
           <h2>Step 5 — Verify Data Upload</h2>
           <p class="subtitle">
             Let's check if the watchdog is successfully pushing data to your
-            facility branch.
+            facility directory on <code>main</code>.
           </p>
           <div id="verify-status"></div>
           <div style="margin-top:1rem">
@@ -896,7 +897,7 @@ pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Cop
 
         facility = {
           name, institution, machineType, machineName, email, watchDir, notes,
-          slug, branch: "facility/" + slug,
+          slug, uploadPath: "data/" + slug + "/",
           issueNumber: issue.number, issueUrl: issue.html_url
         };
         localStorage.setItem("rosetta_facility", JSON.stringify(facility));
@@ -957,6 +958,7 @@ pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Cop
       if (!facility) return;
       const machineName = facility.machineName || facility.slug;
       const watchDir    = facility.watchDir || "D:\\XradiaData\\Scans";
+      const uploadPath  = facility.uploadPath || "data/" + facility.slug + "/";
 
       const configYaml = [
         "watch_directories:",
@@ -971,8 +973,8 @@ pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Cop
         "github:",
         '  token_env: "ROSETTA_GITHUB_TOKEN"',
         '  repo: "' + OWNER + "/" + REPO + '"',
-        '  branch: "' + facility.branch + '"',
-        '  upload_path: "data/"',
+        '  branch: "main"',
+        '  upload_path: "' + uploadPath + '"',
         '  commit_prefix: "[edge-watchdog]"',
         "",
         "logging:",
@@ -1010,54 +1012,47 @@ pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Cop
       const statusEl  = document.getElementById("verify-status");
       const resultEl  = document.getElementById("verify-result");
       const spinner   = document.getElementById("verify-spinner");
+      const uploadPath = facility.uploadPath || "data/" + facility.slug + "/";
+      const dirPath    = uploadPath.replace(/\/$/, "");
 
       spinner.style.display = "inline-block";
-      statusEl.innerHTML = '<span class="status-badge waiting"><span class="spinner-inline"></span> Checking branch <code>' + facility.branch + '</code>…</span>';
+      statusEl.innerHTML = '<span class="status-badge waiting"><span class="spinner-inline"></span> Checking <code>' + uploadPath + '</code> on main…</span>';
       resultEl.innerHTML = "";
 
       try {
-        const branchRef = facility.branch.replace(/\//g, "/");
-        const refRes = await ghFetch("/repos/" + OWNER + "/" + REPO + "/git/ref/heads/" + branchRef);
+        const contentsRes = await ghFetch("/repos/" + OWNER + "/" + REPO + "/contents/" + dirPath + "?ref=main");
 
-        if (!refRes.ok) {
-          statusEl.innerHTML = '<span class="status-badge waiting">Branch not found yet</span>';
+        if (!contentsRes.ok) {
+          statusEl.innerHTML = '<span class="status-badge waiting">Directory not found yet</span>';
           resultEl.innerHTML = '<div class="verify-result not-found">' +
-            'The branch <code>' + facility.branch + '</code> hasn\'t been created yet. ' +
+            'The directory <code>' + uploadPath + '</code> hasn\'t been created yet. ' +
             'This happens automatically when the <code>facility-approved</code> label is added to your issue. ' +
             'If you just got approved, wait a moment and check again.</div>';
           spinner.style.display = "none";
           return;
         }
 
-        const contentsRes = await ghFetch("/repos/" + OWNER + "/" + REPO + "/contents/data?ref=" + branchRef);
+        const files = await contentsRes.json();
+        const dataFiles = Array.isArray(files)
+          ? files.filter(f => f.name.endsWith(".json") || f.name.endsWith(".txrm"))
+          : [];
 
-        if (contentsRes.ok) {
-          const files = await contentsRes.json();
-          const dataFiles = Array.isArray(files) ? files.filter(f => f.name.endsWith(".json") || f.name.endsWith(".txrm")) : [];
-
-          if (dataFiles.length > 0) {
-            statusEl.innerHTML = '<span class="status-badge success">&#10003; Data detected!</span>';
-            resultEl.innerHTML = '<div class="verify-result found">' +
-              '<strong>Your facility is live!</strong> Found ' + dataFiles.length + ' file(s) on the <code>' + facility.branch + '</code> branch.<br><br>' +
-              'The watchdog is successfully pushing data. The parse-and-aggregate workflow will process it automatically.</div>' +
-              '<div class="completion-links" style="margin-top:1.25rem">' +
-              '<a class="btn btn-primary" href="https://github.com/' + OWNER + '/' + REPO + '/tree/' + branchRef + '/data" target="_blank">View branch data</a>' +
-              '<a class="btn" href="../">Go to Upload page</a>' +
-              '</div>';
-
-            goToStep(6);
-          } else {
-            statusEl.innerHTML = '<span class="status-badge waiting">Branch exists, no data yet</span>';
-            resultEl.innerHTML = '<div class="verify-result not-found">' +
-              'The branch <code>' + facility.branch + '</code> exists but no data files were found in <code>data/</code> yet. ' +
-              'Make sure the watchdog is running and scanning a directory with <code>.txrm</code> files. ' +
-              'Check the watchdog logs for errors.</div>';
-          }
+        if (dataFiles.length > 0) {
+          statusEl.innerHTML = '<span class="status-badge success">&#10003; Data detected!</span>';
+          resultEl.innerHTML = '<div class="verify-result found">' +
+            '<strong>Your facility is live!</strong> Found ' + dataFiles.length + ' data file(s) in <code>' + uploadPath + '</code>.<br><br>' +
+            'The watchdog is successfully pushing data. The parse-and-aggregate workflow will process it automatically.</div>' +
+            '<div class="completion-links" style="margin-top:1.25rem">' +
+            '<a class="btn btn-primary" href="https://github.com/' + OWNER + '/' + REPO + '/tree/main/' + dirPath + '" target="_blank">View facility data</a>' +
+            '<a class="btn" href="../">Go to Upload page</a>' +
+            '</div>';
+          goToStep(6);
         } else {
-          statusEl.innerHTML = '<span class="status-badge waiting">Branch exists, waiting for data</span>';
+          statusEl.innerHTML = '<span class="status-badge waiting">Directory exists, no data yet</span>';
           resultEl.innerHTML = '<div class="verify-result not-found">' +
-            'Branch <code>' + facility.branch + '</code> exists but no <code>data/</code> folder yet. ' +
-            'Start the watchdog and place a <code>.txrm</code> file in the watch directory.</div>';
+            'The directory <code>' + uploadPath + '</code> exists but no data files were found yet. ' +
+            'Make sure the watchdog is running and scanning a directory with <code>.txrm</code> files. ' +
+            'Check the watchdog logs for errors.</div>';
         }
       } catch (err) {
         statusEl.innerHTML = '<span class="status-badge error">Error: ' + err.message + '</span>';

@@ -14,7 +14,7 @@ body:
     id: facility_name
     attributes:
       label: Facility Name
-      description: A short, unique name for this facility (used in branch names and config).
+      description: A short, unique name for this facility (used in directory names and config).
       placeholder: e.g. AMNH-Xradia520
     validations:
       required: true
