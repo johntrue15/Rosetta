@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rosetta – Setup Facility</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --success: #3fb950;
+      --warning: #d29922;
+      --danger: #f85149;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      width: 100%;
+      padding: 1.25rem 2rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { font-size: 1.3rem; font-weight: 600; }
+    header h1 span { color: var(--accent); }
+    header nav { display: flex; gap: 1.25rem; align-items: center; }
+    header nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.88rem;
+      transition: color 0.15s;
+    }
+    header nav a:hover { color: var(--text); }
+
+    #user-info {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    #user-info img { width: 30px; height: 30px; border-radius: 50%; }
+
+    main {
+      width: 100%;
+      max-width: 760px;
+      padding: 2rem 1rem;
+      flex: 1;
+    }
+
+    /* ---- Buttons ---- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 0.9rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn-primary { background: #238636; border-color: #2ea043; color: #fff; }
+    .btn-primary:hover { background: #2ea043; }
+    .btn-warning { background: #9e6a03; border-color: var(--warning); color: #fff; }
+    .btn-warning:hover { background: #b07a04; }
+    .btn-sm { padding: 0.3rem 0.8rem; font-size: 0.8rem; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ---- Auth section ---- */
+    #auth-section {
+      text-align: center;
+      margin-top: 5rem;
+    }
+    #auth-section p {
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.7;
+      max-width: 480px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    #auth-waiting {
+      display: none;
+      margin-top: 1.25rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .spinner-inline {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.4rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---- Wizard ---- */
+    #wizard { display: none; }
+    #wizard.visible { display: block; }
+
+    .progress-bar {
+      display: flex;
+      gap: 0;
+      margin-bottom: 2.5rem;
+      position: relative;
+    }
+    .progress-step {
+      flex: 1;
+      text-align: center;
+      position: relative;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .progress-step .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--bg);
+      font-weight: 600;
+      font-size: 0.82rem;
+      margin-bottom: 0.4rem;
+      transition: all 0.3s;
+      position: relative;
+      z-index: 1;
+    }
+    .progress-step.active .step-num {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .progress-step.done .step-num {
+      border-color: var(--success);
+      background: var(--success);
+      color: #fff;
+    }
+    .progress-step .step-label {
+      display: block;
+      margin-top: 0.15rem;
+    }
+    .progress-step.active .step-label { color: var(--accent); }
+    .progress-step.done .step-label { color: var(--success); }
+
+    .progress-line {
+      position: absolute;
+      top: 15px;
+      left: 10%;
+      right: 10%;
+      height: 2px;
+      background: var(--border);
+      z-index: 0;
+    }
+    .progress-line-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--success);
+      transition: width 0.4s;
+    }
+
+    /* ---- Step panels ---- */
+    .step-panel { display: none; }
+    .step-panel.active { display: block; }
+
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+    }
+    .step-card h2 {
+      font-size: 1.15rem;
+      margin-bottom: 0.5rem;
+    }
+    .step-card .subtitle {
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Status badges */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 500;
+    }
+    .status-badge.success {
+      background: rgba(63,185,80,0.12);
+      color: var(--success);
+      border: 1px solid rgba(63,185,80,0.3);
+    }
+    .status-badge.waiting {
+      background: rgba(210,153,34,0.12);
+      color: var(--warning);
+      border: 1px solid rgba(210,153,34,0.3);
+    }
+    .status-badge.error {
+      background: rgba(248,81,73,0.1);
+      color: var(--danger);
+      border: 1px solid rgba(248,81,73,0.3);
+    }
+
+    /* ---- Form styles ---- */
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-bottom: 0.35rem;
+    }
+    .form-group .hint {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.88rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      border-color: var(--accent);
+    }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+    .form-group select { cursor: pointer; }
+    .form-group .required { color: var(--danger); }
+
+    .form-actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+
+    #form-status {
+      margin-top: 1rem;
+      font-size: 0.85rem;
+    }
+
+    /* ---- Code blocks ---- */
+    .code-block {
+      position: relative;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 0.75rem 0;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.82rem;
+      line-height: 1.7;
+      overflow-x: auto;
+      white-space: pre;
+      color: var(--text);
+    }
+    .code-block .copy-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.72rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .code-block .copy-btn:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+    .code-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-top: 1rem;
+      margin-bottom: 0.25rem;
+    }
+
+    /* ---- Polling / waiting ---- */
+    .poll-status {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 1.25rem 0;
+      font-size: 0.88rem;
+    }
+    .poll-status a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .poll-status a:hover { text-decoration: underline; }
+
+    /* ---- Verify section ---- */
+    .verify-result {
+      margin: 1rem 0;
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+    .verify-result.found {
+      background: rgba(63,185,80,0.08);
+      border: 1px solid rgba(63,185,80,0.25);
+      color: var(--success);
+    }
+    .verify-result.not-found {
+      background: rgba(210,153,34,0.08);
+      border: 1px solid rgba(210,153,34,0.25);
+      color: var(--warning);
+    }
+
+    /* ---- Completion ---- */
+    .completion-card {
+      text-align: center;
+      padding: 3rem 2rem;
+    }
+    .completion-card .big-check {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+    .completion-card h2 {
+      color: var(--success);
+      margin-bottom: 0.75rem;
+    }
+    .completion-card p {
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 420px;
+      margin: 0 auto;
+    }
+    .completion-links {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: center;
+      margin-top: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    footer {
+      padding: 1.25rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🪨 <span>Rosetta</span> Setup Facility</h1>
+    <nav>
+      <a href="../">Upload</a>
+      <div id="user-info"></div>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- Auth gate -->
+    <div id="auth-section">
+      <p>
+        Sign in with your GitHub account to set up a new facility for the
+        <a href="https://github.com/johntrue15/Rosetta" style="color:var(--accent)">Rosetta</a>
+        CT metadata pipeline. This wizard will walk you through every step.
+      </p>
+      <button class="btn btn-primary" id="login-btn">
+        <svg height="16" viewBox="0 0 16 16" width="16" style="fill:currentColor">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+            0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13
+            -.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66
+            .07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15
+            -.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0
+            1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82
+            1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01
+            1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+        Sign in with GitHub
+      </button>
+      <div id="auth-waiting">
+        <span class="spinner-inline"></span>
+        Waiting for authorization…
+      </div>
+    </div>
+
+    <!-- Wizard (shown after auth) -->
+    <div id="wizard">
+
+      <!-- Progress bar -->
+      <div class="progress-bar">
+        <div class="progress-line"><div class="progress-line-fill" id="progress-fill"></div></div>
+        <div class="progress-step active" data-step="1">
+          <span class="step-num">1</span>
+          <span class="step-label">Access</span>
+        </div>
+        <div class="progress-step" data-step="2">
+          <span class="step-num">2</span>
+          <span class="step-label">Request</span>
+        </div>
+        <div class="progress-step" data-step="3">
+          <span class="step-num">3</span>
+          <span class="step-label">Approval</span>
+        </div>
+        <div class="progress-step" data-step="4">
+          <span class="step-num">4</span>
+          <span class="step-label">Install</span>
+        </div>
+        <div class="progress-step" data-step="5">
+          <span class="step-num">5</span>
+          <span class="step-label">Verify</span>
+        </div>
+      </div>
+
+      <!-- Step 1: Confirm collaborator access -->
+      <div class="step-panel active" id="step-1">
+        <div class="step-card">
+          <h2>Step 1 — Confirm Collaborator Access</h2>
+          <p class="subtitle">
+            You need collaborator (write) access to the Rosetta repository before
+            you can create a facility. Let's check your permissions.
+          </p>
+          <div id="access-status"></div>
+          <div id="access-actions" style="margin-top:1.25rem"></div>
+        </div>
+      </div>
+
+      <!-- Step 2: Facility request form -->
+      <div class="step-panel" id="step-2">
+        <div class="step-card">
+          <h2>Step 2 — Request New Facility</h2>
+          <p class="subtitle">
+            Fill in details about your CT scanner facility. This will create a
+            GitHub Issue for the maintainer to review and approve.
+          </p>
+          <form id="facility-form" autocomplete="off">
+            <div class="form-group">
+              <label>Facility Name <span class="required">*</span></label>
+              <div class="hint">A short, unique name (used in branch names and config).</div>
+              <input type="text" id="f-name" placeholder="e.g. AMNH-Xradia520" required />
+            </div>
+            <div class="form-group">
+              <label>Institution / Organization</label>
+              <input type="text" id="f-institution" placeholder="e.g. American Museum of Natural History" />
+            </div>
+            <div class="form-group">
+              <label>Machine Type <span class="required">*</span></label>
+              <select id="f-machine-type" required>
+                <option value="">Select…</option>
+                <option value="Xradia 520 Versa">Xradia 520 Versa</option>
+                <option value="Xradia 620 Versa">Xradia 620 Versa</option>
+                <option value="Other">Other (specify in notes)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Machine Name / Identifier</label>
+              <div class="hint">The name tagged on metadata pushed by this machine.</div>
+              <input type="text" id="f-machine-name" placeholder="e.g. Xradia-520-Versa" />
+            </div>
+            <div class="form-group">
+              <label>Contact Email</label>
+              <input type="email" id="f-email" placeholder="e.g. scientist@institution.edu" />
+            </div>
+            <div class="form-group">
+              <label>Watch Directory Path</label>
+              <div class="hint">Local path where the scanner writes .txrm files.</div>
+              <input type="text" id="f-watch-dir" placeholder="e.g. D:\XradiaData\Scans" />
+            </div>
+            <div class="form-group">
+              <label>Notes</label>
+              <textarea id="f-notes" placeholder="Any additional context — justification, special requirements, etc."></textarea>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" id="submit-facility-btn">Submit Facility Request</button>
+            </div>
+            <div id="form-status"></div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Step 3: Await approval -->
+      <div class="step-panel" id="step-3">
+        <div class="step-card">
+          <h2>Step 3 — Awaiting Approval</h2>
+          <p class="subtitle">
+            Your facility request has been submitted. A maintainer will review it
+            and add the <code>facility-approved</code> label when ready. This page
+            checks automatically.
+          </p>
+          <div class="poll-status" id="approval-poll">
+            <span class="spinner-inline"></span>
+            <span>Checking issue <a id="issue-link" href="#" target="_blank"></a> for approval…</span>
+          </div>
+          <div id="approval-status"></div>
+        </div>
+      </div>
+
+      <!-- Step 4: Install watchdog -->
+      <div class="step-panel" id="step-4">
+        <div class="step-card">
+          <h2>Step 4 — Install the Rosetta Edge Watchdog</h2>
+          <p class="subtitle">
+            Your facility has been approved and the branch is ready. Now install
+            the watchdog on the machine where your scanner writes data.
+          </p>
+
+          <div class="code-label">1. Clone and install</div>
+          <div class="code-block" id="code-install">git clone https://github.com/johntrue15/Rosetta.git
+cd Rosetta/edge
+pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Copy</button></div>
+
+          <div class="code-label">2. Create your config file</div>
+          <p style="color:var(--muted);font-size:0.85rem;margin:0.5rem 0">
+            Click below to download a <code>config.yml</code> pre-filled with your
+            facility details, or copy the contents and save manually.
+          </p>
+          <div class="code-block" id="code-config"><button class="copy-btn" onclick="copyBlock('code-config')">Copy</button></div>
+          <div style="margin-top:0.5rem">
+            <button class="btn btn-sm" id="download-config-btn">Download config.yml</button>
+          </div>
+
+          <div class="code-label">3. Set your GitHub token</div>
+          <div class="code-block" id="code-token">export ROSETTA_GITHUB_TOKEN="ghp_YourPersonalAccessTokenHere"<button class="copy-btn" onclick="copyBlock('code-token')">Copy</button></div>
+          <p style="color:var(--muted);font-size:0.82rem;margin:0.5rem 0 0">
+            Create a
+            <a href="https://github.com/settings/tokens/new?scopes=repo&description=Rosetta+Edge+Watchdog" target="_blank" style="color:var(--accent)">
+              Personal Access Token
+            </a>
+            with <code>repo</code> scope.
+          </p>
+
+          <div class="code-label">4. Run the watchdog</div>
+          <div class="code-block" id="code-run">rosetta-watchdog -c config.yml<button class="copy-btn" onclick="copyBlock('code-run')">Copy</button></div>
+
+          <div class="form-actions">
+            <button class="btn btn-primary" id="goto-verify-btn">I've started the watchdog — verify data</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 5: Verify data -->
+      <div class="step-panel" id="step-5">
+        <div class="step-card">
+          <h2>Step 5 — Verify Data Upload</h2>
+          <p class="subtitle">
+            Let's check if the watchdog is successfully pushing data to your
+            facility branch.
+          </p>
+          <div id="verify-status"></div>
+          <div style="margin-top:1rem">
+            <button class="btn" id="recheck-data-btn">
+              <span class="spinner-inline" id="verify-spinner" style="display:none"></span>
+              Check again
+            </button>
+          </div>
+          <div id="verify-result"></div>
+        </div>
+      </div>
+
+    </div><!-- /wizard -->
+  </main>
+
+  <footer>
+    Powered by <a href="https://github.com/johntrue15/Rosetta">Rosetta</a> &middot;
+    <a href="../">Upload interface</a>
+  </footer>
+
+  <script>
+    /* ================================================================ */
+    /*  Config                                                           */
+    /* ================================================================ */
+    const OWNER      = "johntrue15";
+    const REPO       = "Rosetta";
+    const WORKER_URL = "https://rosetta.jtrue15.workers.dev";
+    const API        = "https://api.github.com";
+
+    /* ================================================================ */
+    /*  State                                                            */
+    /* ================================================================ */
+    let token       = localStorage.getItem("gh_token");
+    let currentUser = null;
+    let pollTimer   = null;
+    let currentStep = 1;
+
+    /* Facility data persisted across page reloads */
+    let facility = JSON.parse(localStorage.getItem("rosetta_facility") || "null");
+
+    /* ================================================================ */
+    /*  DOM refs                                                         */
+    /* ================================================================ */
+    const authSection  = document.getElementById("auth-section");
+    const authWaiting  = document.getElementById("auth-waiting");
+    const loginBtn     = document.getElementById("login-btn");
+    const userInfo     = document.getElementById("user-info");
+    const wizard       = document.getElementById("wizard");
+
+    /* ================================================================ */
+    /*  Boot                                                             */
+    /* ================================================================ */
+    (async () => {
+      if (token) {
+        await verifyAndRoute(token);
+      }
+    })();
+
+    /* ================================================================ */
+    /*  Auth — same pattern as the upload page                          */
+    /* ================================================================ */
+    loginBtn.addEventListener("click", startOAuth);
+
+    function startOAuth() {
+      loginBtn.disabled = true;
+      authWaiting.style.display = "block";
+      const popup = window.open(
+        WORKER_URL,
+        "rosetta_oauth",
+        "width=600,height=720,menubar=no,toolbar=no,location=yes"
+      );
+      window.addEventListener("gh_token_ready", onTokenReady, { once: true });
+      pollTimer = setInterval(() => {
+        const t = localStorage.getItem("gh_token");
+        if (t && t !== token) onTokenReady();
+      }, 1000);
+      const popupCheck = setInterval(() => {
+        if (popup && popup.closed) {
+          clearInterval(popupCheck);
+          if (!localStorage.getItem("gh_token")) {
+            loginBtn.disabled = false;
+            authWaiting.style.display = "none";
+            clearPoll();
+          }
+        }
+      }, 500);
+    }
+
+    async function onTokenReady() {
+      clearPoll();
+      token = localStorage.getItem("gh_token");
+      if (!token) { loginBtn.disabled = false; authWaiting.style.display = "none"; return; }
+      loginBtn.disabled = false;
+      authWaiting.style.display = "none";
+      await verifyAndRoute(token);
+    }
+
+    function clearPoll() {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      window.removeEventListener("gh_token_ready", onTokenReady);
+    }
+
+    async function verifyAndRoute(t) {
+      try {
+        const userRes = await ghFetch("/user");
+        if (!userRes.ok) { signOut(); return; }
+        currentUser = await userRes.json();
+        showUserChrome(currentUser);
+        authSection.style.display = "none";
+        wizard.classList.add("visible");
+        await runStep1();
+      } catch (err) {
+        console.error("verifyAndRoute error:", err);
+        signOut();
+      }
+    }
+
+    function showUserChrome(user) {
+      userInfo.textContent = "";
+      const avatar = document.createElement("img");
+      avatar.src = user.avatar_url; avatar.alt = "avatar";
+      const uname = document.createElement("span");
+      uname.textContent = user.login;
+      const logoutBtn = document.createElement("button");
+      logoutBtn.className = "btn btn-sm";
+      logoutBtn.textContent = "Sign out";
+      logoutBtn.addEventListener("click", signOut);
+      userInfo.append(avatar, uname, logoutBtn);
+    }
+
+    function signOut() {
+      clearPoll();
+      localStorage.removeItem("gh_token");
+      token = null; currentUser = null;
+      userInfo.textContent = "";
+      wizard.classList.remove("visible");
+      authSection.style.display = "block";
+    }
+
+    /* ================================================================ */
+    /*  GitHub API helper                                                */
+    /* ================================================================ */
+    function ghFetch(path, opts = {}) {
+      const headers = { Authorization: "Bearer " + token, Accept: "application/vnd.github+json", ...opts.headers };
+      return fetch(API + path, { ...opts, headers });
+    }
+
+    /* ================================================================ */
+    /*  Wizard navigation                                                */
+    /* ================================================================ */
+    function goToStep(n) {
+      currentStep = n;
+      document.querySelectorAll(".step-panel").forEach(p => p.classList.remove("active"));
+      document.getElementById("step-" + n).classList.add("active");
+
+      document.querySelectorAll(".progress-step").forEach(s => {
+        const sn = parseInt(s.dataset.step);
+        s.classList.remove("active", "done");
+        if (sn < n) s.classList.add("done");
+        else if (sn === n) s.classList.add("active");
+      });
+
+      const fill = document.getElementById("progress-fill");
+      fill.style.width = ((n - 1) / 4 * 100) + "%";
+    }
+
+    /* ================================================================ */
+    /*  Step 1: Confirm collaborator access                             */
+    /* ================================================================ */
+    async function runStep1() {
+      const statusEl  = document.getElementById("access-status");
+      const actionsEl = document.getElementById("access-actions");
+      statusEl.innerHTML = '<span class="status-badge waiting"><span class="spinner-inline"></span> Checking permissions…</span>';
+      actionsEl.innerHTML = "";
+
+      /* If we already have a facility with an approved issue, jump ahead */
+      if (facility && facility.issueNumber) {
+        const approved = await checkApproval(facility.issueNumber);
+        if (approved) {
+          goToStep(4);
+          renderStep4();
+          return;
+        }
+        /* Issue exists but not yet approved — jump to step 3 */
+        goToStep(3);
+        startApprovalPoll();
+        return;
+      }
+
+      try {
+        const repoRes = await ghFetch("/repos/" + OWNER + "/" + REPO);
+        if (repoRes.ok) {
+          const repo = await repoRes.json();
+          if (repo.permissions && repo.permissions.push) {
+            statusEl.innerHTML = '<span class="status-badge success">&#10003; You have collaborator access</span>';
+            const nextBtn = document.createElement("button");
+            nextBtn.className = "btn btn-primary";
+            nextBtn.textContent = "Continue to facility request";
+            nextBtn.addEventListener("click", () => goToStep(2));
+            actionsEl.appendChild(nextBtn);
+            return;
+          }
+        }
+
+        statusEl.innerHTML = '<span class="status-badge waiting">You don\'t have write access yet</span>';
+        const requestBtn = document.createElement("button");
+        requestBtn.className = "btn btn-warning";
+        requestBtn.textContent = "Request Access";
+        requestBtn.addEventListener("click", () => requestCollabAccess(statusEl, actionsEl));
+        const recheckBtn = document.createElement("button");
+        recheckBtn.className = "btn";
+        recheckBtn.textContent = "Re-check";
+        recheckBtn.addEventListener("click", runStep1);
+        actionsEl.append(requestBtn, document.createTextNode(" "), recheckBtn);
+      } catch (err) {
+        statusEl.innerHTML = '<span class="status-badge error">Error checking access: ' + err.message + '</span>';
+      }
+    }
+
+    async function requestCollabAccess(statusEl, actionsEl) {
+      actionsEl.innerHTML = '<span style="color:var(--muted);font-size:0.85rem"><span class="spinner-inline"></span> Submitting…</span>';
+      try {
+        const res = await ghFetch("/repos/" + OWNER + "/" + REPO + "/issues", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: "Access request: @" + currentUser.login,
+            body: "**@" + currentUser.login + "** is requesting write access to upload files via the Rosetta web interface.\n\n" +
+                  "- GitHub profile: https://github.com/" + currentUser.login + "\n" +
+                  "- Requested at: " + new Date().toUTCString() + "\n\n" +
+                  "_To approve: add this user as a repository collaborator, then close this issue._"
+          })
+        });
+        if (res.ok) {
+          const issue = await res.json();
+          statusEl.innerHTML = '<span class="status-badge waiting">Access requested — issue <a href="' + issue.html_url + '" target="_blank" style="color:var(--accent)">#' + issue.number + '</a> created</span>';
+          actionsEl.innerHTML = "";
+          const recheckBtn = document.createElement("button");
+          recheckBtn.className = "btn";
+          recheckBtn.textContent = "Re-check access";
+          recheckBtn.addEventListener("click", runStep1);
+          actionsEl.appendChild(recheckBtn);
+        } else {
+          throw new Error((await res.json()).message);
+        }
+      } catch (err) {
+        actionsEl.innerHTML = '<span class="status-badge error">Failed: ' + err.message + '</span>';
+      }
+    }
+
+    /* ================================================================ */
+    /*  Step 2: Facility request form                                   */
+    /* ================================================================ */
+    const facilityForm = document.getElementById("facility-form");
+    const formStatus   = document.getElementById("form-status");
+
+    facilityForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("submit-facility-btn");
+      btn.disabled = true;
+      formStatus.textContent = "";
+
+      const name        = document.getElementById("f-name").value.trim();
+      const institution = document.getElementById("f-institution").value.trim();
+      const machineType = document.getElementById("f-machine-type").value;
+      const machineName = document.getElementById("f-machine-name").value.trim();
+      const email       = document.getElementById("f-email").value.trim();
+      const watchDir    = document.getElementById("f-watch-dir").value.trim();
+      const notes       = document.getElementById("f-notes").value.trim();
+
+      if (!name || !machineType) {
+        formStatus.innerHTML = '<span style="color:var(--danger)">Please fill in all required fields.</span>';
+        btn.disabled = false;
+        return;
+      }
+
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+      const issueBody = [
+        "### Facility Name", "", name, "",
+        "### Institution / Organization", "", institution || "_No response_", "",
+        "### Machine Type", "", machineType, "",
+        "### Machine Name / Identifier", "", machineName || "_No response_", "",
+        "### Contact Email", "", email || "_No response_", "",
+        "### Watch Directory Path", "", watchDir || "_No response_", "",
+        "### Notes", "", notes || "_No response_", "",
+        "---",
+        "_Submitted via the [Setup Facility](https://" + OWNER + ".github.io/" + REPO + "/docs/setup-facility/) wizard by @" + currentUser.login + "_"
+      ].join("\n");
+
+      formStatus.innerHTML = '<span style="color:var(--muted)"><span class="spinner-inline"></span> Creating issue…</span>';
+
+      try {
+        const res = await ghFetch("/repos/" + OWNER + "/" + REPO + "/issues", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: "Facility request: " + name,
+            body: issueBody,
+            labels: ["request-facility"]
+          })
+        });
+
+        if (!res.ok) throw new Error((await res.json()).message);
+        const issue = await res.json();
+
+        facility = {
+          name, institution, machineType, machineName, email, watchDir, notes,
+          slug, branch: "facility/" + slug,
+          issueNumber: issue.number, issueUrl: issue.html_url
+        };
+        localStorage.setItem("rosetta_facility", JSON.stringify(facility));
+
+        goToStep(3);
+        startApprovalPoll();
+      } catch (err) {
+        formStatus.innerHTML = '<span style="color:var(--danger)">Failed to create issue: ' + err.message + '</span>';
+        btn.disabled = false;
+      }
+    });
+
+    /* ================================================================ */
+    /*  Step 3: Await approval                                          */
+    /* ================================================================ */
+    let approvalTimer = null;
+
+    function startApprovalPoll() {
+      if (!facility) return;
+      const link = document.getElementById("issue-link");
+      link.href = facility.issueUrl;
+      link.textContent = "#" + facility.issueNumber;
+
+      const statusEl = document.getElementById("approval-status");
+      const pollEl   = document.getElementById("approval-poll");
+      statusEl.innerHTML = "";
+      pollEl.style.display = "flex";
+
+      if (approvalTimer) clearInterval(approvalTimer);
+      checkAndPoll();
+
+      async function checkAndPoll() {
+        const approved = await checkApproval(facility.issueNumber);
+        if (approved) {
+          pollEl.style.display = "none";
+          statusEl.innerHTML = '<span class="status-badge success">&#10003; Facility approved!</span>';
+          if (approvalTimer) { clearInterval(approvalTimer); approvalTimer = null; }
+          setTimeout(() => { goToStep(4); renderStep4(); }, 800);
+        } else {
+          approvalTimer = setTimeout(checkAndPoll, 15000);
+        }
+      }
+    }
+
+    async function checkApproval(issueNumber) {
+      try {
+        const res = await ghFetch("/repos/" + OWNER + "/" + REPO + "/issues/" + issueNumber);
+        if (!res.ok) return false;
+        const issue = await res.json();
+        return issue.labels.some(l => l.name === "facility-approved");
+      } catch { return false; }
+    }
+
+    /* ================================================================ */
+    /*  Step 4: Watchdog install guide                                  */
+    /* ================================================================ */
+    function renderStep4() {
+      if (!facility) return;
+      const machineName = facility.machineName || facility.slug;
+      const watchDir    = facility.watchDir || "D:\\XradiaData\\Scans";
+
+      const configYaml = [
+        "watch_directories:",
+        '  - path: "' + watchDir + '"',
+        '    machine_name: "' + machineName + '"',
+        "",
+        "polling_interval_seconds: 30",
+        "include_drift_files: false",
+        'parser_backend: "auto"',
+        'state_file: "processed_files.json"',
+        "",
+        "github:",
+        '  token_env: "ROSETTA_GITHUB_TOKEN"',
+        '  repo: "' + OWNER + "/" + REPO + '"',
+        '  branch: "' + facility.branch + '"',
+        '  upload_path: "data/"',
+        '  commit_prefix: "[edge-watchdog]"',
+        "",
+        "logging:",
+        '  level: "INFO"',
+        '  file: "rosetta-watchdog.log"',
+      ].join("\n");
+
+      const configBlock = document.getElementById("code-config");
+      const copyBtn = configBlock.querySelector(".copy-btn");
+      configBlock.textContent = configYaml;
+      configBlock.appendChild(copyBtn);
+
+      document.getElementById("download-config-btn").addEventListener("click", () => {
+        const blob = new Blob([configYaml], { type: "text/yaml" });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement("a");
+        a.href = url; a.download = "config.yml";
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+      });
+
+      document.getElementById("goto-verify-btn").addEventListener("click", () => {
+        goToStep(5);
+        runVerify();
+      });
+    }
+
+    /* ================================================================ */
+    /*  Step 5: Verify data                                             */
+    /* ================================================================ */
+    document.getElementById("recheck-data-btn").addEventListener("click", runVerify);
+
+    async function runVerify() {
+      if (!facility) return;
+      const statusEl  = document.getElementById("verify-status");
+      const resultEl  = document.getElementById("verify-result");
+      const spinner   = document.getElementById("verify-spinner");
+
+      spinner.style.display = "inline-block";
+      statusEl.innerHTML = '<span class="status-badge waiting"><span class="spinner-inline"></span> Checking branch <code>' + facility.branch + '</code>…</span>';
+      resultEl.innerHTML = "";
+
+      try {
+        const branchRef = facility.branch.replace(/\//g, "/");
+        const refRes = await ghFetch("/repos/" + OWNER + "/" + REPO + "/git/ref/heads/" + branchRef);
+
+        if (!refRes.ok) {
+          statusEl.innerHTML = '<span class="status-badge waiting">Branch not found yet</span>';
+          resultEl.innerHTML = '<div class="verify-result not-found">' +
+            'The branch <code>' + facility.branch + '</code> hasn\'t been created yet. ' +
+            'This happens automatically when the <code>facility-approved</code> label is added to your issue. ' +
+            'If you just got approved, wait a moment and check again.</div>';
+          spinner.style.display = "none";
+          return;
+        }
+
+        const contentsRes = await ghFetch("/repos/" + OWNER + "/" + REPO + "/contents/data?ref=" + branchRef);
+
+        if (contentsRes.ok) {
+          const files = await contentsRes.json();
+          const dataFiles = Array.isArray(files) ? files.filter(f => f.name.endsWith(".json") || f.name.endsWith(".txrm")) : [];
+
+          if (dataFiles.length > 0) {
+            statusEl.innerHTML = '<span class="status-badge success">&#10003; Data detected!</span>';
+            resultEl.innerHTML = '<div class="verify-result found">' +
+              '<strong>Your facility is live!</strong> Found ' + dataFiles.length + ' file(s) on the <code>' + facility.branch + '</code> branch.<br><br>' +
+              'The watchdog is successfully pushing data. The parse-and-aggregate workflow will process it automatically.</div>' +
+              '<div class="completion-links" style="margin-top:1.25rem">' +
+              '<a class="btn btn-primary" href="https://github.com/' + OWNER + '/' + REPO + '/tree/' + branchRef + '/data" target="_blank">View branch data</a>' +
+              '<a class="btn" href="../">Go to Upload page</a>' +
+              '</div>';
+
+            goToStep(6);
+          } else {
+            statusEl.innerHTML = '<span class="status-badge waiting">Branch exists, no data yet</span>';
+            resultEl.innerHTML = '<div class="verify-result not-found">' +
+              'The branch <code>' + facility.branch + '</code> exists but no data files were found in <code>data/</code> yet. ' +
+              'Make sure the watchdog is running and scanning a directory with <code>.txrm</code> files. ' +
+              'Check the watchdog logs for errors.</div>';
+          }
+        } else {
+          statusEl.innerHTML = '<span class="status-badge waiting">Branch exists, waiting for data</span>';
+          resultEl.innerHTML = '<div class="verify-result not-found">' +
+            'Branch <code>' + facility.branch + '</code> exists but no <code>data/</code> folder yet. ' +
+            'Start the watchdog and place a <code>.txrm</code> file in the watch directory.</div>';
+        }
+      } catch (err) {
+        statusEl.innerHTML = '<span class="status-badge error">Error: ' + err.message + '</span>';
+      }
+
+      spinner.style.display = "none";
+    }
+
+    /* ================================================================ */
+    /*  Step 6 (pseudo): Mark all steps done                            */
+    /* ================================================================ */
+    const realGoToStep = goToStep;
+    goToStep = function(n) {
+      if (n === 6) {
+        document.querySelectorAll(".progress-step").forEach(s => s.classList.add("done"));
+        document.querySelectorAll(".progress-step").forEach(s => s.classList.remove("active"));
+        document.getElementById("progress-fill").style.width = "100%";
+        return;
+      }
+      realGoToStep(n);
+    };
+
+    /* ================================================================ */
+    /*  Copy to clipboard helper                                        */
+    /* ================================================================ */
+    function copyBlock(id) {
+      const block = document.getElementById(id);
+      const text = block.textContent.replace(/Copy$/, "").trim();
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = block.querySelector(".copy-btn");
+        const orig = btn.textContent;
+        btn.textContent = "Copied!";
+        setTimeout(() => btn.textContent = orig, 1500);
+      });
+    }
+  </script>
+</body>
+</html>

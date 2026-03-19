@@ -1,0 +1,63 @@
+name: Facility Request
+description: Request onboarding for a new CT scanner facility
+title: "Facility request: "
+labels: ["request-facility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for setting up a new facility! Fill in the details below and a
+        maintainer will review your request. Once approved, you'll be guided
+        through installing the Rosetta Edge Watchdog.
+
+  - type: input
+    id: facility_name
+    attributes:
+      label: Facility Name
+      description: A short, unique name for this facility (used in branch names and config).
+      placeholder: e.g. AMNH-Xradia520
+    validations:
+      required: true
+
+  - type: input
+    id: institution
+    attributes:
+      label: Institution / Organization
+      placeholder: e.g. American Museum of Natural History
+
+  - type: dropdown
+    id: machine_type
+    attributes:
+      label: Machine Type
+      options:
+        - Xradia 520 Versa
+        - Xradia 620 Versa
+        - Other (specify in notes)
+    validations:
+      required: true
+
+  - type: input
+    id: machine_name
+    attributes:
+      label: Machine Name / Identifier
+      description: The name you want tagged on metadata pushed by this machine.
+      placeholder: e.g. Xradia-520-Versa
+
+  - type: input
+    id: contact_email
+    attributes:
+      label: Contact Email
+      placeholder: e.g. scientist@institution.edu
+
+  - type: input
+    id: watch_directory
+    attributes:
+      label: Watch Directory Path
+      description: The local path where the scanner writes .txrm files.
+      placeholder: "e.g. D:\\XradiaData\\Scans"
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Any additional context — justification, special requirements, etc.
