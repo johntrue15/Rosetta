@@ -7,8 +7,8 @@ body:
     attributes:
       value: |
         Thanks for setting up a new facility! Fill in the details below and a
-        maintainer will review your request. Once approved, you'll be guided
-        through installing the Rosetta Edge Watchdog.
+        maintainer will review your request. Once approved, a `config.yml` will
+        be generated and you'll be guided through installing the Rosetta Edge Watchdog.
 
   - type: input
     id: facility_name
@@ -25,36 +25,26 @@ body:
       label: Institution / Organization
       placeholder: e.g. American Museum of Natural History
 
-  - type: dropdown
-    id: machine_type
-    attributes:
-      label: Machine Type
-      options:
-        - Xradia 520 Versa
-        - Xradia 620 Versa
-        - Other (specify in notes)
-    validations:
-      required: true
-
-  - type: input
-    id: machine_name
-    attributes:
-      label: Machine Name / Identifier
-      description: The name you want tagged on metadata pushed by this machine.
-      placeholder: e.g. Xradia-520-Versa
-
   - type: input
     id: contact_email
     attributes:
       label: Contact Email
       placeholder: e.g. scientist@institution.edu
 
-  - type: input
-    id: watch_directory
+  - type: textarea
+    id: machines
     attributes:
-      label: Watch Directory Path
-      description: The local path where the scanner writes .txrm files.
-      placeholder: "e.g. D:\\XradiaData\\Scans"
+      label: X-ray Machines
+      description: |
+        List each machine on its own line: file format, machine name, watch folder path.
+        Use this markdown table format (keep the header row).
+      value: |
+        | Format | Machine Name | Watch Path |
+        |--------|-------------|------------|
+        | .txrm | Xradia-520-Versa | D:\XradiaData\Scans |
+        | .pca | Phoenix-v2 | D:\CT_Output |
+    validations:
+      required: true
 
   - type: textarea
     id: notes

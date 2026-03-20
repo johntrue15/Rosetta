@@ -79,12 +79,16 @@ def compute_axis_range(start, end) -> Optional[str]:
     return None
 
 
-class BaseTXRMParser(ABC):
-    """Abstract interface for TXRM parsing backends."""
+class BaseParser(ABC):
+    """Abstract interface for metadata file parsing backends."""
 
     @abstractmethod
     def parse(self, file_path: str) -> Optional[Dict[str, Any]]:
-        """Parse a .txrm file and return a Rosetta-compatible metadata dict.
+        """Parse a metadata file and return a Rosetta-compatible metadata dict.
 
         Returns None on failure.
         """
+
+
+# Backward-compatible alias
+BaseTXRMParser = BaseParser

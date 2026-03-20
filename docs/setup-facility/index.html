@@ -41,351 +41,146 @@
     header h1 { font-size: 1.3rem; font-weight: 600; }
     header h1 span { color: var(--accent); }
     header nav { display: flex; gap: 1.25rem; align-items: center; }
-    header nav a {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 0.88rem;
-      transition: color 0.15s;
-    }
+    header nav a { color: var(--muted); text-decoration: none; font-size: 0.88rem; transition: color 0.15s; }
     header nav a:hover { color: var(--text); }
-
-    #user-info {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      color: var(--muted);
-      font-size: 0.9rem;
-    }
+    #user-info { display: flex; align-items: center; gap: 0.75rem; color: var(--muted); font-size: 0.9rem; }
     #user-info img { width: 30px; height: 30px; border-radius: 50%; }
 
-    main {
-      width: 100%;
-      max-width: 760px;
-      padding: 2rem 1rem;
-      flex: 1;
-    }
+    main { width: 100%; max-width: 760px; padding: 2rem 1rem; flex: 1; }
 
-    /* ---- Buttons ---- */
     .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.6rem 1.25rem;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--surface);
-      color: var(--text);
-      font-size: 0.9rem;
-      cursor: pointer;
-      text-decoration: none;
-      transition: border-color 0.15s, background 0.15s;
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.6rem 1.25rem; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--surface); color: var(--text); font-size: 0.9rem;
+      cursor: pointer; text-decoration: none; transition: border-color 0.15s, background 0.15s;
     }
     .btn:hover { border-color: var(--accent); }
     .btn-primary { background: #238636; border-color: #2ea043; color: #fff; }
     .btn-primary:hover { background: #2ea043; }
     .btn-warning { background: #9e6a03; border-color: var(--warning); color: #fff; }
     .btn-warning:hover { background: #b07a04; }
+    .btn-danger { background: #da3633; border-color: #f85149; color: #fff; }
+    .btn-danger:hover { background: #f85149; }
     .btn-sm { padding: 0.3rem 0.8rem; font-size: 0.8rem; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* ---- Auth section ---- */
-    #auth-section {
-      text-align: center;
-      margin-top: 5rem;
-    }
-    #auth-section p {
-      color: var(--muted);
-      margin-bottom: 1.5rem;
-      line-height: 1.7;
-      max-width: 480px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    #auth-waiting {
-      display: none;
-      margin-top: 1.25rem;
-      color: var(--muted);
-      font-size: 0.85rem;
-    }
+    #auth-section { text-align: center; margin-top: 5rem; }
+    #auth-section p { color: var(--muted); margin-bottom: 1.5rem; line-height: 1.7; max-width: 480px; margin-left: auto; margin-right: auto; }
+    #auth-waiting { display: none; margin-top: 1.25rem; color: var(--muted); font-size: 0.85rem; }
     .spinner-inline {
-      display: inline-block;
-      width: 14px; height: 14px;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      vertical-align: middle;
-      margin-right: 0.4rem;
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      vertical-align: middle; margin-right: 0.4rem;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ---- Wizard ---- */
     #wizard { display: none; }
     #wizard.visible { display: block; }
 
-    .progress-bar {
-      display: flex;
-      gap: 0;
-      margin-bottom: 2.5rem;
-      position: relative;
-    }
-    .progress-step {
-      flex: 1;
-      text-align: center;
-      position: relative;
-      font-size: 0.78rem;
-      color: var(--muted);
-    }
+    .progress-bar { display: flex; gap: 0; margin-bottom: 2.5rem; position: relative; }
+    .progress-step { flex: 1; text-align: center; position: relative; font-size: 0.78rem; color: var(--muted); }
     .progress-step .step-num {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 32px; height: 32px;
-      border-radius: 50%;
-      border: 2px solid var(--border);
-      background: var(--bg);
-      font-weight: 600;
-      font-size: 0.82rem;
-      margin-bottom: 0.4rem;
-      transition: all 0.3s;
-      position: relative;
-      z-index: 1;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border);
+      background: var(--bg); font-weight: 600; font-size: 0.82rem;
+      margin-bottom: 0.4rem; transition: all 0.3s; position: relative; z-index: 1;
     }
-    .progress-step.active .step-num {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-    .progress-step.done .step-num {
-      border-color: var(--success);
-      background: var(--success);
-      color: #fff;
-    }
-    .progress-step .step-label {
-      display: block;
-      margin-top: 0.15rem;
-    }
+    .progress-step.active .step-num { border-color: var(--accent); color: var(--accent); }
+    .progress-step.done .step-num { border-color: var(--success); background: var(--success); color: #fff; }
+    .progress-step .step-label { display: block; margin-top: 0.15rem; }
     .progress-step.active .step-label { color: var(--accent); }
     .progress-step.done .step-label { color: var(--success); }
+    .progress-line { position: absolute; top: 15px; left: 10%; right: 10%; height: 2px; background: var(--border); z-index: 0; }
+    .progress-line-fill { height: 100%; width: 0%; background: var(--success); transition: width 0.4s; }
 
-    .progress-line {
-      position: absolute;
-      top: 15px;
-      left: 10%;
-      right: 10%;
-      height: 2px;
-      background: var(--border);
-      z-index: 0;
-    }
-    .progress-line-fill {
-      height: 100%;
-      width: 0%;
-      background: var(--success);
-      transition: width 0.4s;
-    }
-
-    /* ---- Step panels ---- */
     .step-panel { display: none; }
     .step-panel.active { display: block; }
+    .step-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; }
+    .step-card h2 { font-size: 1.15rem; margin-bottom: 0.5rem; }
+    .step-card .subtitle { color: var(--muted); font-size: 0.88rem; line-height: 1.6; margin-bottom: 1.5rem; }
 
-    .step-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 2rem;
-    }
-    .step-card h2 {
-      font-size: 1.15rem;
-      margin-bottom: 0.5rem;
-    }
-    .step-card .subtitle {
-      color: var(--muted);
-      font-size: 0.88rem;
-      line-height: 1.6;
-      margin-bottom: 1.5rem;
-    }
+    .status-badge { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.88rem; font-weight: 500; }
+    .status-badge.success { background: rgba(63,185,80,0.12); color: var(--success); border: 1px solid rgba(63,185,80,0.3); }
+    .status-badge.waiting { background: rgba(210,153,34,0.12); color: var(--warning); border: 1px solid rgba(210,153,34,0.3); }
+    .status-badge.error { background: rgba(248,81,73,0.1); color: var(--danger); border: 1px solid rgba(248,81,73,0.3); }
 
-    /* Status badges */
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.5rem 1rem;
-      border-radius: 8px;
-      font-size: 0.88rem;
-      font-weight: 500;
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 0.35rem; }
+    .form-group .hint { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.35rem; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; padding: 0.55rem 0.75rem; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--bg); color: var(--text); font-size: 0.88rem; font-family: inherit; outline: none; transition: border-color 0.15s;
     }
-    .status-badge.success {
-      background: rgba(63,185,80,0.12);
-      color: var(--success);
-      border: 1px solid rgba(63,185,80,0.3);
-    }
-    .status-badge.waiting {
-      background: rgba(210,153,34,0.12);
-      color: var(--warning);
-      border: 1px solid rgba(210,153,34,0.3);
-    }
-    .status-badge.error {
-      background: rgba(248,81,73,0.1);
-      color: var(--danger);
-      border: 1px solid rgba(248,81,73,0.3);
-    }
-
-    /* ---- Form styles ---- */
-    .form-group {
-      margin-bottom: 1.25rem;
-    }
-    .form-group label {
-      display: block;
-      font-size: 0.85rem;
-      font-weight: 500;
-      margin-bottom: 0.35rem;
-    }
-    .form-group .hint {
-      font-size: 0.78rem;
-      color: var(--muted);
-      margin-bottom: 0.35rem;
-    }
-    .form-group input,
-    .form-group select,
-    .form-group textarea {
-      width: 100%;
-      padding: 0.55rem 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--bg);
-      color: var(--text);
-      font-size: 0.88rem;
-      font-family: inherit;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-    .form-group input:focus,
-    .form-group select:focus,
-    .form-group textarea:focus {
-      border-color: var(--accent);
-    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--accent); }
     .form-group textarea { resize: vertical; min-height: 80px; }
     .form-group select { cursor: pointer; }
     .form-group .required { color: var(--danger); }
+    .form-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
+    #form-status { margin-top: 1rem; font-size: 0.85rem; }
 
-    .form-actions {
-      display: flex;
-      gap: 0.75rem;
-      margin-top: 1.5rem;
+    .machine-entry {
+      border: 1px solid var(--border); border-radius: 8px; padding: 1rem;
+      margin-bottom: 0.75rem; background: var(--bg); position: relative;
     }
-
-    #form-status {
-      margin-top: 1rem;
-      font-size: 0.85rem;
+    .machine-entry .machine-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 0.75rem; font-size: 0.82rem; font-weight: 600; color: var(--muted);
     }
+    .machine-entry .machine-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .machine-entry .machine-fields .full-width { grid-column: 1 / -1; }
+    .machine-entry input, .machine-entry select {
+      width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--surface); color: var(--text); font-size: 0.82rem; font-family: inherit; outline: none;
+    }
+    .machine-entry input:focus, .machine-entry select:focus { border-color: var(--accent); }
+    .machine-entry label { font-size: 0.75rem; color: var(--muted); display: block; margin-bottom: 0.2rem; }
 
-    /* ---- Code blocks ---- */
     .code-block {
-      position: relative;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1rem 1.25rem;
-      margin: 0.75rem 0;
+      position: relative; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1rem 1.25rem; margin: 0.75rem 0;
       font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-      font-size: 0.82rem;
-      line-height: 1.7;
-      overflow-x: auto;
-      white-space: pre;
-      color: var(--text);
+      font-size: 0.82rem; line-height: 1.7; overflow-x: auto; white-space: pre; color: var(--text);
     }
     .code-block .copy-btn {
-      position: absolute;
-      top: 0.5rem;
-      right: 0.5rem;
-      padding: 0.25rem 0.6rem;
-      font-size: 0.72rem;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--muted);
-      cursor: pointer;
-      transition: color 0.15s, border-color 0.15s;
+      position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.25rem 0.6rem;
+      font-size: 0.72rem; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 4px; color: var(--muted); cursor: pointer;
     }
-    .code-block .copy-btn:hover {
-      color: var(--text);
-      border-color: var(--accent);
-    }
-    .code-label {
-      font-size: 0.75rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      margin-top: 1rem;
-      margin-bottom: 0.25rem;
-    }
+    .code-block .copy-btn:hover { color: var(--text); border-color: var(--accent); }
+    .code-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1rem; margin-bottom: 0.25rem; }
 
-    /* ---- Polling / waiting ---- */
-    .poll-status {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin: 1.25rem 0;
-      font-size: 0.88rem;
+    .os-tabs { display: flex; gap: 0; margin-top: 0.5rem; }
+    .os-tab {
+      padding: 0.4rem 1rem; font-size: 0.78rem; cursor: pointer;
+      border: 1px solid var(--border); background: var(--bg); color: var(--muted);
     }
-    .poll-status a {
-      color: var(--accent);
-      text-decoration: none;
-    }
+    .os-tab:first-child { border-radius: 6px 0 0 6px; }
+    .os-tab:last-child { border-radius: 0 6px 6px 0; }
+    .os-tab.active { background: var(--surface); color: var(--accent); border-color: var(--accent); }
+    .os-panel { display: none; }
+    .os-panel.active { display: block; }
+
+    .poll-status { display: flex; align-items: center; gap: 0.75rem; margin: 1.25rem 0; font-size: 0.88rem; }
+    .poll-status a { color: var(--accent); text-decoration: none; }
     .poll-status a:hover { text-decoration: underline; }
 
-    /* ---- Verify section ---- */
-    .verify-result {
-      margin: 1rem 0;
-      padding: 1rem 1.25rem;
-      border-radius: 8px;
-      font-size: 0.88rem;
-      line-height: 1.6;
-    }
-    .verify-result.found {
-      background: rgba(63,185,80,0.08);
-      border: 1px solid rgba(63,185,80,0.25);
-      color: var(--success);
-    }
-    .verify-result.not-found {
-      background: rgba(210,153,34,0.08);
-      border: 1px solid rgba(210,153,34,0.25);
-      color: var(--warning);
-    }
+    .verify-result { margin: 1rem 0; padding: 1rem 1.25rem; border-radius: 8px; font-size: 0.88rem; line-height: 1.6; }
+    .verify-result.found { background: rgba(63,185,80,0.08); border: 1px solid rgba(63,185,80,0.25); color: var(--success); }
+    .verify-result.not-found { background: rgba(210,153,34,0.08); border: 1px solid rgba(210,153,34,0.25); color: var(--warning); }
 
-    /* ---- Completion ---- */
-    .completion-card {
-      text-align: center;
-      padding: 3rem 2rem;
-    }
-    .completion-card .big-check {
-      font-size: 3rem;
-      margin-bottom: 1rem;
-    }
-    .completion-card h2 {
-      color: var(--success);
-      margin-bottom: 0.75rem;
-    }
-    .completion-card p {
-      color: var(--muted);
-      line-height: 1.7;
-      max-width: 420px;
-      margin: 0 auto;
-    }
-    .completion-links {
-      display: flex;
-      gap: 0.75rem;
-      justify-content: center;
-      margin-top: 1.5rem;
-      flex-wrap: wrap;
-    }
+    .completion-links { display: flex; gap: 0.75rem; justify-content: center; margin-top: 1.5rem; flex-wrap: wrap; }
 
-    footer {
-      padding: 1.25rem;
-      text-align: center;
-      color: var(--muted);
-      font-size: 0.78rem;
+    .facility-list { margin: 1rem 0; }
+    .facility-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px;
+      margin-bottom: 0.5rem; background: var(--bg);
     }
+    .facility-item .f-name { font-weight: 600; font-size: 0.9rem; }
+    .facility-item .f-path { font-size: 0.78rem; color: var(--muted); font-family: monospace; }
+
+    footer { padding: 1.25rem; text-align: center; color: var(--muted); font-size: 0.78rem; }
     footer a { color: var(--accent); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
   </style>
@@ -400,8 +195,6 @@
   </header>
 
   <main>
-
-    <!-- Auth gate -->
     <div id="auth-section">
       <p>
         Sign in with your GitHub account to set up a new facility for the
@@ -421,103 +214,74 @@
         </svg>
         Sign in with GitHub
       </button>
-      <div id="auth-waiting">
-        <span class="spinner-inline"></span>
-        Waiting for authorization…
-      </div>
+      <div id="auth-waiting"><span class="spinner-inline"></span> Waiting for authorization…</div>
     </div>
 
-    <!-- Wizard (shown after auth) -->
     <div id="wizard">
-
-      <!-- Progress bar -->
       <div class="progress-bar">
         <div class="progress-line"><div class="progress-line-fill" id="progress-fill"></div></div>
-        <div class="progress-step active" data-step="1">
-          <span class="step-num">1</span>
-          <span class="step-label">Access</span>
-        </div>
-        <div class="progress-step" data-step="2">
-          <span class="step-num">2</span>
-          <span class="step-label">Request</span>
-        </div>
-        <div class="progress-step" data-step="3">
-          <span class="step-num">3</span>
-          <span class="step-label">Approval</span>
-        </div>
-        <div class="progress-step" data-step="4">
-          <span class="step-num">4</span>
-          <span class="step-label">Install</span>
-        </div>
-        <div class="progress-step" data-step="5">
-          <span class="step-num">5</span>
-          <span class="step-label">Verify</span>
-        </div>
+        <div class="progress-step active" data-step="1"><span class="step-num">1</span><span class="step-label">Access</span></div>
+        <div class="progress-step" data-step="2"><span class="step-num">2</span><span class="step-label">Request</span></div>
+        <div class="progress-step" data-step="3"><span class="step-num">3</span><span class="step-label">Approval</span></div>
+        <div class="progress-step" data-step="4"><span class="step-num">4</span><span class="step-label">Install</span></div>
+        <div class="progress-step" data-step="5"><span class="step-num">5</span><span class="step-label">Verify</span></div>
       </div>
 
       <!-- Step 1: Confirm collaborator access -->
       <div class="step-panel active" id="step-1">
         <div class="step-card">
           <h2>Step 1 — Confirm Collaborator Access</h2>
-          <p class="subtitle">
-            You need collaborator (write) access to the Rosetta repository before
-            you can create a facility. Let's check your permissions.
-          </p>
+          <p class="subtitle">You need collaborator (write) access to the Rosetta repository before you can create a facility.</p>
           <div id="access-status"></div>
           <div id="access-actions" style="margin-top:1.25rem"></div>
         </div>
       </div>
 
-      <!-- Step 2: Facility request form -->
+      <!-- Step 2: Facility request form (with existing facilities + multi-machine) -->
       <div class="step-panel" id="step-2">
         <div class="step-card">
-          <h2>Step 2 — Request New Facility</h2>
-          <p class="subtitle">
-            Fill in details about your CT scanner facility. This will create a
-            GitHub Issue for the maintainer to review and approve.
-          </p>
-          <form id="facility-form" autocomplete="off">
-            <div class="form-group">
-              <label>Facility Name <span class="required">*</span></label>
-              <div class="hint">A short, unique name (used in directory names and config).</div>
-              <input type="text" id="f-name" placeholder="e.g. AMNH-Xradia520" required />
-            </div>
-            <div class="form-group">
-              <label>Institution / Organization</label>
-              <input type="text" id="f-institution" placeholder="e.g. American Museum of Natural History" />
-            </div>
-            <div class="form-group">
-              <label>Machine Type <span class="required">*</span></label>
-              <select id="f-machine-type" required>
-                <option value="">Select…</option>
-                <option value="Xradia 520 Versa">Xradia 520 Versa</option>
-                <option value="Xradia 620 Versa">Xradia 620 Versa</option>
-                <option value="Other">Other (specify in notes)</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Machine Name / Identifier</label>
-              <div class="hint">The name tagged on metadata pushed by this machine.</div>
-              <input type="text" id="f-machine-name" placeholder="e.g. Xradia-520-Versa" />
-            </div>
-            <div class="form-group">
-              <label>Contact Email</label>
-              <input type="email" id="f-email" placeholder="e.g. scientist@institution.edu" />
-            </div>
-            <div class="form-group">
-              <label>Watch Directory Path</label>
-              <div class="hint">Local path where the scanner writes .txrm files.</div>
-              <input type="text" id="f-watch-dir" placeholder="e.g. D:\XradiaData\Scans" />
-            </div>
-            <div class="form-group">
-              <label>Notes</label>
-              <textarea id="f-notes" placeholder="Any additional context — justification, special requirements, etc."></textarea>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary" id="submit-facility-btn">Submit Facility Request</button>
-            </div>
-            <div id="form-status"></div>
-          </form>
+          <h2>Step 2 — Request Facility</h2>
+          <p class="subtitle">Join an existing facility or create a new one. Each facility can have multiple X-ray machines.</p>
+
+          <div id="existing-facilities" style="margin-bottom:1.5rem">
+            <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem">Existing Facilities</div>
+            <div id="facilities-list"><span style="color:var(--muted);font-size:0.82rem"><span class="spinner-inline"></span> Loading…</span></div>
+          </div>
+
+          <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-top:0.5rem">
+            <div style="font-size:0.85rem;font-weight:600;margin-bottom:1rem">Create New Facility</div>
+            <form id="facility-form" autocomplete="off">
+              <div class="form-group">
+                <label>Facility Name <span class="required">*</span></label>
+                <div class="hint">A short, unique name (used in directory names and config).</div>
+                <input type="text" id="f-name" placeholder="e.g. AMNH-Xradia520" required />
+              </div>
+              <div class="form-group">
+                <label>Institution / Organization</label>
+                <input type="text" id="f-institution" placeholder="e.g. American Museum of Natural History" />
+              </div>
+              <div class="form-group">
+                <label>Contact Email</label>
+                <input type="email" id="f-email" placeholder="e.g. scientist@institution.edu" />
+              </div>
+
+              <div class="form-group">
+                <label>X-ray Machines <span class="required">*</span></label>
+                <div class="hint">Add each machine that will push data to this facility.</div>
+                <div id="machines-container"></div>
+                <button type="button" class="btn btn-sm" id="add-machine-btn" style="margin-top:0.5rem">+ Add machine</button>
+              </div>
+
+              <div class="form-group">
+                <label>Notes</label>
+                <textarea id="f-notes" placeholder="Any additional context — justification, special requirements, etc."></textarea>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="submit-facility-btn">Submit Facility Request</button>
+              </div>
+              <div id="form-status"></div>
+            </form>
+          </div>
         </div>
       </div>
 
@@ -525,11 +289,7 @@
       <div class="step-panel" id="step-3">
         <div class="step-card">
           <h2>Step 3 — Awaiting Approval</h2>
-          <p class="subtitle">
-            Your facility request has been submitted. A maintainer will review it
-            and add the <code>facility-approved</code> label when ready. This page
-            checks automatically.
-          </p>
+          <p class="subtitle">Your facility request has been submitted. A maintainer will review it and add the <code>facility-approved</code> label. This page checks automatically.</p>
           <div class="poll-status" id="approval-poll">
             <span class="spinner-inline"></span>
             <span>Checking issue <a id="issue-link" href="#" target="_blank"></a> for approval…</span>
@@ -542,39 +302,47 @@
       <div class="step-panel" id="step-4">
         <div class="step-card">
           <h2>Step 4 — Install the Rosetta Edge Watchdog</h2>
-          <p class="subtitle">
-            Your facility has been approved and its data directory is ready on
-            <code>main</code>. Now install the watchdog on the machine where
-            your scanner writes data.
-          </p>
+          <p class="subtitle">Your facility is ready. Install the watchdog on the machine where your scanner writes data.</p>
 
           <div class="code-label">1. Clone and install</div>
           <div class="code-block" id="code-install">git clone https://github.com/johntrue15/Rosetta.git
 cd Rosetta/edge
 pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Copy</button></div>
 
-          <div class="code-label">2. Create your config file</div>
+          <div class="code-label">2. Download your config</div>
           <p style="color:var(--muted);font-size:0.85rem;margin:0.5rem 0">
-            Click below to download a <code>config.yml</code> pre-filled with your
-            facility details, or copy the contents and save manually.
+            Your <code>config.yml</code> was auto-generated when the facility was approved.
+            Download it and place it in the <code>edge/</code> directory.
           </p>
-          <div class="code-block" id="code-config"><button class="copy-btn" onclick="copyBlock('code-config')">Copy</button></div>
-          <div style="margin-top:0.5rem">
-            <button class="btn btn-sm" id="download-config-btn">Download config.yml</button>
-          </div>
+          <div id="config-download-area"></div>
 
           <div class="code-label">3. Set your GitHub token</div>
-          <div class="code-block" id="code-token">export ROSETTA_GITHUB_TOKEN="ghp_YourPersonalAccessTokenHere"<button class="copy-btn" onclick="copyBlock('code-token')">Copy</button></div>
-          <p style="color:var(--muted);font-size:0.82rem;margin:0.5rem 0 0">
+          <p style="color:var(--muted);font-size:0.82rem;margin:0.25rem 0 0.5rem">
             Create a
-            <a href="https://github.com/settings/tokens/new?scopes=repo&description=Rosetta+Edge+Watchdog" target="_blank" style="color:var(--accent)">
-              Personal Access Token
-            </a>
-            with <code>repo</code> scope.
+            <a href="https://github.com/settings/tokens/new?scopes=repo&description=Rosetta+Edge+Watchdog" target="_blank" style="color:var(--accent)">Personal Access Token</a>
+            with <code>repo</code> scope, then set it:
           </p>
+          <div class="os-tabs">
+            <div class="os-tab active" onclick="switchOS('mac')">Mac / Linux</div>
+            <div class="os-tab" onclick="switchOS('win-ps')">Windows PowerShell</div>
+            <div class="os-tab" onclick="switchOS('win-cmd')">Windows CMD</div>
+          </div>
+          <div class="os-panel active" id="os-mac">
+            <div class="code-block" id="code-token-mac">export ROSETTA_GITHUB_TOKEN="ghp_YourTokenHere"<button class="copy-btn" onclick="copyBlock('code-token-mac')">Copy</button></div>
+          </div>
+          <div class="os-panel" id="os-win-ps">
+            <div class="code-block" id="code-token-win-ps">$env:ROSETTA_GITHUB_TOKEN = "ghp_YourTokenHere"<button class="copy-btn" onclick="copyBlock('code-token-win-ps')">Copy</button></div>
+          </div>
+          <div class="os-panel" id="os-win-cmd">
+            <div class="code-block" id="code-token-win-cmd">set ROSETTA_GITHUB_TOKEN=ghp_YourTokenHere<button class="copy-btn" onclick="copyBlock('code-token-win-cmd')">Copy</button></div>
+          </div>
 
           <div class="code-label">4. Run the watchdog</div>
           <div class="code-block" id="code-run">rosetta-watchdog -c config.yml<button class="copy-btn" onclick="copyBlock('code-run')">Copy</button></div>
+          <p style="color:var(--muted);font-size:0.82rem;margin:0.5rem 0">
+            A bundled <code>example.pca</code> test file is included in <code>edge/test_data/</code>.
+            Copy it into your watch folder to confirm the full upload loop works.
+          </p>
 
           <div class="form-actions">
             <button class="btn btn-primary" id="goto-verify-btn">I've started the watchdog — verify data</button>
@@ -586,10 +354,7 @@ pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Cop
       <div class="step-panel" id="step-5">
         <div class="step-card">
           <h2>Step 5 — Verify Data Upload</h2>
-          <p class="subtitle">
-            Let's check if the watchdog is successfully pushing data to your
-            facility directory on <code>main</code>.
-          </p>
+          <p class="subtitle">Let's check if the watchdog is successfully pushing data to your facility directory on <code>main</code>.</p>
           <div id="verify-status"></div>
           <div style="margin-top:1rem">
             <button class="btn" id="recheck-data-btn">
@@ -600,8 +365,7 @@ pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Cop
           <div id="verify-result"></div>
         </div>
       </div>
-
-    </div><!-- /wizard -->
+    </div>
   </main>
 
   <footer>
@@ -610,86 +374,51 @@ pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Cop
   </footer>
 
   <script>
-    /* ================================================================ */
-    /*  Config                                                           */
-    /* ================================================================ */
     const OWNER      = "johntrue15";
     const REPO       = "Rosetta";
     const WORKER_URL = "https://rosetta.jtrue15.workers.dev";
     const API        = "https://api.github.com";
+    const RESERVED_DIRS = new Set(["parsed", "completed", "tests"]);
 
-    /* ================================================================ */
-    /*  State                                                            */
-    /* ================================================================ */
     let token       = localStorage.getItem("gh_token");
     let currentUser = null;
     let pollTimer   = null;
     let currentStep = 1;
+    let facility    = JSON.parse(localStorage.getItem("rosetta_facility") || "null");
+    let machineCount = 0;
 
-    /* Facility data persisted across page reloads */
-    let facility = JSON.parse(localStorage.getItem("rosetta_facility") || "null");
+    const authSection = document.getElementById("auth-section");
+    const authWaiting = document.getElementById("auth-waiting");
+    const loginBtn    = document.getElementById("login-btn");
+    const userInfo    = document.getElementById("user-info");
+    const wizard      = document.getElementById("wizard");
 
-    /* ================================================================ */
-    /*  DOM refs                                                         */
-    /* ================================================================ */
-    const authSection  = document.getElementById("auth-section");
-    const authWaiting  = document.getElementById("auth-waiting");
-    const loginBtn     = document.getElementById("login-btn");
-    const userInfo     = document.getElementById("user-info");
-    const wizard       = document.getElementById("wizard");
+    (async () => { if (token) await verifyAndRoute(token); })();
 
-    /* ================================================================ */
-    /*  Boot                                                             */
-    /* ================================================================ */
-    (async () => {
-      if (token) {
-        await verifyAndRoute(token);
-      }
-    })();
-
-    /* ================================================================ */
-    /*  Auth — same pattern as the upload page                          */
-    /* ================================================================ */
+    /* ============================================================== */
+    /*  Auth                                                           */
+    /* ============================================================== */
     loginBtn.addEventListener("click", startOAuth);
 
     function startOAuth() {
       loginBtn.disabled = true;
       authWaiting.style.display = "block";
-      const popup = window.open(
-        WORKER_URL,
-        "rosetta_oauth",
-        "width=600,height=720,menubar=no,toolbar=no,location=yes"
-      );
+      const popup = window.open(WORKER_URL, "rosetta_oauth", "width=600,height=720,menubar=no,toolbar=no,location=yes");
       window.addEventListener("gh_token_ready", onTokenReady, { once: true });
-      pollTimer = setInterval(() => {
-        const t = localStorage.getItem("gh_token");
-        if (t && t !== token) onTokenReady();
-      }, 1000);
+      pollTimer = setInterval(() => { const t = localStorage.getItem("gh_token"); if (t && t !== token) onTokenReady(); }, 1000);
       const popupCheck = setInterval(() => {
-        if (popup && popup.closed) {
-          clearInterval(popupCheck);
-          if (!localStorage.getItem("gh_token")) {
-            loginBtn.disabled = false;
-            authWaiting.style.display = "none";
-            clearPoll();
-          }
-        }
+        if (popup && popup.closed) { clearInterval(popupCheck); if (!localStorage.getItem("gh_token")) { loginBtn.disabled = false; authWaiting.style.display = "none"; clearPoll(); } }
       }, 500);
     }
 
     async function onTokenReady() {
-      clearPoll();
-      token = localStorage.getItem("gh_token");
+      clearPoll(); token = localStorage.getItem("gh_token");
       if (!token) { loginBtn.disabled = false; authWaiting.style.display = "none"; return; }
-      loginBtn.disabled = false;
-      authWaiting.style.display = "none";
+      loginBtn.disabled = false; authWaiting.style.display = "none";
       await verifyAndRoute(token);
     }
 
-    function clearPoll() {
-      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-      window.removeEventListener("gh_token_ready", onTokenReady);
-    }
+    function clearPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } window.removeEventListener("gh_token_ready", onTokenReady); }
 
     async function verifyAndRoute(t) {
       try {
@@ -700,82 +429,62 @@ pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Cop
         authSection.style.display = "none";
         wizard.classList.add("visible");
         await runStep1();
-      } catch (err) {
-        console.error("verifyAndRoute error:", err);
-        signOut();
-      }
+      } catch (err) { console.error("verifyAndRoute error:", err); signOut(); }
     }
 
     function showUserChrome(user) {
       userInfo.textContent = "";
-      const avatar = document.createElement("img");
-      avatar.src = user.avatar_url; avatar.alt = "avatar";
-      const uname = document.createElement("span");
-      uname.textContent = user.login;
-      const logoutBtn = document.createElement("button");
-      logoutBtn.className = "btn btn-sm";
-      logoutBtn.textContent = "Sign out";
+      const avatar = document.createElement("img"); avatar.src = user.avatar_url; avatar.alt = "avatar";
+      const uname = document.createElement("span"); uname.textContent = user.login;
+      const logoutBtn = document.createElement("button"); logoutBtn.className = "btn btn-sm"; logoutBtn.textContent = "Sign out";
       logoutBtn.addEventListener("click", signOut);
       userInfo.append(avatar, uname, logoutBtn);
     }
 
-    function signOut() {
-      clearPoll();
-      localStorage.removeItem("gh_token");
-      token = null; currentUser = null;
-      userInfo.textContent = "";
-      wizard.classList.remove("visible");
-      authSection.style.display = "block";
-    }
+    function signOut() { clearPoll(); localStorage.removeItem("gh_token"); token = null; currentUser = null; userInfo.textContent = ""; wizard.classList.remove("visible"); authSection.style.display = "block"; }
 
-    /* ================================================================ */
-    /*  GitHub API helper                                                */
-    /* ================================================================ */
     function ghFetch(path, opts = {}) {
       const headers = { Authorization: "Bearer " + token, Accept: "application/vnd.github+json", ...opts.headers };
       return fetch(API + path, { ...opts, headers });
     }
 
-    /* ================================================================ */
-    /*  Wizard navigation                                                */
-    /* ================================================================ */
+    /* ============================================================== */
+    /*  Wizard navigation                                              */
+    /* ============================================================== */
     function goToStep(n) {
       currentStep = n;
       document.querySelectorAll(".step-panel").forEach(p => p.classList.remove("active"));
       document.getElementById("step-" + n).classList.add("active");
-
       document.querySelectorAll(".progress-step").forEach(s => {
-        const sn = parseInt(s.dataset.step);
-        s.classList.remove("active", "done");
-        if (sn < n) s.classList.add("done");
-        else if (sn === n) s.classList.add("active");
+        const sn = parseInt(s.dataset.step); s.classList.remove("active", "done");
+        if (sn < n) s.classList.add("done"); else if (sn === n) s.classList.add("active");
       });
-
-      const fill = document.getElementById("progress-fill");
-      fill.style.width = ((n - 1) / 4 * 100) + "%";
+      document.getElementById("progress-fill").style.width = ((n - 1) / 4 * 100) + "%";
     }
 
-    /* ================================================================ */
-    /*  Step 1: Confirm collaborator access                             */
-    /* ================================================================ */
+    const realGoToStep = goToStep;
+    goToStep = function(n) {
+      if (n === 6) {
+        document.querySelectorAll(".progress-step").forEach(s => { s.classList.add("done"); s.classList.remove("active"); });
+        document.getElementById("progress-fill").style.width = "100%";
+        return;
+      }
+      realGoToStep(n);
+    };
+
+    /* ============================================================== */
+    /*  Step 1: Confirm access                                         */
+    /* ============================================================== */
     async function runStep1() {
-      const statusEl  = document.getElementById("access-status");
+      const statusEl = document.getElementById("access-status");
       const actionsEl = document.getElementById("access-actions");
       statusEl.innerHTML = '<span class="status-badge waiting"><span class="spinner-inline"></span> Checking permissions…</span>';
       actionsEl.innerHTML = "";
 
-      /* If we already have a facility with an approved issue, jump ahead */
       if (facility && facility.issueNumber) {
         const approved = await checkApproval(facility.issueNumber);
-        if (approved) {
-          goToStep(4);
-          renderStep4();
-          return;
-        }
-        /* Issue exists but not yet approved — jump to step 3 */
-        goToStep(3);
-        startApprovalPoll();
-        return;
+        if (approved) { goToStep(4); renderStep4(); return; }
+        goToStep(3); startApprovalPoll(); return;
       }
 
       try {
@@ -784,66 +493,114 @@ pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Cop
           const repo = await repoRes.json();
           if (repo.permissions && repo.permissions.push) {
             statusEl.innerHTML = '<span class="status-badge success">&#10003; You have collaborator access</span>';
-            const nextBtn = document.createElement("button");
-            nextBtn.className = "btn btn-primary";
-            nextBtn.textContent = "Continue to facility request";
-            nextBtn.addEventListener("click", () => goToStep(2));
+            const nextBtn = document.createElement("button"); nextBtn.className = "btn btn-primary";
+            nextBtn.textContent = "Continue to facility setup";
+            nextBtn.addEventListener("click", () => { goToStep(2); loadExistingFacilities(); addMachineEntry(); addMachineEntry(); });
             actionsEl.appendChild(nextBtn);
             return;
           }
         }
-
         statusEl.innerHTML = '<span class="status-badge waiting">You don\'t have write access yet</span>';
-        const requestBtn = document.createElement("button");
-        requestBtn.className = "btn btn-warning";
-        requestBtn.textContent = "Request Access";
+        const requestBtn = document.createElement("button"); requestBtn.className = "btn btn-warning"; requestBtn.textContent = "Request Access";
         requestBtn.addEventListener("click", () => requestCollabAccess(statusEl, actionsEl));
-        const recheckBtn = document.createElement("button");
-        recheckBtn.className = "btn";
-        recheckBtn.textContent = "Re-check";
+        const recheckBtn = document.createElement("button"); recheckBtn.className = "btn"; recheckBtn.textContent = "Re-check";
         recheckBtn.addEventListener("click", runStep1);
         actionsEl.append(requestBtn, document.createTextNode(" "), recheckBtn);
-      } catch (err) {
-        statusEl.innerHTML = '<span class="status-badge error">Error checking access: ' + err.message + '</span>';
-      }
+      } catch (err) { statusEl.innerHTML = '<span class="status-badge error">Error: ' + err.message + '</span>'; }
     }
 
-    async function requestCollabAccess(statusEl, actionsEl) {
-      actionsEl.innerHTML = '<span style="color:var(--muted);font-size:0.85rem"><span class="spinner-inline"></span> Submitting…</span>';
+    function requestCollabAccess(statusEl, actionsEl) {
+      const title = "Access request: @" + currentUser.login;
+      const body = "**@" + currentUser.login + "** is requesting write access.\n\n- Profile: https://github.com/" + currentUser.login + "\n- Requested: " + new Date().toUTCString() + "\n\n_To approve: add this user as a collaborator, then close this issue._";
+      window.open("https://github.com/" + OWNER + "/" + REPO + "/issues/new?title=" + encodeURIComponent(title) + "&body=" + encodeURIComponent(body), "_blank");
+      statusEl.innerHTML = '<span class="status-badge waiting">Issue page opened — submit on GitHub, then re-check below</span>';
+      actionsEl.innerHTML = "";
+      const recheckBtn = document.createElement("button"); recheckBtn.className = "btn"; recheckBtn.textContent = "Re-check access";
+      recheckBtn.addEventListener("click", runStep1);
+      actionsEl.appendChild(recheckBtn);
+    }
+
+    /* ============================================================== */
+    /*  Existing facilities list                                       */
+    /* ============================================================== */
+    async function loadExistingFacilities() {
+      const listEl = document.getElementById("facilities-list");
       try {
-        const res = await ghFetch("/repos/" + OWNER + "/" + REPO + "/issues", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: "Access request: @" + currentUser.login,
-            body: "**@" + currentUser.login + "** is requesting write access to upload files via the Rosetta web interface.\n\n" +
-                  "- GitHub profile: https://github.com/" + currentUser.login + "\n" +
-                  "- Requested at: " + new Date().toUTCString() + "\n\n" +
-                  "_To approve: add this user as a repository collaborator, then close this issue._"
-          })
+        const res = await ghFetch("/repos/" + OWNER + "/" + REPO + "/contents/data?ref=main");
+        if (!res.ok) { listEl.innerHTML = '<span style="color:var(--muted);font-size:0.82rem">No facilities found yet.</span>'; return; }
+        const items = await res.json();
+        const dirs = items.filter(i => i.type === "dir" && !RESERVED_DIRS.has(i.name));
+        if (dirs.length === 0) { listEl.innerHTML = '<span style="color:var(--muted);font-size:0.82rem">No facilities found yet. Create one below.</span>'; return; }
+
+        listEl.innerHTML = "";
+        dirs.forEach(d => {
+          const item = document.createElement("div"); item.className = "facility-item";
+          item.innerHTML = '<div><div class="f-name">' + d.name + '</div><div class="f-path">data/' + d.name + '/</div></div>';
+          const joinBtn = document.createElement("button"); joinBtn.className = "btn btn-sm btn-primary"; joinBtn.textContent = "Join this facility";
+          joinBtn.addEventListener("click", () => joinFacility(d.name));
+          item.appendChild(joinBtn);
+          listEl.appendChild(item);
         });
-        if (res.ok) {
-          const issue = await res.json();
-          statusEl.innerHTML = '<span class="status-badge waiting">Access requested — issue <a href="' + issue.html_url + '" target="_blank" style="color:var(--accent)">#' + issue.number + '</a> created</span>';
-          actionsEl.innerHTML = "";
-          const recheckBtn = document.createElement("button");
-          recheckBtn.className = "btn";
-          recheckBtn.textContent = "Re-check access";
-          recheckBtn.addEventListener("click", runStep1);
-          actionsEl.appendChild(recheckBtn);
-        } else {
-          throw new Error((await res.json()).message);
-        }
-      } catch (err) {
-        actionsEl.innerHTML = '<span class="status-badge error">Failed: ' + err.message + '</span>';
-      }
+      } catch (err) { listEl.innerHTML = '<span style="color:var(--muted);font-size:0.82rem">Could not load facilities.</span>'; }
     }
 
-    /* ================================================================ */
-    /*  Step 2: Facility request form                                   */
-    /* ================================================================ */
+    async function joinFacility(slug) {
+      facility = { name: slug, slug, uploadPath: "data/" + slug + "/", machines: [] };
+
+      const configRes = await ghFetch("/repos/" + OWNER + "/" + REPO + "/contents/data/" + slug + "/config.yml?ref=main");
+      if (configRes.ok) {
+        const configData = await configRes.json();
+        facility.configUrl = configData.download_url;
+      }
+
+      localStorage.setItem("rosetta_facility", JSON.stringify(facility));
+      goToStep(4); renderStep4();
+    }
+
+    /* ============================================================== */
+    /*  Dynamic machine entries                                        */
+    /* ============================================================== */
+    function addMachineEntry() {
+      machineCount++;
+      const idx = machineCount;
+      const container = document.getElementById("machines-container");
+      const entry = document.createElement("div"); entry.className = "machine-entry"; entry.id = "machine-" + idx;
+      entry.innerHTML =
+        '<div class="machine-header"><span>Machine ' + idx + '</span>' +
+        (idx > 1 ? '<button type="button" class="btn btn-sm btn-danger" onclick="removeMachine(' + idx + ')">Remove</button>' : '') +
+        '</div>' +
+        '<div class="machine-fields">' +
+        '<div><label>File Format</label><select class="m-format"><option value=".txrm">.txrm (Zeiss Xradia)</option><option value=".pca">.pca (Phoenix / Waygate)</option></select></div>' +
+        '<div><label>Machine Name</label><input type="text" class="m-name" placeholder="e.g. Xradia-520-Versa" /></div>' +
+        '<div class="full-width"><label>Watch Folder Path</label><input type="text" class="m-path" placeholder="e.g. D:\\XradiaData\\Scans" /></div>' +
+        '</div>';
+      container.appendChild(entry);
+    }
+
+    window.removeMachine = function(idx) {
+      const el = document.getElementById("machine-" + idx);
+      if (el) el.remove();
+    };
+
+    document.getElementById("add-machine-btn").addEventListener("click", addMachineEntry);
+
+    function collectMachines() {
+      const entries = document.querySelectorAll(".machine-entry");
+      const machines = [];
+      entries.forEach(e => {
+        const format = e.querySelector(".m-format").value;
+        const name = e.querySelector(".m-name").value.trim();
+        const path = e.querySelector(".m-path").value.trim();
+        if (name && path) machines.push({ format, name, path });
+      });
+      return machines;
+    }
+
+    /* ============================================================== */
+    /*  Step 2: Facility request form                                  */
+    /* ============================================================== */
     const facilityForm = document.getElementById("facility-form");
-    const formStatus   = document.getElementById("form-status");
+    const formStatus = document.getElementById("form-status");
 
     facilityForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -851,29 +608,27 @@ pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Cop
       btn.disabled = true;
       formStatus.textContent = "";
 
-      const name        = document.getElementById("f-name").value.trim();
+      const name = document.getElementById("f-name").value.trim();
       const institution = document.getElementById("f-institution").value.trim();
-      const machineType = document.getElementById("f-machine-type").value;
-      const machineName = document.getElementById("f-machine-name").value.trim();
-      const email       = document.getElementById("f-email").value.trim();
-      const watchDir    = document.getElementById("f-watch-dir").value.trim();
-      const notes       = document.getElementById("f-notes").value.trim();
+      const email = document.getElementById("f-email").value.trim();
+      const notes = document.getElementById("f-notes").value.trim();
+      const machines = collectMachines();
 
-      if (!name || !machineType) {
-        formStatus.innerHTML = '<span style="color:var(--danger)">Please fill in all required fields.</span>';
-        btn.disabled = false;
-        return;
+      if (!name || machines.length === 0) {
+        formStatus.innerHTML = '<span style="color:var(--danger)">Please provide a facility name and at least one machine with name and watch path.</span>';
+        btn.disabled = false; return;
       }
 
       const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
+      const machineTable = "| Format | Machine Name | Watch Path |\n|--------|-------------|------------|\n" +
+        machines.map(m => "| " + m.format + " | " + m.name + " | " + m.path + " |").join("\n");
+
       const issueBody = [
         "### Facility Name", "", name, "",
         "### Institution / Organization", "", institution || "_No response_", "",
-        "### Machine Type", "", machineType, "",
-        "### Machine Name / Identifier", "", machineName || "_No response_", "",
         "### Contact Email", "", email || "_No response_", "",
-        "### Watch Directory Path", "", watchDir || "_No response_", "",
+        "### X-ray Machines", "", machineTable, "",
         "### Notes", "", notes || "_No response_", "",
         "---",
         "_Submitted via the [Setup Facility](https://" + OWNER + ".github.io/" + REPO + "/docs/setup-facility/) wizard by @" + currentUser.login + "_"
@@ -883,52 +638,41 @@ pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Cop
 
       try {
         const res = await ghFetch("/repos/" + OWNER + "/" + REPO + "/issues", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: "Facility request: " + name,
-            body: issueBody,
-            labels: ["request-facility"]
-          })
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: "Facility request: " + name, body: issueBody, labels: ["request-facility"] })
         });
 
-        if (!res.ok) throw new Error((await res.json()).message);
+        if (!res.ok) {
+          const errData = await res.json();
+          const detail = errData.errors ? errData.errors.map(e => e.message || e.code).join(", ") : "";
+          throw new Error((errData.message || res.statusText) + (detail ? " (" + detail + ")" : ""));
+        }
         const issue = await res.json();
 
-        facility = {
-          name, institution, machineType, machineName, email, watchDir, notes,
-          slug, uploadPath: "data/" + slug + "/",
-          issueNumber: issue.number, issueUrl: issue.html_url
-        };
+        facility = { name, institution, email, notes, machines, slug, uploadPath: "data/" + slug + "/", issueNumber: issue.number, issueUrl: issue.html_url };
         localStorage.setItem("rosetta_facility", JSON.stringify(facility));
-
-        goToStep(3);
-        startApprovalPoll();
+        goToStep(3); startApprovalPoll();
       } catch (err) {
-        formStatus.innerHTML = '<span style="color:var(--danger)">Failed to create issue: ' + err.message + '</span>';
+        const fallbackUrl = "https://github.com/" + OWNER + "/" + REPO + "/issues/new?title=" + encodeURIComponent("Facility request: " + name) + "&body=" + encodeURIComponent(issueBody) + "&labels=" + encodeURIComponent("request-facility");
+        formStatus.innerHTML = '<span style="color:var(--danger)">API error: ' + err.message + '</span><br><a href="' + fallbackUrl + '" target="_blank" style="color:var(--accent);font-size:0.85rem">Open issue manually on GitHub instead</a>';
         btn.disabled = false;
       }
     });
 
-    /* ================================================================ */
-    /*  Step 3: Await approval                                          */
-    /* ================================================================ */
+    /* ============================================================== */
+    /*  Step 3: Await approval                                         */
+    /* ============================================================== */
     let approvalTimer = null;
 
     function startApprovalPoll() {
       if (!facility) return;
-      const link = document.getElementById("issue-link");
-      link.href = facility.issueUrl;
-      link.textContent = "#" + facility.issueNumber;
-
+      document.getElementById("issue-link").href = facility.issueUrl;
+      document.getElementById("issue-link").textContent = "#" + facility.issueNumber;
       const statusEl = document.getElementById("approval-status");
-      const pollEl   = document.getElementById("approval-poll");
-      statusEl.innerHTML = "";
-      pollEl.style.display = "flex";
-
+      const pollEl = document.getElementById("approval-poll");
+      statusEl.innerHTML = ""; pollEl.style.display = "flex";
       if (approvalTimer) clearInterval(approvalTimer);
       checkAndPoll();
-
       async function checkAndPoll() {
         const approved = await checkApproval(facility.issueNumber);
         if (approved) {
@@ -936,9 +680,7 @@ pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Cop
           statusEl.innerHTML = '<span class="status-badge success">&#10003; Facility approved!</span>';
           if (approvalTimer) { clearInterval(approvalTimer); approvalTimer = null; }
           setTimeout(() => { goToStep(4); renderStep4(); }, 800);
-        } else {
-          approvalTimer = setTimeout(checkAndPoll, 15000);
-        }
+        } else { approvalTimer = setTimeout(checkAndPoll, 15000); }
       }
     }
 
@@ -951,69 +693,49 @@ pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Cop
       } catch { return false; }
     }
 
-    /* ================================================================ */
-    /*  Step 4: Watchdog install guide                                  */
-    /* ================================================================ */
+    /* ============================================================== */
+    /*  Step 4: Install watchdog                                       */
+    /* ============================================================== */
     function renderStep4() {
       if (!facility) return;
-      const machineName = facility.machineName || facility.slug;
-      const watchDir    = facility.watchDir || "D:\\XradiaData\\Scans";
-      const uploadPath  = facility.uploadPath || "data/" + facility.slug + "/";
+      const area = document.getElementById("config-download-area");
+      area.innerHTML = "";
 
-      const configYaml = [
-        "watch_directories:",
-        '  - path: "' + watchDir + '"',
-        '    machine_name: "' + machineName + '"',
-        "",
-        "polling_interval_seconds: 30",
-        "include_drift_files: false",
-        'parser_backend: "auto"',
-        'state_file: "processed_files.json"',
-        "",
-        "github:",
-        '  token_env: "ROSETTA_GITHUB_TOKEN"',
-        '  repo: "' + OWNER + "/" + REPO + '"',
-        '  branch: "main"',
-        '  upload_path: "' + uploadPath + '"',
-        '  commit_prefix: "[edge-watchdog]"',
-        "",
-        "logging:",
-        '  level: "INFO"',
-        '  file: "rosetta-watchdog.log"',
-      ].join("\n");
+      const configUrl = facility.configUrl || "https://github.com/" + OWNER + "/" + REPO + "/raw/main/data/" + facility.slug + "/config.yml";
+      const dlBtn = document.createElement("a"); dlBtn.className = "btn btn-primary"; dlBtn.href = configUrl;
+      dlBtn.target = "_blank"; dlBtn.textContent = "Download config.yml";
+      area.appendChild(dlBtn);
 
-      const configBlock = document.getElementById("code-config");
-      const copyBtn = configBlock.querySelector(".copy-btn");
-      configBlock.textContent = configYaml;
-      configBlock.appendChild(copyBtn);
+      const viewBtn = document.createElement("a"); viewBtn.className = "btn"; viewBtn.style.marginLeft = "0.5rem";
+      viewBtn.href = "https://github.com/" + OWNER + "/" + REPO + "/blob/main/data/" + facility.slug + "/config.yml";
+      viewBtn.target = "_blank"; viewBtn.textContent = "View on GitHub";
+      area.appendChild(viewBtn);
 
-      document.getElementById("download-config-btn").addEventListener("click", () => {
-        const blob = new Blob([configYaml], { type: "text/yaml" });
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement("a");
-        a.href = url; a.download = "config.yml";
-        document.body.appendChild(a); a.click();
-        document.body.removeChild(a); URL.revokeObjectURL(url);
-      });
-
-      document.getElementById("goto-verify-btn").addEventListener("click", () => {
-        goToStep(5);
-        runVerify();
-      });
+      document.getElementById("goto-verify-btn").addEventListener("click", () => { goToStep(5); runVerify(); });
     }
 
-    /* ================================================================ */
-    /*  Step 5: Verify data                                             */
-    /* ================================================================ */
+    /* ============================================================== */
+    /*  OS tab switcher                                                */
+    /* ============================================================== */
+    window.switchOS = function(id) {
+      document.querySelectorAll(".os-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".os-panel").forEach(p => p.classList.remove("active"));
+      document.querySelector('.os-tab[onclick*="' + id + '"]').classList.add("active");
+      document.getElementById("os-" + id).classList.add("active");
+    };
+
+    /* ============================================================== */
+    /*  Step 5: Verify data                                            */
+    /* ============================================================== */
     document.getElementById("recheck-data-btn").addEventListener("click", runVerify);
 
     async function runVerify() {
       if (!facility) return;
-      const statusEl  = document.getElementById("verify-status");
-      const resultEl  = document.getElementById("verify-result");
-      const spinner   = document.getElementById("verify-spinner");
+      const statusEl = document.getElementById("verify-status");
+      const resultEl = document.getElementById("verify-result");
+      const spinner = document.getElementById("verify-spinner");
       const uploadPath = facility.uploadPath || "data/" + facility.slug + "/";
-      const dirPath    = uploadPath.replace(/\/$/, "");
+      const dirPath = uploadPath.replace(/\/$/, "");
 
       spinner.style.display = "inline-block";
       statusEl.innerHTML = '<span class="status-badge waiting"><span class="spinner-inline"></span> Checking <code>' + uploadPath + '</code> on main…</span>';
@@ -1021,71 +743,38 @@ pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Cop
 
       try {
         const contentsRes = await ghFetch("/repos/" + OWNER + "/" + REPO + "/contents/" + dirPath + "?ref=main");
-
         if (!contentsRes.ok) {
           statusEl.innerHTML = '<span class="status-badge waiting">Directory not found yet</span>';
-          resultEl.innerHTML = '<div class="verify-result not-found">' +
-            'The directory <code>' + uploadPath + '</code> hasn\'t been created yet. ' +
-            'This happens automatically when the <code>facility-approved</code> label is added to your issue. ' +
-            'If you just got approved, wait a moment and check again.</div>';
-          spinner.style.display = "none";
-          return;
+          resultEl.innerHTML = '<div class="verify-result not-found">The directory <code>' + uploadPath + '</code> hasn\'t been created yet. If you just got approved, wait a moment and check again.</div>';
+          spinner.style.display = "none"; return;
         }
-
         const files = await contentsRes.json();
-        const dataFiles = Array.isArray(files)
-          ? files.filter(f => f.name.endsWith(".json") || f.name.endsWith(".txrm"))
-          : [];
+        const dataFiles = Array.isArray(files) ? files.filter(f => f.name.endsWith(".json") || f.name.endsWith(".pca") || f.name.endsWith(".txrm")) : [];
+        const nonConfig = dataFiles.filter(f => f.name !== "config.yml" && f.name !== "README.md");
 
-        if (dataFiles.length > 0) {
+        if (nonConfig.length > 0) {
           statusEl.innerHTML = '<span class="status-badge success">&#10003; Data detected!</span>';
-          resultEl.innerHTML = '<div class="verify-result found">' +
-            '<strong>Your facility is live!</strong> Found ' + dataFiles.length + ' data file(s) in <code>' + uploadPath + '</code>.<br><br>' +
-            'The watchdog is successfully pushing data. The parse-and-aggregate workflow will process it automatically.</div>' +
-            '<div class="completion-links" style="margin-top:1.25rem">' +
-            '<a class="btn btn-primary" href="https://github.com/' + OWNER + '/' + REPO + '/tree/main/' + dirPath + '" target="_blank">View facility data</a>' +
-            '<a class="btn" href="../">Go to Upload page</a>' +
-            '</div>';
+          resultEl.innerHTML = '<div class="verify-result found"><strong>Your facility is live!</strong> Found ' + nonConfig.length + ' data file(s) in <code>' + uploadPath + '</code>.<br><br>The watchdog is pushing data. The parse-and-aggregate workflow will process it automatically.</div>' +
+            '<div class="completion-links" style="margin-top:1.25rem"><a class="btn btn-primary" href="https://github.com/' + OWNER + '/' + REPO + '/tree/main/' + dirPath + '" target="_blank">View facility data</a><a class="btn" href="../">Go to Upload page</a></div>';
           goToStep(6);
         } else {
           statusEl.innerHTML = '<span class="status-badge waiting">Directory exists, no data yet</span>';
-          resultEl.innerHTML = '<div class="verify-result not-found">' +
-            'The directory <code>' + uploadPath + '</code> exists but no data files were found yet. ' +
-            'Make sure the watchdog is running and scanning a directory with <code>.txrm</code> files. ' +
-            'Check the watchdog logs for errors.</div>';
+          resultEl.innerHTML = '<div class="verify-result not-found">The directory <code>' + uploadPath + '</code> exists but no data files were found yet. Copy the <code>example.pca</code> from <code>edge/test_data/</code> into your watch folder to test the loop.</div>';
         }
-      } catch (err) {
-        statusEl.innerHTML = '<span class="status-badge error">Error: ' + err.message + '</span>';
-      }
-
+      } catch (err) { statusEl.innerHTML = '<span class="status-badge error">Error: ' + err.message + '</span>'; }
       spinner.style.display = "none";
     }
 
-    /* ================================================================ */
-    /*  Step 6 (pseudo): Mark all steps done                            */
-    /* ================================================================ */
-    const realGoToStep = goToStep;
-    goToStep = function(n) {
-      if (n === 6) {
-        document.querySelectorAll(".progress-step").forEach(s => s.classList.add("done"));
-        document.querySelectorAll(".progress-step").forEach(s => s.classList.remove("active"));
-        document.getElementById("progress-fill").style.width = "100%";
-        return;
-      }
-      realGoToStep(n);
-    };
-
-    /* ================================================================ */
-    /*  Copy to clipboard helper                                        */
-    /* ================================================================ */
+    /* ============================================================== */
+    /*  Copy to clipboard                                              */
+    /* ============================================================== */
     function copyBlock(id) {
       const block = document.getElementById(id);
       const text = block.textContent.replace(/Copy$/, "").trim();
       navigator.clipboard.writeText(text).then(() => {
         const btn = block.querySelector(".copy-btn");
-        const orig = btn.textContent;
         btn.textContent = "Copied!";
-        setTimeout(() => btn.textContent = orig, 1500);
+        setTimeout(() => btn.textContent = "Copy", 1500);
       });
     }
   </script>

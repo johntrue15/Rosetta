@@ -1,4 +1,4 @@
-"""Directory watcher that monitors for new .txrm files and processes them."""
+"""Directory watcher that monitors for new metadata files and processes them."""
 
 from __future__ import annotations
 
@@ -47,8 +47,11 @@ class ProcessedState:
         self._save()
 
 
+SUPPORTED_EXTENSIONS = (".txrm", ".pca")
+
+
 class DirectoryWatcher:
-    """Polls watch directories for new .txrm files."""
+    """Polls watch directories for new metadata files (.txrm, .pca)."""
 
     def __init__(
         self,
@@ -60,14 +63,14 @@ class DirectoryWatcher:
         self._state = ProcessedState(config.state_file)
 
     def _find_new_files(self, watch_dir: WatchDirectory) -> List[str]:
-        """Walk a directory and return paths of new .txrm files."""
+        """Walk a directory and return paths of new metadata files."""
         new_files: List[str] = []
         drift_skipped = 0
 
         try:
             for root, _, files in os.walk(watch_dir.path):
                 for fname in files:
-                    if not fname.lower().endswith(".txrm"):
+                    if not fname.lower().endswith(SUPPORTED_EXTENSIONS):
                         continue
 
                     is_drift = "drift" in fname.lower()

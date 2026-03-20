@@ -1,14 +1,14 @@
 # Rosetta Edge Watchdog — example configuration
 # Copy this file to config.yml and edit for your environment.
 
-# Directories to monitor for new .txrm files.
+# Directories to monitor for new .txrm and .pca files.
 # Each entry has a path and a machine_name used for attribution.
 watch_directories:
   - path: "D:/XradiaData/Scans"
     machine_name: "Xradia-520-Versa"
-  # Add more machines as needed:
-  # - path: "E:/CT_Output"
-  #   machine_name: "Xradia-620-Versa"
+  - path: "D:/CT_Output"
+    machine_name: "Phoenix-v2"
+  # Add more machines as needed
 
 # How often to scan for new files (seconds)
 polling_interval_seconds: 30
@@ -16,7 +16,7 @@ polling_interval_seconds: 30
 # Set to true to also process drift scan files
 include_drift_files: false
 
-# Parser backend:
+# Parser backend (for .txrm files — .pca always uses the built-in parser):
 #   "auto"      — try XradiaPy first, fall back to olefile
 #   "xradiaPy"  — require XradiaPy (fails if not installed)
 #   "olefile"   — always use olefile (no proprietary deps)
@@ -38,3 +38,6 @@ github:
 logging:
   level: "INFO"
   file: "rosetta-watchdog.log"
+
+# TIP: Copy edge/test_data/example.pca into one of your watch directories
+# to verify that the watchdog can parse, push, and trigger the pipeline.

@@ -24,8 +24,8 @@ def _setup_logging(level: str, log_file: str | None) -> None:
                         format=fmt, handlers=handlers)
 
 
-def _get_parser(backend: str):
-    """Resolve the parser backend based on config ('auto', 'xradiaPy', 'olefile')."""
+def _get_txrm_parser(backend: str):
+    """Resolve the TXRM parser backend."""
     if backend in ("auto", "xradiaPy"):
         try:
             from .parsers.xradiaPy_parser import XradiaPyParser
@@ -42,10 +42,29 @@ def _get_parser(backend: str):
     return OlefileParser()
 
 
+def _get_pca_parser():
+    from .parsers.pca_parser import PcaParser
+    return PcaParser()
+
+
+class ParserDispatcher:
+    """Routes files to the correct parser based on extension."""
+
+    def __init__(self, txrm_parser, pca_parser):
+        self._txrm = txrm_parser
+        self._pca = pca_parser
+
+    def parse(self, file_path: str):
+        ext = Path(file_path).suffix.lower()
+        if ext == ".pca":
+            return self._pca.parse(file_path)
+        return self._txrm.parse(file_path)
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(
         prog="rosetta-watchdog",
-        description="Rosetta edge watchdog — monitors Xradia scan directories "
+        description="Rosetta edge watchdog — monitors scan directories "
                     "and pushes metadata to GitHub",
     )
     ap.add_argument("-c", "--config", required=True,
@@ -59,8 +78,10 @@ def main(argv: list[str] | None = None) -> None:
     _setup_logging(config.logging.level, config.logging.file)
     log = logging.getLogger(__name__)
 
-    parser = _get_parser(config.parser_backend)
-    log.info("Using parser backend: %s", type(parser).__name__)
+    txrm_parser = _get_txrm_parser(config.parser_backend)
+    pca_parser = _get_pca_parser()
+    parser = ParserDispatcher(txrm_parser, pca_parser)
+    log.info("Parser backends: txrm=%s, pca=%s", type(txrm_parser).__name__, type(pca_parser).__name__)
 
     pusher = None
     if config.github.token and config.github.repo:

@@ -381,11 +381,11 @@
       <p>
         You're signed in as <strong id="req-username"></strong>, but you don't yet
         have write access to the Rosetta repository.<br />
-        Click below to submit an access request — a GitHub Issue will be opened
-        and the maintainer will be notified.
+        Click below to open a GitHub Issue requesting access — the maintainer
+        will be notified.
       </p>
-      <button class="btn btn-warning" id="request-btn">Request Access</button>
-      <div id="request-status"></div>
+      <a class="btn btn-warning" id="request-btn" target="_blank">Request Access</a>
+      <div id="request-status" style="margin-top:1rem;font-size:0.85rem;color:var(--muted)"></div>
     </div>
 
     <!-- ③ Signed in and approved -->
@@ -400,7 +400,21 @@
         <input type="file" id="file-input" multiple />
       </div>
 
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1rem">
+        <span id="upload-count" style="font-size:0.78rem;color:var(--muted)"></span>
+        <button class="btn btn-sm" id="clear-log-btn" style="display:none">Clear log</button>
+      </div>
       <div id="status-log"></div>
+
+      <!-- Recent uploads in this session -->
+      <div id="recent-uploads-section" style="display:none;margin-top:1.75rem;padding:1.1rem 1.25rem;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+        <h3 style="font-size:0.92rem;margin-bottom:0.75rem">
+          <svg viewBox="0 0 16 16" style="width:16px;height:16px;fill:var(--accent);vertical-align:middle;margin-right:0.3rem"><path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"/></svg>
+          Recent Uploads (this session)
+        </h3>
+        <div id="recent-uploads-list" style="font-size:0.82rem;font-family:monospace"></div>
+        <div style="margin-top:0.75rem" id="recent-downloads-actions"></div>
+      </div>
 
       <!-- Remote URL fetch (for large files like .txrm) -->
       <div id="remote-url-section">
@@ -553,6 +567,8 @@
       requestSection.classList.add("visible");
       uploadSection.classList.remove("visible");
       reqUsername.textContent      = user.login;
+      requestBtn.href             = buildAccessRequestUrl(user.login);
+      requestStatus.textContent   = "After submitting, a maintainer will add you as a collaborator.";
     }
 
     function showUpload(user) {
@@ -691,54 +707,17 @@
     }
 
     /* ================================================================== */
-    /*  Access request (creates GitHub Issue)                             */
+    /*  Access request (opens pre-filled GitHub Issue)                    */
     /* ================================================================== */
-    requestBtn.addEventListener("click", async () => {
-      if (!currentUser || !token) return;
-      requestBtn.disabled = true;
-      requestStatus.textContent = "Submitting request…";
-
-      try {
-        const res = await fetch(
-          "https://api.github.com/repos/" + OWNER + "/" + REPO + "/issues",
-          {
-            method: "POST",
-            headers: {
-              Authorization:  "Bearer " + token,
-              "Content-Type": "application/json",
-              Accept:         "application/vnd.github+json"
-            },
-            body: JSON.stringify({
-              title: "Access request: @" + currentUser.login,
-              body:  "**@" + currentUser.login + "** is requesting write access to upload files via the Rosetta web interface.\n\n" +
-                     "- GitHub profile: https://github.com/" + currentUser.login + "\n" +
-                     "- Requested at: " + new Date().toUTCString() + "\n\n" +
-                     "_To approve: add this user as a repository collaborator, then close this issue._"
-            })
-          }
-        );
-
-        if (res.ok) {
-          const issue = await res.json();
-          requestStatus.style.color = "var(--success)";
-          const link = document.createElement("a");
-          link.href = issue.html_url;
-          link.target = "_blank";
-          link.style.color = "var(--accent)";
-          link.textContent = "#" + issue.number;
-          requestStatus.textContent = "Request submitted! Issue ";
-          requestStatus.appendChild(link);
-          requestStatus.append(" created. You'll be notified when access is granted.");
-        } else {
-          const err = await res.json();
-          throw new Error(err.message || res.statusText);
-        }
-      } catch (err) {
-        requestStatus.style.color  = "var(--danger)";
-        requestStatus.textContent  = "Failed to submit: " + err.message;
-        requestBtn.disabled        = false;
-      }
-    });
+    function buildAccessRequestUrl(login) {
+      const title = "Access request: @" + login;
+      const body  = "**@" + login + "** is requesting write access to upload files via the Rosetta web interface.\n\n" +
+                    "- GitHub profile: https://github.com/" + login + "\n" +
+                    "- Requested at: " + new Date().toUTCString() + "\n\n" +
+                    "_To approve: add this user as a repository collaborator, then close this issue._";
+      return "https://github.com/" + OWNER + "/" + REPO + "/issues/new?" +
+             "title=" + encodeURIComponent(title) + "&body=" + encodeURIComponent(body);
+    }
 
     /* ================================================================== */
     /*  Drag-and-drop & file input                                        */
@@ -756,77 +735,50 @@
     /* ================================================================== */
     /*  Upload via GitHub API                                             */
     /* ================================================================== */
+    const sessionUploads = [];
+    const clearLogBtn    = document.getElementById("clear-log-btn");
+    const uploadCountEl  = document.getElementById("upload-count");
+
+    clearLogBtn.addEventListener("click", () => {
+      statusLog.innerHTML = "";
+      clearLogBtn.style.display = "none";
+      uploadCountEl.textContent = "";
+    });
+
     function log(msg, type) {
       const el = document.createElement("div");
       el.className  = "log-entry " + type;
       el.textContent = msg;
       statusLog.prepend(el);
+      clearLogBtn.style.display = "inline-flex";
+    }
+
+    function trackUpload(name) {
+      sessionUploads.push({ name, path: UPLOAD_PATH + name, time: new Date().toISOString() });
+      uploadCountEl.textContent = sessionUploads.length + " file(s) uploaded this session";
+      renderRecentUploads();
+    }
+
+    function renderRecentUploads() {
+      const section = document.getElementById("recent-uploads-section");
+      const list    = document.getElementById("recent-uploads-list");
+      const actions = document.getElementById("recent-downloads-actions");
+      if (sessionUploads.length === 0) { section.style.display = "none"; return; }
+      section.style.display = "block";
+      list.innerHTML = sessionUploads.map(u =>
+        '<div style="padding:0.3rem 0;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)">' +
+        '<span>' + u.name + '</span>' +
+        '<a href="https://github.com/' + OWNER + '/' + REPO + '/blob/' + BRANCH + '/' + u.path + '" target="_blank" style="color:var(--accent);font-size:0.75rem;text-decoration:none">View on GitHub</a>' +
+        '</div>'
+      ).join("");
+      actions.innerHTML = '<a class="btn btn-sm" href="https://github.com/' + OWNER + '/' + REPO + '/tree/' + BRANCH + '/' + UPLOAD_PATH + '" target="_blank">Browse all in data/</a>';
     }
 
     async function handleFiles(fileList) {
       if (!token) { alert("Please sign in first."); return; }
-
       const files = Array.from(fileList);
       if (files.length === 0) return;
-
-      /* Single-file: use the simpler Contents API */
-      if (files.length === 1) {
-        await uploadSingleFile(files[0]);
-        return;
-      }
-
-      /* Multi-file: batch via Git Trees API (1 commit = 1 workflow trigger, no SHA conflicts) */
       await uploadBatch(files);
-    }
-
-    /* Single-file upload via Contents API */
-    async function uploadSingleFile(file) {
-      log("Uploading " + file.name + " …", "info");
-      try {
-        const content = await readAsBase64(file);
-        const path    = UPLOAD_PATH + file.name;
-
-        /* Get existing SHA if the file already exists */
-        let sha;
-        try {
-          const existing = await fetch(
-            "https://api.github.com/repos/" + OWNER + "/" + REPO +
-            "/contents/" + encodeURIComponent(path) + "?ref=" + BRANCH,
-            { headers: { Authorization: "Bearer " + token } }
-          );
-          if (existing.ok) sha = (await existing.json()).sha;
-        } catch (_) {}
-
-        const uploaderTag = currentUser ? " [uploader:" + currentUser.login + "]" : "";
-        const body = {
-          message: "Upload " + file.name + " via Rosetta" + uploaderTag,
-          content,
-          branch: BRANCH,
-        };
-        if (sha) body.sha = sha;
-
-        const putRes = await fetch(
-          "https://api.github.com/repos/" + OWNER + "/" + REPO +
-          "/contents/" + encodeURIComponent(path),
-          {
-            method:  "PUT",
-            headers: {
-              Authorization:  "Bearer " + token,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(body),
-          }
-        );
-
-        if (!putRes.ok) {
-          const err = await putRes.json();
-          throw new Error(err.message || putRes.statusText);
-        }
-
-        log("✓ " + file.name + " uploaded successfully.", "success");
-      } catch (err) {
-        log("✗ " + file.name + " – " + err.message, "error");
-      }
     }
 
     /* Multi-file batch upload via Git Trees API */
@@ -914,6 +866,7 @@
           throw new Error("Ref update failed: " + (err.message || updateRefRes.statusText));
         }
 
+        files.forEach(f => trackUpload(f.name));
         log("✓ All " + files.length + " files uploaded in a single commit.", "success");
       } catch (err) {
         log("✗ Batch upload failed – " + err.message, "error");
