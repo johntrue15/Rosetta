@@ -84,11 +84,33 @@ def main(argv: list[str] | None = None) -> None:
     log.info("Parser backends: txrm=%s, pca=%s", type(txrm_parser).__name__, type(pca_parser).__name__)
 
     pusher = None
-    if config.github.token and config.github.repo:
+    token_ok = bool(config.github.token)
+    repo_ok = bool(config.github.repo)
+    log.info(
+        "GitHub config: token_env=%s token_set=%s repo=%r",
+        config.github.token_env, token_ok, config.github.repo,
+    )
+    if token_ok and repo_ok:
         pusher = GitHubPusher(config.github)
         log.info("GitHub push enabled → %s (%s)", config.github.repo, config.github.branch)
     else:
-        log.warning("GitHub push disabled (no token or repo configured)")
+        reasons = []
+        if not token_ok:
+            reasons.append(
+                f"env var ${config.github.token_env} is not set"
+            )
+        if not repo_ok:
+            reasons.append(
+                "github.repo is empty in config.yml"
+            )
+        log.warning(
+            "GitHub push disabled — %s\n"
+            "  PowerShell:  $env:%s = \"ghp_...\"\n"
+            "  CMD:         set %s=ghp_...\n"
+            "  Mac/Linux:   export %s=\"ghp_...\"",
+            "; ".join(reasons),
+            config.github.token_env, config.github.token_env, config.github.token_env,
+        )
 
     def process_file(file_path: str, machine_name: str) -> bool:
         log.info("Parsing %s (machine: %s)", file_path, machine_name)
@@ -120,7 +142,11 @@ def main(argv: list[str] | None = None) -> None:
             out_dir = Path("watchdog_output")
             out_dir.mkdir(exist_ok=True)
             (out_dir / filename).write_bytes(json_bytes)
-            log.info("Wrote local file: %s", out_dir / filename)
+            log.warning(
+                "Saved %s locally (GitHub push disabled) — file will be "
+                "retried when a token is configured", filename,
+            )
+            return False
 
         return True
 

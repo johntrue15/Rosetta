@@ -8,7 +8,7 @@ repository for aggregation.
 
 ```bash
 cd edge/
-pip install -e .
+python -m pip install -e .
 cp config.example.yml config.yml   # edit for your environment
 export ROSETTA_GITHUB_TOKEN="ghp_..."
 rosetta-watchdog -c config.yml
@@ -19,7 +19,7 @@ rosetta-watchdog -c config.yml
 | Backend | Requires | Metadata depth |
 |---------|----------|---------------|
 | **XradiaPy** (default on Xradia machines) | Zeiss Xradia Software Suite | Full per-projection axis positions, dates, geometry |
-| **olefile** (fallback) | `pip install olefile` | Machine settings, geometry, acquisition parameters |
+| **olefile** (fallback) | `python -m pip install olefile` | Machine settings, geometry, acquisition parameters |
 
 Set `parser_backend` in `config.yml` to `"auto"`, `"xradiaPy"`, or `"olefile"`.
 

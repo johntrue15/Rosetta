@@ -304,10 +304,19 @@
           <h2>Step 4 — Install the Rosetta Edge Watchdog</h2>
           <p class="subtitle">Your facility is ready. Install the watchdog on the machine where your scanner writes data.</p>
 
+          <div style="background:var(--surface);border-left:3px solid var(--accent);padding:0.75rem 1rem;margin-bottom:1rem;border-radius:0 6px 6px 0;font-size:0.85rem;">
+            <strong>Prerequisite — Python on PATH</strong><br>
+            Open a terminal and run <code>python --version</code>. If it's not recognized, install Python from
+            <a href="https://www.python.org/downloads/" target="_blank" style="color:var(--accent)">python.org</a>
+            and <strong>check "Add Python to PATH"</strong> during setup.<br>
+            <span style="color:var(--muted)">PyCharm/Anaconda bundle their own Python but don't add it to the system PATH.
+            You can also run these commands inside PyCharm's Terminal tab instead.</span>
+          </div>
+
           <div class="code-label">1. Clone and install</div>
           <div class="code-block" id="code-install">git clone https://github.com/johntrue15/Rosetta.git
 cd Rosetta/edge
-pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Copy</button></div>
+python -m pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Copy</button></div>
 
           <div class="code-label">2. Download your config</div>
           <p style="color:var(--muted);font-size:0.85rem;margin:0.5rem 0">

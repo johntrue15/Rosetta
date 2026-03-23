@@ -54,7 +54,7 @@ jobs:
             // Fallback for old-style issues without machine table
             if (machines.length === 0) {
               const machineName = field('Machine Name / Identifier') || slug;
-              const watchDir = field('Watch Directory Path') || 'D:\\XradiaData\\Scans';
+              const watchDir = field('Watch Directory Path') || 'D:/XradiaData/Scans';
               machines.push({ format: '.txrm', name: machineName, path: watchDir });
             }
 
@@ -95,7 +95,8 @@ jobs:
               "watch_directories:",
           ]
           for m in machines:
-              lines.append(f'  - path: "{m["path"]}"')
+              safe_path = m["path"].replace("\\", "/")
+              lines.append(f'  - path: "{safe_path}"')
               lines.append(f'    machine_name: "{m["name"]}"')
           lines.extend([
               "",
@@ -176,7 +177,7 @@ jobs:
               `\`\`\`bash`,
               `git clone https://github.com/${context.repo.owner}/${context.repo.repo}.git`,
               `cd ${context.repo.repo}/edge`,
-              `pip install -e .`,
+              `python -m pip install -e .`,
               `\`\`\``,
               ``,
               `**Download your config:** [config.yml](${configUrl})`,

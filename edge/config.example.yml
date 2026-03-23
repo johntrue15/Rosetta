@@ -3,6 +3,7 @@
 
 # Directories to monitor for new .txrm and .pca files.
 # Each entry has a path and a machine_name used for attribution.
+# Use forward slashes (/) even on Windows — backslashes break YAML parsing.
 watch_directories:
   - path: "D:/XradiaData/Scans"
     machine_name: "Xradia-520-Versa"
