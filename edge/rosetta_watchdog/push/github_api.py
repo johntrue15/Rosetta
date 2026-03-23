@@ -8,6 +8,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import time
 from typing import Optional, Tuple
 
 import requests
@@ -95,14 +96,22 @@ class GitHubPusher:
             logger.error("No GitHub token available (env var: %s)", self._config.token_env)
             return False
 
+        t0 = time.monotonic()
         blob_sha, remote_sha256 = self._get_existing_file(remote_path)
+        check_ms = (time.monotonic() - t0) * 1000
 
         if content_sha256 and remote_sha256 and content_sha256 == remote_sha256:
             logger.info(
-                "Skipped %s — identical file already on GitHub (sha256: %s…)",
-                remote_path, content_sha256[:12],
+                "Skipped %s — identical file already on GitHub "
+                "(sha256: %s…, checked in %.0fms)",
+                remote_path, content_sha256[:12], check_ms,
             )
             return True
+
+        if blob_sha:
+            logger.info("File exists on GitHub (blob sha: %s…) — will update", blob_sha[:12])
+        else:
+            logger.info("New file — will create %s", remote_path)
 
         encoded = base64.b64encode(content).decode("ascii")
         url = self._repo_url(f"/contents/{remote_path}")
@@ -117,15 +126,22 @@ class GitHubPusher:
             body["sha"] = blob_sha
 
         try:
+            t1 = time.monotonic()
             resp = self._session.put(url, json=body, headers=self._auth_headers)
+            push_ms = (time.monotonic() - t1) * 1000
+
             if resp.status_code in (200, 201):
-                logger.info("Pushed %s to %s/%s", remote_path,
-                            self._config.owner, self._config.repo_name)
+                action = "Updated" if blob_sha else "Created"
+                logger.info(
+                    "%s %s on %s/%s (%.0fms)",
+                    action, remote_path,
+                    self._config.owner, self._config.repo_name, push_ms,
+                )
                 return True
             else:
                 logger.error(
-                    "GitHub API error %d for %s: %s",
-                    resp.status_code, remote_path,
+                    "GitHub API error %d for %s (%.0fms): %s",
+                    resp.status_code, remote_path, push_ms,
                     resp.json().get("message", resp.text[:200]),
                 )
                 return False

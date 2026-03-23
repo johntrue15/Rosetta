@@ -7,7 +7,9 @@ import hashlib
 import json
 import logging
 import os
+import platform
 import sys
+import time
 from pathlib import Path
 
 from . import __version__
@@ -62,6 +64,37 @@ class ParserDispatcher:
         return self._txrm.parse(file_path)
 
 
+def _log_startup_banner(log, config, config_path: Path) -> None:
+    """Log a detailed startup banner for diagnostics."""
+    log.info("=" * 60)
+    log.info("Rosetta Edge Watchdog v%s", __version__)
+    log.info("Python %s on %s (%s)", platform.python_version(),
+             platform.system(), platform.machine())
+    log.info("Config: %s", config_path.resolve())
+    log.info("State:  %s", Path(config.state_file).resolve())
+    log.info("-" * 60)
+
+    log.info("Watch directories (%d):", len(config.watch_directories))
+    all_dirs_ok = True
+    for wd in config.watch_directories:
+        exists = Path(wd.path).is_dir()
+        status = "OK" if exists else "NOT FOUND"
+        log.info("  [%s] %s  (machine: %s)", status, wd.path, wd.machine_name)
+        if not exists:
+            all_dirs_ok = False
+
+    if not all_dirs_ok:
+        log.warning(
+            "One or more watch directories do not exist. "
+            "The watchdog will keep polling — create them to start processing."
+        )
+
+    log.info("Polling interval: %ds", config.polling_interval_seconds)
+    log.info("Parser backend: %s", config.parser_backend)
+    log.info("Drift files: %s", "included" if config.include_drift_files else "excluded")
+    log.info("=" * 60)
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(
         prog="rosetta-watchdog",
@@ -80,14 +113,18 @@ def main(argv: list[str] | None = None) -> None:
     if args.token:
         os.environ["ROSETTA_GITHUB_TOKEN"] = args.token
 
-    config = load_config(Path(args.config))
+    config_path = Path(args.config)
+    config = load_config(config_path)
     _setup_logging(config.logging.level, config.logging.file)
     log = logging.getLogger(__name__)
+
+    _log_startup_banner(log, config, config_path)
 
     txrm_parser = _get_txrm_parser(config.parser_backend)
     pca_parser = _get_pca_parser()
     parser = ParserDispatcher(txrm_parser, pca_parser)
-    log.info("Parser backends: txrm=%s, pca=%s", type(txrm_parser).__name__, type(pca_parser).__name__)
+    log.info("Parser backends: txrm=%s, pca=%s",
+             type(txrm_parser).__name__, type(pca_parser).__name__)
 
     pusher = None
     token_ok = bool(config.github.token)
@@ -124,10 +161,14 @@ def main(argv: list[str] | None = None) -> None:
 
     def process_file(file_path: str, machine_name: str) -> bool:
         log.info("Parsing %s (machine: %s)", file_path, machine_name)
+        t0 = time.monotonic()
+
         metadata = parser.parse(file_path)
         if metadata is None:
+            log.error("Parser returned None for %s", file_path)
             return False
 
+        parse_ms = (time.monotonic() - t0) * 1000
         metadata["machine_name"] = machine_name
 
         sha256 = hashlib.sha256(Path(file_path).read_bytes()).hexdigest()
@@ -135,10 +176,17 @@ def main(argv: list[str] | None = None) -> None:
 
         json_bytes = json.dumps(metadata, ensure_ascii=False, indent=2).encode("utf-8")
         filename = Path(file_path).name + ".json"
+        remote_path = config.github.upload_path + filename
+
+        log.info(
+            "Parsed %s (%.0fms, %d bytes JSON, sha256: %s…) → pushing to %s",
+            Path(file_path).name, parse_ms, len(json_bytes),
+            sha256[:12], remote_path,
+        )
 
         ok = pusher.push_file(
             content=json_bytes,
-            remote_path=config.github.upload_path + filename,
+            remote_path=remote_path,
             commit_message=(
                 f"{config.github.commit_prefix} {Path(file_path).name} "
                 f"[uploader:edge-watchdog-{machine_name}]"
