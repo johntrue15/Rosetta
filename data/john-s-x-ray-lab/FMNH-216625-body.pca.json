@@ -1,6 +1,6 @@
 {
   "file_name": "FMNH-216625-body.pca",
-  "file_hyperlink": "file://///192.168.30.2/ct_data/elstanley/2026-03-17/FMNH-216625-body/FMNH-216625-body.pca",
+  "file_hyperlink": "file://///192.168.30.2/ct_data/elstanley/2026-03-17/FMNH-216625-body/Scan1/FMNH-216625-body.pca",
   "ct_voxel_size_um": "26.56765",
   "ct_objective": "DXR-250",
   "ct_number_images": "1200",
@@ -24,15 +24,15 @@
   "scan_time": "1200",
   "start_time": "N/A",
   "end_time": "N/A",
-  "txrm_file_path": "\\\\192.168.30.2\\ct_data\\elstanley\\2026-03-17\\FMNH-216625-body\\FMNH-216625-body.pca",
+  "txrm_file_path": "\\\\192.168.30.2\\ct_data\\elstanley\\2026-03-17\\FMNH-216625-body\\Scan1\\FMNH-216625-body.pca",
   "file_path": "S:\\CT_DATA\\elstanley\\2026-03-17",
   "acquisition_successful": "Yes",
   "sample_x_start": "-149.993700",
   "sample_x_end": "-0.018312",
   "sample_x_range": "149.97538799999998",
   "sample_y_start": "394.998600",
-  "sample_y_end": "299.008256",
-  "sample_y_range": "95.990344",
+  "sample_y_end": "254.162062",
+  "sample_y_range": "140.83653800000002",
   "sample_z_start": "273.987300",
   "sample_z_end": "107.288938",
   "sample_z_range": "166.698362",
@@ -57,5 +57,5 @@
     "calib_folder_path": "S:\\CT_DATA\\elstanley\\2026-03-17"
   },
   "machine_name": "john-s-x-ray-lab-pca",
-  "sha256": "f23a3fa4ac15badfe99f852fe3e3548132033e22beb0a4b51f43e9ab0ca0efa5"
+  "sha256": "638a4127aff299184a4bd72d5a546dcb762b6910ac7520ae02caf88d9de244a9"
 }
