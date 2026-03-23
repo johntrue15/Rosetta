@@ -56,15 +56,32 @@ class WatchdogConfig:
     state_file: str = "processed_files.json"
 
 
+class ConfigError(Exception):
+    """Raised when the configuration file cannot be loaded or is invalid."""
+
+
 def load_config(path: Path) -> WatchdogConfig:
     """Load watchdog configuration from a YAML file."""
-    with open(path, "r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f) or {}
+    if not path.exists():
+        raise ConfigError(
+            f"Configuration file not found: {path}\n"
+            "Copy config.example.yml to config.yml and edit for your environment."
+        )
 
-    watch_dirs = [
-        WatchDirectory(path=d["path"], machine_name=d["machine_name"])
-        for d in raw.get("watch_directories", [])
-    ]
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+    except yaml.YAMLError as exc:
+        raise ConfigError(f"Invalid YAML in {path}: {exc}") from exc
+
+    raw_dirs = raw.get("watch_directories", [])
+    watch_dirs: List[WatchDirectory] = []
+    for i, d in enumerate(raw_dirs):
+        if not isinstance(d, dict) or "path" not in d or "machine_name" not in d:
+            raise ConfigError(
+                f"watch_directories[{i}] must have 'path' and 'machine_name' keys"
+            )
+        watch_dirs.append(WatchDirectory(path=d["path"], machine_name=d["machine_name"]))
 
     gh_raw = raw.get("github", {})
     github = GitHubConfig(

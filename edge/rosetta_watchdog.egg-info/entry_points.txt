@@ -1,0 +1,2 @@
+[console_scripts]
+rosetta-watchdog = rosetta_watchdog.cli:main

@@ -26,7 +26,10 @@ parser_backend: "auto"
 state_file: "processed_files.json"
 
 # GitHub integration — pushes parsed JSON to the Rosetta repository.
-# Set the PAT in an environment variable for security.
+# Set the PAT in an environment variable for security:
+#   Linux/macOS : export ROSETTA_GITHUB_TOKEN="ghp_..."
+#   PowerShell  : $env:ROSETTA_GITHUB_TOKEN = "ghp_..."
+#   cmd.exe     : set ROSETTA_GITHUB_TOKEN=ghp_...
 github:
   token_env: "ROSETTA_GITHUB_TOKEN"
   repo: "johntrue15/Rosetta"

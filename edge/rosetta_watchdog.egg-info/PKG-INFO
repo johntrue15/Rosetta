@@ -1,3 +1,17 @@
+Metadata-Version: 2.4
+Name: rosetta-watchdog
+Version: 0.1.0
+Summary: Rosetta edge watchdog — monitors Xradia scan directories and pushes metadata to GitHub
+License: MIT
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: olefile>=0.47
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: requests>=2.28
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
+
 # Rosetta Edge Watchdog
 
 Standalone service that monitors Xradia CT scanner output directories for new

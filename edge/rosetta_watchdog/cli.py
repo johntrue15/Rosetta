@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .config import load_config
+from .config import ConfigError, load_config
 from .push.github_api import GitHubPusher
 from .watcher import DirectoryWatcher
 
@@ -74,7 +74,12 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = ap.parse_args(argv)
 
-    config = load_config(Path(args.config))
+    try:
+        config = load_config(Path(args.config))
+    except ConfigError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
     _setup_logging(config.logging.level, config.logging.file)
     log = logging.getLogger(__name__)
 
@@ -88,7 +93,18 @@ def main(argv: list[str] | None = None) -> None:
         pusher = GitHubPusher(config.github)
         log.info("GitHub push enabled → %s (%s)", config.github.repo, config.github.branch)
     else:
-        log.warning("GitHub push disabled (no token or repo configured)")
+        token_env = config.github.token_env
+        if not config.github.repo:
+            log.warning("GitHub push disabled (no repo configured in config file)")
+        elif not config.github.token:
+            log.warning(
+                "GitHub push disabled — environment variable %s is not set. "
+                "Set it before running:\n"
+                "  Linux/macOS : export %s=\"ghp_...\"\n"
+                "  PowerShell  : $env:%s = \"ghp_...\"\n"
+                "  cmd.exe     : set %s=ghp_...",
+                token_env, token_env, token_env, token_env,
+            )
 
     def process_file(file_path: str, machine_name: str) -> bool:
         log.info("Parsing %s (machine: %s)", file_path, machine_name)
@@ -98,7 +114,11 @@ def main(argv: list[str] | None = None) -> None:
 
         metadata["machine_name"] = machine_name
 
-        sha256 = hashlib.sha256(Path(file_path).read_bytes()).hexdigest()
+        try:
+            sha256 = hashlib.sha256(Path(file_path).read_bytes()).hexdigest()
+        except OSError as exc:
+            log.error("Cannot read file %s: %s", file_path, exc)
+            return False
         metadata["sha256"] = sha256
 
         json_bytes = json.dumps(metadata, ensure_ascii=False, indent=2).encode("utf-8")
