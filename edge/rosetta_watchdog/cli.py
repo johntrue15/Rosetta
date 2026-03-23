@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -71,8 +72,13 @@ def main(argv: list[str] | None = None) -> None:
                     help="Path to config YAML file")
     ap.add_argument("--once", action="store_true",
                     help="Run one scan cycle then exit (useful for cron)")
+    ap.add_argument("--token",
+                    help="GitHub PAT (alternative to setting the env var)")
     ap.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = ap.parse_args(argv)
+
+    if args.token:
+        os.environ["ROSETTA_GITHUB_TOKEN"] = args.token
 
     config = load_config(Path(args.config))
     _setup_logging(config.logging.level, config.logging.file)
