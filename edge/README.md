@@ -10,9 +10,13 @@ repository for aggregation.
 cd edge/
 python -m pip install -e .
 cp config.example.yml config.yml   # edit for your environment
-export ROSETTA_GITHUB_TOKEN="ghp_..."
-rosetta-watchdog -c config.yml
+rosetta-watchdog -c config.yml --token ghp_YourTokenHere
 ```
+
+Or set the token via environment variable instead of `--token`:
+- **Mac/Linux:** `export ROSETTA_GITHUB_TOKEN="ghp_..."`
+- **PowerShell:** `$env:ROSETTA_GITHUB_TOKEN = "ghp_..."`
+- **CMD:** `set ROSETTA_GITHUB_TOKEN=ghp_...`
 
 ## Parser Backends
 

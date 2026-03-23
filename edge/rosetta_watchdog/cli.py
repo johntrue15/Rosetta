@@ -118,6 +118,10 @@ def main(argv: list[str] | None = None) -> None:
             config.github.token_env, config.github.token_env, config.github.token_env,
         )
 
+    if not pusher:
+        log.error("Cannot run without GitHub push configured — exiting")
+        sys.exit(1)
+
     def process_file(file_path: str, machine_name: str) -> bool:
         log.info("Parsing %s (machine: %s)", file_path, machine_name)
         metadata = parser.parse(file_path)
@@ -132,26 +136,17 @@ def main(argv: list[str] | None = None) -> None:
         json_bytes = json.dumps(metadata, ensure_ascii=False, indent=2).encode("utf-8")
         filename = Path(file_path).name + ".json"
 
-        if pusher:
-            ok = pusher.push_file(
-                content=json_bytes,
-                remote_path=config.github.upload_path + filename,
-                commit_message=(
-                    f"{config.github.commit_prefix} {Path(file_path).name} "
-                    f"[uploader:edge-watchdog-{machine_name}]"
-                ),
-            )
-            if not ok:
-                log.error("Failed to push %s to GitHub", filename)
-                return False
-        else:
-            out_dir = Path("watchdog_output")
-            out_dir.mkdir(exist_ok=True)
-            (out_dir / filename).write_bytes(json_bytes)
-            log.warning(
-                "Saved %s locally (GitHub push disabled) — file will be "
-                "retried when a token is configured", filename,
-            )
+        ok = pusher.push_file(
+            content=json_bytes,
+            remote_path=config.github.upload_path + filename,
+            commit_message=(
+                f"{config.github.commit_prefix} {Path(file_path).name} "
+                f"[uploader:edge-watchdog-{machine_name}]"
+            ),
+            content_sha256=sha256,
+        )
+        if not ok:
+            log.error("Failed to push %s to GitHub", filename)
             return False
 
         return True

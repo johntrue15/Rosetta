@@ -325,33 +325,42 @@ python -m pip install -e .<button class="copy-btn" onclick="copyBlock('code-inst
           </p>
           <div id="config-download-area"></div>
 
-          <div class="code-label">3. Set your GitHub token</div>
+          <div class="code-label">3. Run the watchdog with your GitHub token</div>
           <p style="color:var(--muted);font-size:0.82rem;margin:0.25rem 0 0.5rem">
             Create a
             <a href="https://github.com/settings/tokens/new?scopes=repo&description=Rosetta+Edge+Watchdog" target="_blank" style="color:var(--accent)">Personal Access Token</a>
-            with <code>repo</code> scope, then set it:
+            with <code>repo</code> scope, then run:
           </p>
-          <div class="os-tabs">
-            <div class="os-tab active" onclick="switchOS('mac')">Mac / Linux</div>
-            <div class="os-tab" onclick="switchOS('win-ps')">Windows PowerShell</div>
-            <div class="os-tab" onclick="switchOS('win-cmd')">Windows CMD</div>
-          </div>
-          <div class="os-panel active" id="os-mac">
-            <div class="code-block" id="code-token-mac">export ROSETTA_GITHUB_TOKEN="ghp_YourTokenHere"<button class="copy-btn" onclick="copyBlock('code-token-mac')">Copy</button></div>
-          </div>
-          <div class="os-panel" id="os-win-ps">
-            <div class="code-block" id="code-token-win-ps">$env:ROSETTA_GITHUB_TOKEN = "ghp_YourTokenHere"<button class="copy-btn" onclick="copyBlock('code-token-win-ps')">Copy</button></div>
-          </div>
-          <div class="os-panel" id="os-win-cmd">
-            <div class="code-block" id="code-token-win-cmd">set ROSETTA_GITHUB_TOKEN=ghp_YourTokenHere<button class="copy-btn" onclick="copyBlock('code-token-win-cmd')">Copy</button></div>
-          </div>
-
-          <div class="code-label">4. Run the watchdog</div>
-          <div class="code-block" id="code-run">rosetta-watchdog -c config.yml<button class="copy-btn" onclick="copyBlock('code-run')">Copy</button></div>
+          <div class="code-block" id="code-run">rosetta-watchdog -c config.yml --token ghp_YourTokenHere<button class="copy-btn" onclick="copyBlock('code-run')">Copy</button></div>
           <p style="color:var(--muted);font-size:0.82rem;margin:0.5rem 0">
             A bundled <code>example.pca</code> test file is included in <code>edge/test_data/</code>.
             Copy it into your watch folder to confirm the full upload loop works.
           </p>
+
+          <details style="margin-top:0.75rem;font-size:0.82rem;">
+            <summary style="cursor:pointer;color:var(--accent);">Alternative: set token via environment variable</summary>
+            <p style="color:var(--muted);margin:0.5rem 0 0.25rem">
+              If you prefer not to pass the token on the command line, set it as an environment variable
+              <strong>in the same terminal</strong> before running the watchdog:
+            </p>
+            <div class="os-tabs">
+              <div class="os-tab active" onclick="switchOS('mac')">Mac / Linux</div>
+              <div class="os-tab" onclick="switchOS('win-ps')">Windows PowerShell</div>
+              <div class="os-tab" onclick="switchOS('win-cmd')">Windows CMD</div>
+            </div>
+            <div class="os-panel active" id="os-mac">
+              <div class="code-block" id="code-token-mac">export ROSETTA_GITHUB_TOKEN="ghp_YourTokenHere"
+rosetta-watchdog -c config.yml<button class="copy-btn" onclick="copyBlock('code-token-mac')">Copy</button></div>
+            </div>
+            <div class="os-panel" id="os-win-ps">
+              <div class="code-block" id="code-token-win-ps">$env:ROSETTA_GITHUB_TOKEN = "ghp_YourTokenHere"
+rosetta-watchdog -c config.yml<button class="copy-btn" onclick="copyBlock('code-token-win-ps')">Copy</button></div>
+            </div>
+            <div class="os-panel" id="os-win-cmd">
+              <div class="code-block" id="code-token-win-cmd">set ROSETTA_GITHUB_TOKEN=ghp_YourTokenHere
+rosetta-watchdog -c config.yml<button class="copy-btn" onclick="copyBlock('code-token-win-cmd')">Copy</button></div>
+            </div>
+          </details>
 
           <div class="form-actions">
             <button class="btn btn-primary" id="goto-verify-btn">I've started the watchdog — verify data</button>
