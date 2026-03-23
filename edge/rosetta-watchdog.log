@@ -1,7 +1,0 @@
-2026-03-23 18:46:46,807 [INFO] rosetta_watchdog.cli: XradiaPy not available, falling back to olefile backend
-2026-03-23 18:46:46,813 [INFO] rosetta_watchdog.cli: Parser backends: txrm=OlefileParser, pca=PcaParser
-2026-03-23 18:46:46,813 [WARNING] rosetta_watchdog.cli: GitHub push disabled — environment variable ROSETTA_GITHUB_TOKEN is not set. Set it before running:
-  Linux/macOS : export ROSETTA_GITHUB_TOKEN="ghp_..."
-  PowerShell  : $env:ROSETTA_GITHUB_TOKEN = "ghp_..."
-  cmd.exe     : set ROSETTA_GITHUB_TOKEN=ghp_...
-2026-03-23 18:46:46,814 [INFO] rosetta_watchdog.cli: Single scan complete — processed 0 file(s)
