@@ -1,6 +1,6 @@
 {
   "file_name": "UF-herp-30304-body.pca",
-  "file_hyperlink": "file://///192.168.30.2/ct_data/elstanley/2026-02-24/UF-herp-30304-body/Scan1/UF-herp-30304-body.pca",
+  "file_hyperlink": "file://///192.168.30.2/ct_data/elstanley/2026-02-24/UF-herp-30304-body/Scan2/UF-herp-30304-body.pca",
   "ct_voxel_size_um": "31.4568",
   "ct_objective": "DXR-250",
   "ct_number_images": "1200",
@@ -24,15 +24,15 @@
   "scan_time": "1200",
   "start_time": "N/A",
   "end_time": "N/A",
-  "txrm_file_path": "\\\\192.168.30.2\\ct_data\\elstanley\\2026-02-24\\UF-herp-30304-body\\Scan1\\UF-herp-30304-body.pca",
+  "txrm_file_path": "\\\\192.168.30.2\\ct_data\\elstanley\\2026-02-24\\UF-herp-30304-body\\Scan2\\UF-herp-30304-body.pca",
   "file_path": "S:\\CT_DATA\\elstanley\\2026-02-24",
   "acquisition_successful": "Yes",
   "sample_x_start": "-149.993700",
   "sample_x_end": "0.000000",
   "sample_x_range": "149.9937",
   "sample_y_start": "394.998600",
-  "sample_y_end": "191.488313",
-  "sample_y_range": "203.510287",
+  "sample_y_end": "241.567538",
+  "sample_y_range": "153.431062",
   "sample_z_start": "273.987300",
   "sample_z_end": "127.032938",
   "sample_z_range": "146.954362",
@@ -57,5 +57,5 @@
     "calib_folder_path": "S:\\CT_DATA\\elstanley\\2026-02-24"
   },
   "machine_name": "john-s-x-ray-lab-pca",
-  "sha256": "75bc7e24cfb1593b7d21808b5880eaebe65f0be5ae3e33f966a1cd0d6c8a5a5c"
+  "sha256": "0b08fb1b621d11e91e89f968079490d7e299c370649fb6f03a96d8e03368af17"
 }
