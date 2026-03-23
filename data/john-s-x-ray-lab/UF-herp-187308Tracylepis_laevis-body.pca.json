@@ -1,6 +1,6 @@
 {
   "file_name": "UF-herp-187308Tracylepis_laevis-body.pca",
-  "file_hyperlink": "file://///192.168.30.2/ct_data/elstanley/2026-03-17/UF-herp-187308Tracylepis_laevis-body/Scan2/UF-herp-187308Tracylepis_laevis-body.pca",
+  "file_hyperlink": "file://///192.168.30.2/ct_data/elstanley/2026-03-17/UF-herp-187308Tracylepis_laevis-body/Scan3/UF-herp-187308Tracylepis_laevis-body.pca",
   "ct_voxel_size_um": "18.3355",
   "ct_objective": "DXR-250",
   "ct_number_images": "2000",
@@ -24,15 +24,15 @@
   "scan_time": "2000",
   "start_time": "N/A",
   "end_time": "N/A",
-  "txrm_file_path": "\\\\192.168.30.2\\ct_data\\elstanley\\2026-03-17\\UF-herp-187308Tracylepis_laevis-body\\Scan2\\UF-herp-187308Tracylepis_laevis-body.pca",
+  "txrm_file_path": "\\\\192.168.30.2\\ct_data\\elstanley\\2026-03-17\\UF-herp-187308Tracylepis_laevis-body\\Scan3\\UF-herp-187308Tracylepis_laevis-body.pca",
   "file_path": "S:\\CT_DATA\\elstanley\\2026-03-17\\FMNH-196005-AL plus head",
   "acquisition_successful": "Yes",
   "sample_x_start": "-149.993700",
   "sample_x_end": "0.000000",
   "sample_x_range": "149.9937",
   "sample_y_start": "394.998600",
-  "sample_y_end": "81.082239",
-  "sample_y_range": "313.916361",
+  "sample_y_end": "97.364166",
+  "sample_y_range": "297.634434",
   "sample_z_start": "273.987300",
   "sample_z_end": "74.044813",
   "sample_z_range": "199.942487",
@@ -57,5 +57,5 @@
     "calib_folder_path": "S:\\CT_DATA\\elstanley\\2026-03-17\\FMNH-196005-AL plus head"
   },
   "machine_name": "john-s-x-ray-lab-pca",
-  "sha256": "fd6405cac34724e10b3593e608f72b83732ebf10ce164923629d2b3b89da3748"
+  "sha256": "ef393b043f5c4169261de43966732d898f1d28a7150d13ae70f0c38914cd55c7"
 }
