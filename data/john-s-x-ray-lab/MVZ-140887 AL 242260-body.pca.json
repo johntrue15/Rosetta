@@ -1,6 +1,6 @@
 {
   "file_name": "MVZ-140887 AL 242260-body.pca",
-  "file_hyperlink": "file://///192.168.30.2/ct_data/elstanley/2026-03-17/MVZ-140887 AL 242260-body/MVZ-140887 AL 242260-body.pca",
+  "file_hyperlink": "file://///192.168.30.2/ct_data/elstanley/2026-03-17/MVZ-140887 AL 242260-body/Scan2/MVZ-140887 AL 242260-body.pca",
   "ct_voxel_size_um": "38.210750000000004",
   "ct_objective": "DXR-250",
   "ct_number_images": "2000",
@@ -24,7 +24,7 @@
   "scan_time": "2000",
   "start_time": "N/A",
   "end_time": "N/A",
-  "txrm_file_path": "\\\\192.168.30.2\\ct_data\\elstanley\\2026-03-17\\MVZ-140887 AL 242260-body\\MVZ-140887 AL 242260-body.pca",
+  "txrm_file_path": "\\\\192.168.30.2\\ct_data\\elstanley\\2026-03-17\\MVZ-140887 AL 242260-body\\Scan2\\MVZ-140887 AL 242260-body.pca",
   "file_path": "S:\\CT_DATA\\elstanley\\2026-03-17\\FMNH-196005-AL plus head",
   "acquisition_successful": "Yes",
   "sample_x_start": "-149.993700",
@@ -57,5 +57,5 @@
     "calib_folder_path": "S:\\CT_DATA\\elstanley\\2026-03-17\\FMNH-196005-AL plus head"
   },
   "machine_name": "john-s-x-ray-lab-pca",
-  "sha256": "7725ea4afdda5b76967c9255b1b25e8d2d3db46e9d8446d34ea973acf43457df"
+  "sha256": "0b02b8e832e7685baaaeb64b97da728ca0f28d5cd8c06fd96253d8d5584930ad"
 }
