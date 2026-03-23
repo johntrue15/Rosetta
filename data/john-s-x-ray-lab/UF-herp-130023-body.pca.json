@@ -1,6 +1,6 @@
 {
   "file_name": "UF-herp-130023-body.pca",
-  "file_hyperlink": "file://///192.168.30.2/ct_data/elstanley/2026-02-24/UF-herp-130023-body/Scan1/UF-herp-130023-body.pca",
+  "file_hyperlink": "file://///192.168.30.2/ct_data/elstanley/2026-02-24/UF-herp-130023-body/Scan2/UF-herp-130023-body.pca",
   "ct_voxel_size_um": "25.25544",
   "ct_objective": "DXR-250",
   "ct_number_images": "1500",
@@ -24,15 +24,15 @@
   "scan_time": "1500",
   "start_time": "N/A",
   "end_time": "N/A",
-  "txrm_file_path": "\\\\192.168.30.2\\ct_data\\elstanley\\2026-02-24\\UF-herp-130023-body\\Scan1\\UF-herp-130023-body.pca",
+  "txrm_file_path": "\\\\192.168.30.2\\ct_data\\elstanley\\2026-02-24\\UF-herp-130023-body\\Scan2\\UF-herp-130023-body.pca",
   "file_path": "S:\\CT_DATA\\elstanley\\2026-02-24",
   "acquisition_successful": "Yes",
   "sample_x_start": "-149.993700",
   "sample_x_end": "-0.012687",
   "sample_x_range": "149.981013",
   "sample_y_start": "394.998600",
-  "sample_y_end": "108.642062",
-  "sample_y_range": "286.356538",
+  "sample_y_end": "141.272095",
+  "sample_y_range": "253.726505",
   "sample_z_start": "273.987300",
   "sample_z_end": "101.989812",
   "sample_z_range": "171.997488",
@@ -57,5 +57,5 @@
     "calib_folder_path": "S:\\CT_DATA\\elstanley\\2026-02-24"
   },
   "machine_name": "john-s-x-ray-lab-pca",
-  "sha256": "46577b93f41535feba79c6d716b1a6eea6fb3ea9b8325a165628b1c0735826aa"
+  "sha256": "3208e0bf5d6dea86288b27f9930d6f5b72fba85bf04fcac4c6df6b4e7d56d0a2"
 }
