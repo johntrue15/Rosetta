@@ -253,3 +253,78 @@ FICS,John Doe,john.doe@example.com
 Nishimura,Jane Smith,jane.smith@example.com
 Stanley,Bob Wilson,bob.wilson@example.com
 """
+
+
+@pytest.fixture
+def mock_ctprofile_xml():
+    """Minimal valid ctprofile.xml content for testing."""
+    return """<?xml version="1.0" encoding="utf-8"?>
+<CTProfile xmlns:xsi="none">
+  <ManipulatorPosition Version="2">
+    <AxisPosition>0</AxisPosition>
+    <AxisPosition>178.7256</AxisPosition>
+    <AxisPosition>189.94043</AxisPosition>
+    <AxisPosition>37.9662476</AxisPosition>
+    <AxisPosition>0</AxisPosition>
+    <AxisPosition>0</AxisPosition>
+  </ManipulatorPosition>
+  <XraySettings>
+    <kV>106</kV>
+    <uA>106</uA>
+    <FocusMode>autoDefocus</FocusMode>
+  </XraySettings>
+  <XrayHead>Reflection 225</XrayHead>
+  <DetectorPixelSizeMM>0.2</DetectorPixelSizeMM>
+  <FramesPerProjection>2</FramesPerProjection>
+  <Projections>3142</Projections>
+  <ImagingSettings exposure="1000" binning="0" gain="4">
+    <imageSizeX>2000</imageSizeX>
+    <imageSizeY>2000</imageSizeY>
+  </ImagingSettings>
+  <ShadingCorrectionProfile>
+    <GreyLevelTargets>
+      <Target>
+        <kV>0</kV>
+        <uA>0</uA>
+        <XrayFilterMaterial />
+        <XrayFilterThickness>0</XrayFilterThickness>
+        <GreyLevel>0</GreyLevel>
+      </Target>
+      <Target>
+        <kV>106</kV>
+        <uA>106</uA>
+        <XrayFilterMaterial>Copper</XrayFilterMaterial>
+        <XrayFilterThickness>0.125</XrayFilterThickness>
+        <GreyLevel>60000</GreyLevel>
+      </Target>
+    </GreyLevelTargets>
+  </ShadingCorrectionProfile>
+  <VolumeOfInterest>
+    <XStart>0</XStart>
+    <XEnd>1999</XEnd>
+    <YStart>0</YStart>
+    <YEnd>1999</YEnd>
+    <ZStart>0</ZStart>
+    <ZEnd>1999</ZEnd>
+  </VolumeOfInterest>
+  <ProfileName>test_sample</ProfileName>
+  <DataSetName>test_sample</DataSetName>
+</CTProfile>
+"""
+
+
+@pytest.fixture
+def mock_ctinfo_xml():
+    """Minimal valid ctinfo.xml content for testing."""
+    return """<?xml version="1.0" encoding="utf-8"?>
+<Information xmlns:xsi="none">
+  <JobGuid>c8bc3fc1-17d8-4d33-aa5c-21c79c070814</JobGuid>
+  <Identifier>test_sample_hand</Identifier>
+  <Elements>
+    <Element>
+      <tag>Dataset name</tag>
+      <value>test_sample_hand</value>
+    </Element>
+  </Elements>
+</Information>
+"""
