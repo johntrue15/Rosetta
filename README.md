@@ -35,6 +35,7 @@ For automated uploads from a CT scanner, use the **[Setup Facility](https://john
 | `docs/` | GitHub Pages upload UI, auth callback, and facility setup wizard |
 | `cloudflare/` | Rosetta Upload Cloudflare Worker (OAuth, device flow, App token issuance) |
 | `templates/facility-repo/` | Files seeded into each `rosetta-facility-<slug>` companion repo |
+| `.github/scripts/e2e/` | Windows E2E CI — **[Dell setup guide](.github/scripts/e2e/DELL_SETUP.md)** for Cursor agents |
 | `standard_format.json` | CSV column mapping configuration |
 | `users.csv` | Folder-to-user mapping for scan attribution |
 | `.github/workflows/` | CI/CD pipelines for parsing, aggregation, CSV export, facility onboarding |

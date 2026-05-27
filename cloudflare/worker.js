@@ -32,6 +32,8 @@
  *                                     Create + seed rosetta-facility-<slug>
  *   POST /runner/registration-token   Mint runner reg token + install ticket
  *   POST /watchdog/token              Mint short-lived push token for the watchdog
+ *   POST /workflow/dispatch-deploy    Trigger deploy-watchdog.yml (App token)
+ *   POST /e2e/cleanup                 Tear down companion repo + facility data + issue
  *   GET  /bootstrap-windows.ps1       PowerShell installer
  *   GET  /bootstrap-unix.sh           Bash installer
  */
@@ -68,6 +70,10 @@ export default {
           return await handleWatchdogToken(request, env);
         case "/deploy/status":
           return await handleDeployStatus(request, env);
+        case "/workflow/dispatch-deploy":
+          return await handleDispatchDeploy(request, env);
+        case "/e2e/cleanup":
+          return await handleE2eCleanup(request, env);
         case "/bootstrap-windows.ps1":
           return serveBootstrap(env, "windows");
         case "/bootstrap-unix.sh":
@@ -305,6 +311,9 @@ async function handleRunnerRegistrationToken(request, env) {
   const slug = sanitizeSlug(body.slug);
   const requester = await authenticateCaller(request, env, body);
   if (!requester.ok) return jsonResponse({ error: requester.error }, requester.status);
+  if (requester.slug && sanitizeSlug(requester.slug) !== slug) {
+    return jsonResponse({ error: "slug_mismatch" }, 403);
+  }
 
   const owner = env.FACILITY_OWNER || DEFAULT_FACILITY_OWNER;
   const repoName = `rosetta-facility-${slug}`;
@@ -417,7 +426,118 @@ async function handleDeployStatus(request, env) {
 }
 
 /* ===================================================================== */
-/* 7. Bootstrap script delivery                                           */
+/* 7. Dispatch deploy workflow (App installation token)                     */
+/* ===================================================================== */
+
+async function handleDispatchDeploy(request, env) {
+  if (request.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
+
+  const body = await safeJson(request);
+  if (!body || !body.slug) return jsonResponse({ error: "missing_slug" }, 400);
+
+  const slug = sanitizeSlug(body.slug);
+  const requester = await authenticateCaller(request, env, body);
+  if (!requester.ok) return jsonResponse({ error: requester.error }, requester.status);
+  if (requester.slug && sanitizeSlug(requester.slug) !== slug) {
+    return jsonResponse({ error: "slug_mismatch" }, 403);
+  }
+
+  const owner = env.FACILITY_OWNER || DEFAULT_FACILITY_OWNER;
+  const repoName = `rosetta-facility-${slug}`;
+  const ref = body.ref || "main";
+  const installationToken = await getAppInstallationToken(env);
+
+  const res = await fetch(
+    `${GH_API}/repos/${owner}/${repoName}/actions/workflows/deploy-watchdog.yml/dispatches`,
+    {
+      method: "POST",
+      headers: githubAppHeaders(installationToken),
+      body: JSON.stringify({ ref, inputs: { ref: body.rosetta_ref || ref } }),
+    },
+  );
+  if (res.status !== 204 && !res.ok) {
+    const detail = await res.text();
+    return jsonResponse({ error: "dispatch_failed", status: res.status, detail }, 502);
+  }
+  return jsonResponse({ ok: true, companion_repo: `${owner}/${repoName}`, ref });
+}
+
+/* ===================================================================== */
+/* 8. E2E cleanup (companion repo, facility dir, issue)                   */
+/* ===================================================================== */
+
+async function handleE2eCleanup(request, env) {
+  if (request.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
+
+  const body = await safeJson(request);
+  if (!body || !body.slug) return jsonResponse({ error: "missing_slug" }, 400);
+
+  const slug = sanitizeSlug(body.slug);
+  const requester = await authenticateCaller(request, env, body);
+  if (!requester.ok) return jsonResponse({ error: requester.error }, requester.status);
+
+  const owner = env.FACILITY_OWNER || DEFAULT_FACILITY_OWNER;
+  const mainRepo = env.MAIN_REPO || DEFAULT_MAIN_REPO;
+  const [mainOwner, mainName] = mainRepo.split("/");
+  const companionName = `rosetta-facility-${slug}`;
+  const installationToken = await getAppInstallationToken(env);
+  const headers = githubAppHeaders(installationToken);
+  const results = {};
+
+  // Delete companion repo (ignore 404)
+  const delRepo = await fetch(`${GH_API}/repos/${owner}/${companionName}`, {
+    method: "DELETE",
+    headers,
+  });
+  results.companion_repo = delRepo.status === 204 ? "deleted" : `status_${delRepo.status}`;
+
+  // Remove data/<slug>/ from main repo
+  const dirPath = `data/${slug}`;
+  const contentsRes = await fetch(
+    `${GH_API}/repos/${mainOwner}/${mainName}/contents/${dirPath}?ref=main`,
+    { headers },
+  );
+  if (contentsRes.ok) {
+    const items = await contentsRes.json();
+    for (const item of items) {
+      if (item.type === "file") {
+        await fetch(`${GH_API}/repos/${mainOwner}/${mainName}/contents/${item.path}`, {
+          method: "DELETE",
+          headers,
+          body: JSON.stringify({
+            message: `chore(e2e): remove ${item.path} [skip ci]`,
+            sha: item.sha,
+            branch: "main",
+          }),
+        });
+      }
+    }
+    // Remove README + config if present as individual deletes above; remove dir marker files
+    results.facility_dir = "cleared";
+  } else {
+    results.facility_dir = `status_${contentsRes.status}`;
+  }
+
+  // Close + delete issue when provided
+  if (body.issue_number) {
+    const issueNum = parseInt(body.issue_number, 10);
+    await fetch(`${GH_API}/repos/${mainOwner}/${mainName}/issues/${issueNum}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ state: "closed" }),
+    });
+    const delIssue = await fetch(`${GH_API}/repos/${mainOwner}/${mainName}/issues/${issueNum}`, {
+      method: "DELETE",
+      headers,
+    });
+    results.issue = delIssue.status === 204 ? "deleted" : `closed_status_${delIssue.status}`;
+  }
+
+  return jsonResponse({ ok: true, slug, results });
+}
+
+/* ===================================================================== */
+/* 9. Bootstrap script delivery                                           */
 /* ===================================================================== */
 
 function serveBootstrap(env, kind) {
@@ -461,6 +581,18 @@ async function authenticateCaller(request, env, body) {
     );
     if (ok) return { ok: true, login: "facility-onboard-workflow" };
     return { ok: false, status: 401, error: "invalid_onboard_signature" };
+  }
+
+  if (body && body.install_ticket) {
+    const verified = await verifyInstallTicket(env, body.install_ticket);
+    if (verified.ok) {
+      return {
+        ok: true,
+        login: verified.claims.sub || "install-ticket",
+        slug: verified.claims.slug,
+      };
+    }
+    return { ok: false, status: 401, error: verified.error };
   }
 
   return { ok: false, status: 401, error: "missing_authentication" };
@@ -683,10 +815,18 @@ jobs:
           p.write_text(yaml.safe_dump(cfg, sort_keys=False))
           "
 
+      - name: Load install ticket from machine environment (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          \$ticket = [Environment]::GetEnvironmentVariable('ROSETTA_INSTALL_TICKET', 'Machine')
+          if (-not \$ticket) { throw 'ROSETTA_INSTALL_TICKET is not set in the machine environment' }
+          "ROSETTA_INSTALL_TICKET=\$ticket" | Out-File -FilePath \$env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Install/refresh watchdog service
         shell: bash
         env:
-          ROSETTA_INSTALL_TICKET: \${{ secrets.ROSETTA_INSTALL_TICKET }}
+          ROSETTA_INSTALL_TICKET: \${{ runner.os != 'Windows' && secrets.ROSETTA_INSTALL_TICKET || '' }}
         run: |
           if [ "\${RUNNER_OS}" = "Windows" ]; then
             python ./rosetta/edge/scripts/install_service_windows.py \\
@@ -765,12 +905,19 @@ function Info($msg) { Write-Host "[rosetta] $msg" -ForegroundColor Cyan }
 
 $slug   = $env:ROSETTA_SLUG
 $ticket = $env:ROSETTA_INSTALL_TICKET
+$worker = ($env:ROSETTA_WORKER_URL -replace '/$', '')
 if (-not $slug -or -not $ticket) {
   throw "Set ROSETTA_SLUG and ROSETTA_INSTALL_TICKET before piping this script into iex."
 }
+if (-not $worker) {
+  throw "Set ROSETTA_WORKER_URL to the Rosetta Upload Worker base URL."
+}
+
+$runnerDir  = if ($env:ROSETTA_RUNNER_DIR) { $env:ROSETTA_RUNNER_DIR } else { "C:\\rosetta-runner" }
+$runnerName = if ($env:ROSETTA_RUNNER_NAME) { $env:ROSETTA_RUNNER_NAME } else { "rosetta-$slug" }
 
 Info "Requesting runner registration token for facility '$slug'..."
-$resp = Invoke-RestMethod -Method Post -Uri "${workerUrl}/runner/registration-token" \`
+$resp = Invoke-RestMethod -Method Post -Uri "$worker/runner/registration-token" \`
   -Headers @{ "Content-Type" = "application/json" } \`
   -Body (ConvertTo-Json @{ slug = $slug; install_ticket = $ticket })
 
@@ -779,7 +926,6 @@ $regToken   = $resp.registration_token
 $label      = $resp.runner_label
 $newTicket  = $resp.install_ticket
 
-$runnerDir = "C:\\rosetta-runner"
 New-Item -ItemType Directory -Force -Path $runnerDir | Out-Null
 Set-Location $runnerDir
 
@@ -792,8 +938,8 @@ if (-not (Test-Path "$runnerDir\\config.cmd")) {
   Remove-Item runner.zip
 }
 
-Info "Configuring runner against $runnerRepo with label $label..."
-.\\config.cmd --unattended --url $runnerRepo --token $regToken --labels $label --name "rosetta-$slug" --replace
+Info "Configuring runner '$runnerName' against $runnerRepo with label $label..."
+.\\config.cmd --unattended --url $runnerRepo --token $regToken --labels $label --name $runnerName --replace
 
 Info "Installing runner as a Windows service..."
 .\\svc.cmd install
@@ -802,16 +948,10 @@ Info "Installing runner as a Windows service..."
 Info "Storing install ticket for the deploy workflow..."
 [Environment]::SetEnvironmentVariable("ROSETTA_INSTALL_TICKET", $newTicket, "Machine")
 
-Info "Triggering initial deploy of rosetta-watchdog..."
-$repoParts = ($runnerRepo -replace "https://github.com/", "") -split "/"
-Invoke-RestMethod -Method Post \`
-  -Uri "https://api.github.com/repos/$($repoParts[0])/$($repoParts[1])/actions/workflows/deploy-watchdog.yml/dispatches" \`
-  -Headers @{
-    Authorization = "Bearer $regToken"
-    Accept        = "application/vnd.github+json"
-    "Content-Type" = "application/json"
-  } \`
-  -Body (ConvertTo-Json @{ ref = "main" })
+Info "Triggering initial deploy of rosetta-watchdog via Worker..."
+Invoke-RestMethod -Method Post -Uri "$worker/workflow/dispatch-deploy" \`
+  -Headers @{ "Content-Type" = "application/json" } \`
+  -Body (ConvertTo-Json @{ slug = $slug; install_ticket = $newTicket; ref = "main" })
 
 Info "Bootstrap complete. Watch the deploy progress on $runnerRepo/actions."
 `;

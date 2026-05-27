@@ -21,6 +21,8 @@ pipeline:
 | `POST /runner/registration-token`    | Mint a runner-registration token + install ticket for the bootstrap script.                       |
 | `POST /watchdog/token`               | Trade install ticket for a 1-hour App installation token (used by the watchdog).                  |
 | `POST /deploy/status` or `GET ?…`    | Proxy the latest `deploy-watchdog.yml` run for a facility (auth: install ticket).                 |
+| `POST /workflow/dispatch-deploy`   | Trigger `deploy-watchdog.yml` on the companion repo (auth: install ticket or HMAC).                 |
+| `POST /e2e/cleanup`                  | Delete companion repo, facility data dir, and facility issue (auth: HMAC).                        |
 | `GET  /bootstrap-windows.ps1`        | PowerShell installer served as plain text.                                                        |
 | `GET  /bootstrap-unix.sh`            | bash installer served as plain text.                                                              |
 

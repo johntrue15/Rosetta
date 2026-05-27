@@ -73,7 +73,12 @@ Add multiple entries under `watch_directories` — each tagged with a
 
 ## Manual end-to-end test of the new install flow
 
-Use this checklist whenever you change anything in `cloudflare/worker.js`,
+For automated regression on the Dell Windows machine, see
+[`.github/scripts/e2e/README.md`](../.github/scripts/e2e/README.md) and the
+`watchdog-windows-e2e.yml` workflow (enable with repo variable
+`ROSETTA_E2E_ENABLED=true`).
+
+Manual checklist (when changing install components):
 `docs/setup-facility/`, `.github/workflows/facility-onboard.yml`, or the
 `templates/facility-repo/` workflows.
 
