@@ -298,72 +298,75 @@
         </div>
       </div>
 
-      <!-- Step 4: Install watchdog -->
+      <!-- Step 4: Install watchdog (device flow + self-hosted runner) -->
       <div class="step-panel" id="step-4">
         <div class="step-card">
-          <h2>Step 4 — Install the Rosetta Edge Watchdog</h2>
-          <p class="subtitle">Your facility is ready. Install the watchdog on the machine where your scanner writes data.</p>
+          <h2>Step 4 — Install the Rosetta Watchdog</h2>
+          <p class="subtitle">
+            We'll register a small self-hosted GitHub Actions runner on the CT machine.
+            The runner deploys the watchdog as a background service and keeps both
+            itself and the watchdog up to date.
+            <strong>No personal access tokens, no <code>git clone</code>.</strong>
+          </p>
 
-          <div style="background:var(--surface);border-left:3px solid var(--accent);padding:0.75rem 1rem;margin-bottom:1rem;border-radius:0 6px 6px 0;font-size:0.85rem;">
-            <strong>Prerequisite — Python on PATH</strong><br>
-            Open a terminal and run <code>python --version</code>. If it's not recognized, install Python from
-            <a href="https://www.python.org/downloads/" target="_blank" style="color:var(--accent)">python.org</a>
-            and <strong>check "Add Python to PATH"</strong> during setup.<br>
-            <span style="color:var(--muted)">PyCharm/Anaconda bundle their own Python but don't add it to the system PATH.
-            You can also run these commands inside PyCharm's Terminal tab instead.</span>
+          <!-- 4a: device code panel -->
+          <div id="device-auth">
+            <div class="code-label">1. Approve the Rosetta Upload GitHub App</div>
+            <p style="color:var(--muted);font-size:0.85rem;margin:0.25rem 0 0.75rem">
+              Click the button below, then on the GitHub page that opens enter the short code shown here
+              and approve <strong>Rosetta Upload</strong> for your account.
+            </p>
+            <div class="form-actions" style="margin-top:0">
+              <button class="btn btn-primary" id="start-device-btn">Start device authorization</button>
+              <a class="btn" id="device-link" href="https://github.com/login/device" target="_blank" style="display:none">Open github.com/login/device</a>
+            </div>
+            <div id="device-code-area" style="display:none;margin-top:1rem">
+              <div class="code-label">Your one-time code</div>
+              <div class="code-block" id="user-code-block"><span id="user-code">--------</span><button class="copy-btn" onclick="copyUserCode()">Copy</button></div>
+              <div id="device-status" style="font-size:0.85rem;color:var(--muted);margin-top:0.5rem">
+                <span class="spinner-inline"></span> Waiting for approval&hellip;
+              </div>
+            </div>
           </div>
 
-          <div class="code-label">1. Clone and install</div>
-          <div class="code-block" id="code-install">git clone https://github.com/johntrue15/Rosetta.git
-cd Rosetta/edge
-python -m pip install -e .<button class="copy-btn" onclick="copyBlock('code-install')">Copy</button></div>
-
-          <div class="code-label">2. Download your config</div>
-          <p style="color:var(--muted);font-size:0.85rem;margin:0.5rem 0">
-            Your <code>config.yml</code> was auto-generated when the facility was approved.
-            Download it and place it in the <code>edge/</code> directory.
-          </p>
-          <div id="config-download-area"></div>
-
-          <div class="code-label">3. Run the watchdog with your GitHub token</div>
-          <p style="color:var(--muted);font-size:0.82rem;margin:0.25rem 0 0.5rem">
-            Create a
-            <a href="https://github.com/settings/tokens/new?scopes=repo&description=Rosetta+Edge+Watchdog" target="_blank" style="color:var(--accent)">Personal Access Token</a>
-            with <code>repo</code> scope, then run:
-          </p>
-          <div class="code-block" id="code-run">rosetta-watchdog -c config.yml --token ghp_YourTokenHere<button class="copy-btn" onclick="copyBlock('code-run')">Copy</button></div>
-          <p style="color:var(--muted);font-size:0.82rem;margin:0.5rem 0">
-            A bundled <code>example.pca</code> test file is included in <code>edge/test_data/</code>.
-            Copy it into your watch folder to confirm the full upload loop works.
-          </p>
-
-          <details style="margin-top:0.75rem;font-size:0.82rem;">
-            <summary style="cursor:pointer;color:var(--accent);">Alternative: set token via environment variable</summary>
-            <p style="color:var(--muted);margin:0.5rem 0 0.25rem">
-              If you prefer not to pass the token on the command line, set it as an environment variable
-              <strong>in the same terminal</strong> before running the watchdog:
+          <!-- 4b: bootstrap one-liner panel -->
+          <div id="bootstrap-panel" style="display:none;margin-top:1.75rem;border-top:1px solid var(--border);padding-top:1.5rem">
+            <div class="code-label">2. Run the one-liner on the CT machine</div>
+            <p style="color:var(--muted);font-size:0.85rem;margin:0.25rem 0 0.5rem">
+              Open a terminal <strong>as administrator</strong> on the CT machine and paste this:
             </p>
             <div class="os-tabs">
-              <div class="os-tab active" onclick="switchOS('mac')">Mac / Linux</div>
-              <div class="os-tab" onclick="switchOS('win-ps')">Windows PowerShell</div>
-              <div class="os-tab" onclick="switchOS('win-cmd')">Windows CMD</div>
+              <div class="os-tab active" data-os="win-ps" onclick="switchInstallOS('win-ps')">Windows (PowerShell)</div>
+              <div class="os-tab" data-os="mac" onclick="switchInstallOS('mac')">macOS</div>
+              <div class="os-tab" data-os="linux" onclick="switchInstallOS('linux')">Linux</div>
             </div>
-            <div class="os-panel active" id="os-mac">
-              <div class="code-block" id="code-token-mac">export ROSETTA_GITHUB_TOKEN="ghp_YourTokenHere"
-rosetta-watchdog -c config.yml<button class="copy-btn" onclick="copyBlock('code-token-mac')">Copy</button></div>
+            <div class="os-panel active" id="install-os-win-ps">
+              <div class="code-block" id="install-cmd-win-ps"><span class="install-cmd"></span><button class="copy-btn" onclick="copyBlock('install-cmd-win-ps')">Copy</button></div>
             </div>
-            <div class="os-panel" id="os-win-ps">
-              <div class="code-block" id="code-token-win-ps">$env:ROSETTA_GITHUB_TOKEN = "ghp_YourTokenHere"
-rosetta-watchdog -c config.yml<button class="copy-btn" onclick="copyBlock('code-token-win-ps')">Copy</button></div>
+            <div class="os-panel" id="install-os-mac">
+              <div class="code-block" id="install-cmd-mac"><span class="install-cmd"></span><button class="copy-btn" onclick="copyBlock('install-cmd-mac')">Copy</button></div>
             </div>
-            <div class="os-panel" id="os-win-cmd">
-              <div class="code-block" id="code-token-win-cmd">set ROSETTA_GITHUB_TOKEN=ghp_YourTokenHere
-rosetta-watchdog -c config.yml<button class="copy-btn" onclick="copyBlock('code-token-win-cmd')">Copy</button></div>
+            <div class="os-panel" id="install-os-linux">
+              <div class="code-block" id="install-cmd-linux"><span class="install-cmd"></span><button class="copy-btn" onclick="copyBlock('install-cmd-linux')">Copy</button></div>
             </div>
-          </details>
+            <p style="color:var(--muted);font-size:0.78rem;margin:0.75rem 0 0">
+              This downloads the GitHub Actions runner, registers it against your private
+              <code id="bootstrap-repo-name">rosetta-facility-…</code> companion repo, installs it as a service,
+              and triggers the initial <code>deploy-watchdog.yml</code> workflow which installs the watchdog.
+            </p>
+          </div>
 
-          <div class="form-actions">
-            <button class="btn btn-primary" id="goto-verify-btn">I've started the watchdog — verify data</button>
+          <!-- 4c: live deploy status -->
+          <div id="deploy-status-panel" style="display:none;margin-top:1.75rem;border-top:1px solid var(--border);padding-top:1.5rem">
+            <div class="code-label">3. Deploy progress</div>
+            <div id="deploy-status" style="font-size:0.88rem;color:var(--muted);margin-top:0.5rem">
+              <span class="spinner-inline"></span> Waiting for the runner to come online&hellip;
+            </div>
+            <div id="deploy-actions" class="form-actions" style="margin-top:1rem"></div>
+          </div>
+
+          <div class="form-actions" style="margin-top:1.5rem">
+            <button class="btn" id="goto-verify-btn">Skip ahead — verify data uploads</button>
           </div>
         </div>
       </div>
@@ -712,35 +715,230 @@ rosetta-watchdog -c config.yml<button class="copy-btn" onclick="copyBlock('code-
     }
 
     /* ============================================================== */
-    /*  Step 4: Install watchdog                                       */
+    /*  Step 4: Install watchdog (device flow + self-hosted runner)    */
     /* ============================================================== */
+    let devicePollTimer = null;
+    let deployPollTimer = null;
+    let deviceState = null; // { user_code, device_code, interval, expires_at }
+    let companionRepo = null;
+    let installTicket = null;
+
     function renderStep4() {
       if (!facility) return;
-      const area = document.getElementById("config-download-area");
-      area.innerHTML = "";
 
-      const configUrl = facility.configUrl || "https://github.com/" + OWNER + "/" + REPO + "/raw/main/data/" + facility.slug + "/config.yml";
-      const dlBtn = document.createElement("a"); dlBtn.className = "btn btn-primary"; dlBtn.href = configUrl;
-      dlBtn.target = "_blank"; dlBtn.textContent = "Download config.yml";
-      area.appendChild(dlBtn);
+      document.getElementById("device-auth").style.display = "block";
+      document.getElementById("device-code-area").style.display = "none";
+      document.getElementById("bootstrap-panel").style.display = "none";
+      document.getElementById("deploy-status-panel").style.display = "none";
+      document.getElementById("start-device-btn").disabled = false;
 
-      const viewBtn = document.createElement("a"); viewBtn.className = "btn"; viewBtn.style.marginLeft = "0.5rem";
-      viewBtn.href = "https://github.com/" + OWNER + "/" + REPO + "/blob/main/data/" + facility.slug + "/config.yml";
-      viewBtn.target = "_blank"; viewBtn.textContent = "View on GitHub";
-      area.appendChild(viewBtn);
-
-      document.getElementById("goto-verify-btn").addEventListener("click", () => { goToStep(5); runVerify(); });
+      document.getElementById("start-device-btn").onclick = startDeviceFlow;
+      document.getElementById("goto-verify-btn").onclick = () => { goToStep(5); runVerify(); };
     }
 
-    /* ============================================================== */
-    /*  OS tab switcher                                                */
-    /* ============================================================== */
-    window.switchOS = function(id) {
-      document.querySelectorAll(".os-tab").forEach(t => t.classList.remove("active"));
-      document.querySelectorAll(".os-panel").forEach(p => p.classList.remove("active"));
-      document.querySelector('.os-tab[onclick*="' + id + '"]').classList.add("active");
-      document.getElementById("os-" + id).classList.add("active");
+    async function startDeviceFlow() {
+      const btn = document.getElementById("start-device-btn");
+      btn.disabled = true;
+      const statusEl = document.getElementById("device-status");
+      statusEl.innerHTML = '<span class="spinner-inline"></span> Requesting device code&hellip;';
+
+      try {
+        const res = await fetch(WORKER_URL + "/device/init", { method: "POST" });
+        if (!res.ok) throw new Error("init failed: " + res.status);
+        deviceState = await res.json();
+      } catch (err) {
+        statusEl.innerHTML = '<span style="color:var(--danger)">Failed to start device flow: ' + err.message + '</span>';
+        btn.disabled = false;
+        return;
+      }
+
+      document.getElementById("user-code").textContent = deviceState.user_code;
+      const link = document.getElementById("device-link");
+      link.href = deviceState.verification_uri || "https://github.com/login/device";
+      link.style.display = "inline-flex";
+      document.getElementById("device-code-area").style.display = "block";
+
+      try {
+        const popup = window.open(deviceState.verification_uri, "rosetta_device", "width=600,height=720");
+        if (popup) popup.focus();
+      } catch (e) { /* ignore */ }
+
+      pollDeviceFlow();
+    }
+
+    async function pollDeviceFlow() {
+      if (!deviceState) return;
+      const statusEl = document.getElementById("device-status");
+      const interval = Math.max(5, deviceState.interval || 5) * 1000;
+
+      try {
+        const res = await fetch(WORKER_URL + "/device/poll", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ device_code: deviceState.device_code }),
+        });
+        const data = await res.json();
+
+        if (data.access_token) {
+          statusEl.innerHTML = '<span class="status-badge success">&#10003; Authorized</span>';
+          await onDeviceApproved(data.access_token);
+          return;
+        }
+        if (data.error === "authorization_pending") {
+          statusEl.innerHTML = '<span class="spinner-inline"></span> Waiting for you to enter <code>' + deviceState.user_code + '</code> at github.com/login/device&hellip;';
+        } else if (data.error === "slow_down") {
+          statusEl.innerHTML = '<span class="spinner-inline"></span> Throttled by GitHub&hellip;';
+        } else if (data.error) {
+          statusEl.innerHTML = '<span style="color:var(--danger)">' + (data.error_description || data.error) + '</span>';
+          document.getElementById("start-device-btn").disabled = false;
+          return;
+        }
+      } catch (err) {
+        statusEl.innerHTML = '<span style="color:var(--danger)">Polling error: ' + err.message + '</span>';
+      }
+
+      devicePollTimer = setTimeout(pollDeviceFlow, interval);
+    }
+
+    async function onDeviceApproved(userToken) {
+      if (devicePollTimer) { clearTimeout(devicePollTimer); devicePollTimer = null; }
+
+      const statusEl = document.getElementById("device-status");
+      statusEl.innerHTML = '<span class="spinner-inline"></span> Preparing your facility runner&hellip;';
+
+      try {
+        const repoRes = await fetch(WORKER_URL + "/facility/create-companion-repo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + userToken },
+          body: JSON.stringify({ slug: facility.slug, facility: facility.name }),
+        });
+        const repoData = await repoRes.json();
+        if (!repoRes.ok || !repoData.companion_repo) {
+          throw new Error(repoData.error || ("HTTP " + repoRes.status));
+        }
+        companionRepo = repoData.companion_repo;
+
+        const tokenRes = await fetch(WORKER_URL + "/runner/registration-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + userToken },
+          body: JSON.stringify({ slug: facility.slug }),
+        });
+        const tokenData = await tokenRes.json();
+        if (!tokenRes.ok || !tokenData.install_ticket) {
+          throw new Error(tokenData.error || ("HTTP " + tokenRes.status));
+        }
+        installTicket = tokenData.install_ticket;
+      } catch (err) {
+        statusEl.innerHTML = '<span style="color:var(--danger)">Setup failed: ' + err.message + '</span>';
+        document.getElementById("start-device-btn").disabled = false;
+        return;
+      }
+
+      statusEl.innerHTML = '<span class="status-badge success">&#10003; Runner ready &mdash; companion repo <a href="https://github.com/' + companionRepo + '" target="_blank" style="color:var(--accent)">' + companionRepo + '</a></span>';
+      renderBootstrapCommands();
+      document.getElementById("bootstrap-panel").style.display = "block";
+      document.getElementById("deploy-status-panel").style.display = "block";
+      startDeployPolling();
+    }
+
+    function renderBootstrapCommands() {
+      document.getElementById("bootstrap-repo-name").textContent = companionRepo;
+
+      const winCmd =
+        '$env:ROSETTA_SLUG = "' + facility.slug + '"\n' +
+        '$env:ROSETTA_INSTALL_TICKET = "' + installTicket + '"\n' +
+        'irm ' + WORKER_URL + '/bootstrap-windows.ps1 | iex';
+
+      const unixCmd =
+        'export ROSETTA_SLUG=' + facility.slug + '\n' +
+        'export ROSETTA_INSTALL_TICKET="' + installTicket + '"\n' +
+        'curl -fsSL ' + WORKER_URL + '/bootstrap-unix.sh | bash';
+
+      setInstallCmd("install-cmd-win-ps", winCmd);
+      setInstallCmd("install-cmd-mac", unixCmd);
+      setInstallCmd("install-cmd-linux", unixCmd);
+    }
+
+    function setInstallCmd(blockId, text) {
+      const block = document.getElementById(blockId);
+      const span = block.querySelector(".install-cmd");
+      span.textContent = text;
+    }
+
+    window.switchInstallOS = function(id) {
+      document.querySelectorAll('#bootstrap-panel .os-tab').forEach(t => t.classList.remove("active"));
+      document.querySelectorAll('#bootstrap-panel .os-panel').forEach(p => p.classList.remove("active"));
+      document.querySelector('#bootstrap-panel .os-tab[data-os="' + id + '"]').classList.add("active");
+      document.getElementById("install-os-" + id).classList.add("active");
     };
+
+    window.copyUserCode = function() {
+      const code = document.getElementById("user-code").textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        const btn = document.querySelector('#user-code-block .copy-btn');
+        if (btn) { btn.textContent = "Copied!"; setTimeout(() => btn.textContent = "Copy", 1500); }
+      });
+    };
+
+    async function startDeployPolling() {
+      if (deployPollTimer) clearInterval(deployPollTimer);
+      const statusEl = document.getElementById("deploy-status");
+      const actionsEl = document.getElementById("deploy-actions");
+      actionsEl.innerHTML = "";
+
+      let consecutiveFailures = 0;
+
+      async function poll() {
+        if (!installTicket || !facility) return;
+        try {
+          const res = await fetch(WORKER_URL + "/deploy/status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ slug: facility.slug, install_ticket: installTicket }),
+          });
+          if (!res.ok) {
+            consecutiveFailures++;
+            if (consecutiveFailures > 5) {
+              statusEl.innerHTML = '<span style="color:var(--warning)">Cannot read deploy status (HTTP ' + res.status + ').</span>';
+              return;
+            }
+            return;
+          }
+          consecutiveFailures = 0;
+          const data = await res.json();
+          const run = data.run;
+
+          if (!run) {
+            statusEl.innerHTML = '<span class="spinner-inline"></span> No deploy run yet &mdash; waiting for the bootstrap script to register the runner&hellip;';
+            return;
+          }
+
+          const url = run.html_url;
+          if (run.status === "completed") {
+            if (run.conclusion === "success") {
+              statusEl.innerHTML = '<span class="status-badge success">&#10003; Deploy succeeded</span> &middot; <a href="' + url + '" target="_blank" style="color:var(--accent)">run #' + run.run_number + '</a>';
+              clearInterval(deployPollTimer); deployPollTimer = null;
+              actionsEl.innerHTML = '';
+              const verifyBtn = document.createElement("button");
+              verifyBtn.className = "btn btn-primary";
+              verifyBtn.textContent = "Verify data uploads";
+              verifyBtn.onclick = () => { goToStep(5); runVerify(); };
+              actionsEl.appendChild(verifyBtn);
+            } else {
+              statusEl.innerHTML = '<span class="status-badge error">Deploy ' + run.conclusion + '</span> &middot; <a href="' + url + '" target="_blank" style="color:var(--accent)">run #' + run.run_number + '</a>';
+              clearInterval(deployPollTimer); deployPollTimer = null;
+            }
+          } else {
+            statusEl.innerHTML = '<span class="spinner-inline"></span> Deploy in progress &middot; <a href="' + url + '" target="_blank" style="color:var(--accent)">run #' + run.run_number + ' (' + run.status + ')</a>';
+          }
+        } catch (err) {
+          consecutiveFailures++;
+        }
+      }
+
+      poll();
+      deployPollTimer = setInterval(poll, 10000);
+    }
 
     /* ============================================================== */
     /*  Step 5: Verify data                                            */

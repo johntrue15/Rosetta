@@ -23,7 +23,7 @@ https://github.com/user-attachments/assets/62d49389-fbd3-42f5-875f-0c6faad48917
 2. **Upload** metadata files (`.rtf`, `.pca`, `.xtekct`, `.log`, `.txrm`) via drag & drop or remote URL.
 3. **GitHub Actions** parses each file into JSON, aggregates results into `data/metadata.json`, and exports a flat CSV at `data/metadata.csv`.
 
-For automated uploads from a CT scanner, use the **[Setup Facility](https://johntrue15.github.io/Rosetta/docs/setup-facility/)** wizard to onboard your machine and install the [Edge Watchdog](edge/).
+For automated uploads from a CT scanner, use the **[Setup Facility](https://johntrue15.github.io/Rosetta/docs/setup-facility/)** wizard. It walks you through approval, then runs a **device-code OAuth** against the **Rosetta Upload** GitHub App and gives you a single PowerShell / bash one-liner that installs a self-hosted runner + the [Edge Watchdog](edge/) as a service on your CT machine — no PAT, no `git clone`, no `pip install`.
 
 ## Repository Layout
 
@@ -33,6 +33,8 @@ For automated uploads from a CT scanner, use the **[Setup Facility](https://john
 | `scripts/` | Python parsers and export scripts |
 | `edge/` | Rosetta Edge Watchdog — local file watcher that pushes metadata to GitHub |
 | `docs/` | GitHub Pages upload UI, auth callback, and facility setup wizard |
+| `cloudflare/` | Rosetta Upload Cloudflare Worker (OAuth, device flow, App token issuance) |
+| `templates/facility-repo/` | Files seeded into each `rosetta-facility-<slug>` companion repo |
 | `standard_format.json` | CSV column mapping configuration |
 | `users.csv` | Folder-to-user mapping for scan attribution |
-| `.github/workflows/` | CI/CD pipelines for parsing, aggregation, and CSV export |
+| `.github/workflows/` | CI/CD pipelines for parsing, aggregation, CSV export, facility onboarding |

@@ -152,46 +152,106 @@ jobs:
             echo "Added $FOLDER to users.csv"
           fi
 
+      - name: Request companion repo from Rosetta Upload Worker
+        id: companion
+        env:
+          ROSETTA_WORKER_URL: ${{ secrets.ROSETTA_WORKER_URL }}
+          ONBOARD_HMAC_KEY:   ${{ secrets.ROSETTA_ONBOARD_HMAC_KEY }}
+          SLUG:               ${{ steps.parse.outputs.slug }}
+          FACILITY:           ${{ steps.parse.outputs.facility }}
+        run: |
+          python3 - <<'PYEOF'
+          import hmac, hashlib, json, os, sys, time, urllib.request, urllib.error
+
+          worker = os.environ.get("ROSETTA_WORKER_URL", "").rstrip("/")
+          key    = os.environ.get("ONBOARD_HMAC_KEY", "")
+          slug   = os.environ.get("SLUG", "")
+          fac    = os.environ.get("FACILITY", "")
+          gh_out = os.environ.get("GITHUB_OUTPUT")
+
+          def out(name, value):
+              if gh_out:
+                  with open(gh_out, "a") as f:
+                      f.write(f"{name}={value}\n")
+
+          if not worker or not key:
+              print("::warning::ROSETTA_WORKER_URL or ROSETTA_ONBOARD_HMAC_KEY not configured -- skipping companion repo creation. The wizard will create the companion repo on demand.")
+              out("ok", "false")
+              sys.exit(0)
+
+          body = {"slug": slug, "facility": fac, "issued_at": int(time.time())}
+          canonical = json.dumps(body, separators=(",", ":"))
+          sig = hmac.new(key.encode("utf-8"), canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+          payload = dict(body, onboard_signature=sig)
+
+          req = urllib.request.Request(
+              f"{worker}/facility/create-companion-repo",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  data = json.loads(resp.read().decode("utf-8"))
+                  print("Worker response:", data)
+                  out("ok", "true")
+                  out("repo", data.get("companion_repo", ""))
+          except urllib.error.HTTPError as e:
+              detail = e.read().decode("utf-8", "ignore")
+              print(f"::warning::Companion repo creation returned HTTP {e.code}: {detail} -- the wizard will create it on demand.")
+              out("ok", "false")
+          except Exception as e:
+              print(f"::warning::Companion repo creation failed: {e} -- the wizard will create it on demand.")
+              out("ok", "false")
+          PYEOF
+
       - name: Comment on issue with next steps
         uses: actions/github-script@v7
+        env:
+          COMPANION_OK:   ${{ steps.companion.outputs.ok }}
+          COMPANION_REPO: ${{ steps.companion.outputs.repo }}
         with:
           script: |
             const facility   = `${{ steps.parse.outputs.facility }}`;
             const slug       = `${{ steps.parse.outputs.slug }}`;
             const uploadPath = `${{ steps.parse.outputs.upload_path }}`;
             const machines   = JSON.parse(`${{ steps.parse.outputs.machines_json }}`);
+            const companionOk   = process.env.COMPANION_OK === 'true';
+            const companionRepo = process.env.COMPANION_REPO || `johntrue15/rosetta-facility-${slug}`;
 
             const machineList = machines.map(m => `- **${m.name}** (${m.format}) → \`${m.path}\``).join('\n');
-            const configUrl  = `https://github.com/${context.repo.owner}/${context.repo.repo}/raw/main/data/${slug}/config.yml`;
+            const wizardUrl   = `https://${context.repo.owner}.github.io/${context.repo.repo}/docs/setup-facility/`;
 
             const body = [
               `## Facility Approved`,
               ``,
-              `Your facility **${facility}** has been approved! Directory \`${uploadPath}\` and \`config.yml\` are ready.`,
+              `Your facility **${facility}** has been approved!`,
+              `Directory \`${uploadPath}\` and \`config.yml\` are in place.`,
               ``,
               `**Machines configured:**`,
               machineList,
               ``,
-              `### Quick start`,
+              `### Install the watchdog (no PAT required)`,
               ``,
-              `\`\`\`bash`,
-              `git clone https://github.com/${context.repo.owner}/${context.repo.repo}.git`,
-              `cd ${context.repo.repo}/edge`,
-              `python -m pip install -e .`,
-              `\`\`\``,
+              `1. Go to the setup wizard: **[${wizardUrl}](${wizardUrl})**`,
+              `2. The wizard will jump straight to **Step 4 — Install** for facility \`${slug}\`.`,
+              `3. Approve the **Rosetta Upload** GitHub App via the short device code shown on screen.`,
+              `4. Copy the one-line PowerShell / bash installer the wizard generates and paste it on the CT machine.`,
               ``,
-              `**Download your config:** [config.yml](${configUrl})`,
-              `Save it to the \`edge/\` directory.`,
+              `That command registers a self-hosted GitHub Actions runner against`,
+              companionOk
+                ? `\`${companionRepo}\` (already created for you).`
+                : `\`${companionRepo}\` (the wizard will create it on first visit).`,
+              `The runner then deploys the watchdog as a service and self-updates from this repo daily.`,
               ``,
-              `**Run with your token** ([create a PAT](https://github.com/settings/tokens/new?scopes=repo&description=Rosetta+Edge+Watchdog) with \`repo\` scope):`,
-              `\`\`\`bash`,
-              `rosetta-watchdog -c config.yml --token ghp_YourTokenHere`,
-              `\`\`\``,
+              `> No personal access token. No \`git clone\`. No \`pip install\`.`,
+              `> All credentials are scoped, rotating App installation tokens issued by the Rosetta Upload Worker.`,
               ``,
-              `Copy \`edge/test_data/example.pca\` into a watch folder to confirm the upload loop works.`,
+              `<details><summary>Legacy manual install (still supported)</summary>`,
               ``,
-              `> Complete the remaining steps interactively at`,
-              `> **https://${context.repo.owner}.github.io/${context.repo.repo}/docs/setup-facility/**`,
+              `If you prefer to skip the runner and run the watchdog yourself with a PAT, the legacy instructions remain in [edge/README.md](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/edge/README.md).`,
+              ``,
+              `</details>`,
             ].join('\n');
 
             await github.rest.issues.createComment({

@@ -1,0 +1,71 @@
+name: Deploy Rosetta Watchdog
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref of johntrue15/Rosetta to deploy
+        required: false
+        default: main
+
+permissions:
+  contents: read
+
+# Reference copy. The Cloudflare Worker generates a slug-scoped version of
+# this file when it seeds rosetta-facility-<slug>. Keep this file in sync
+# with `deployWorkflowYaml()` in cloudflare/worker.js.
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, facility-FACILITY_SLUG]
+    steps:
+      - name: Checkout upstream Rosetta
+        uses: actions/checkout@v4
+        with:
+          repository: johntrue15/Rosetta
+          ref: ${{ inputs.ref || 'main' }}
+          path: rosetta
+
+      - name: Install Python deps
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ./rosetta/edge
+
+      - name: Fetch facility config
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github.raw" \
+            -o config.yml \
+            "https://api.github.com/repos/johntrue15/Rosetta/contents/data/FACILITY_SLUG/config.yml"
+
+      - name: Patch config to use Worker auth
+        shell: bash
+        run: |
+          python -c "
+          import yaml, pathlib
+          p = pathlib.Path('config.yml')
+          cfg = yaml.safe_load(p.read_text())
+          cfg.setdefault('auth', {})
+          cfg['auth']['token_url'] = 'https://rosetta.jtrue15.workers.dev/watchdog/token'
+          cfg['auth']['install_ticket_env'] = 'ROSETTA_INSTALL_TICKET'
+          p.write_text(yaml.safe_dump(cfg, sort_keys=False))
+          "
+
+      - name: Install/refresh watchdog service
+        shell: bash
+        env:
+          ROSETTA_INSTALL_TICKET: ${{ secrets.ROSETTA_INSTALL_TICKET }}
+        run: |
+          if [ "${RUNNER_OS}" = "Windows" ]; then
+            python ./rosetta/edge/scripts/install_service_windows.py \
+              --config "$(pwd)/config.yml" \
+              --install-ticket "$ROSETTA_INSTALL_TICKET"
+          else
+            python ./rosetta/edge/scripts/install_service_unix.py \
+              --config "$(pwd)/config.yml" \
+              --install-ticket "$ROSETTA_INSTALL_TICKET"
+          fi

@@ -35,6 +35,16 @@ github:
   upload_path: "data/"
   commit_prefix: "[edge-watchdog]"
 
+# Worker-backed auth (preferred — installed by the setup wizard).
+# When `token_url` is set, the watchdog trades the install ticket in
+# `install_ticket_env` for a rotating GitHub App installation token from
+# the Rosetta Upload Cloudflare Worker. No PAT required.
+#
+# Leave `token_url` unset to fall back to the legacy PAT in `github.token_env`.
+auth:
+  token_url: "https://rosetta.jtrue15.workers.dev/watchdog/token"
+  install_ticket_env: "ROSETTA_INSTALL_TICKET"
+
 # Logging
 logging:
   level: "INFO"

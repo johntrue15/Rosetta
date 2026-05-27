@@ -17,6 +17,21 @@ class WatchDirectory:
 
 
 @dataclass
+class AuthConfig:
+    """Worker-backed auth: pulls short-lived install tokens from the Rosetta
+    Upload Cloudflare Worker so the watchdog never needs a long-lived PAT.
+
+    When ``token_url`` is set, ``install_ticket_env`` names the environment
+    variable that holds the install ticket minted by the wizard / deploy
+    workflow. The pusher trades the install ticket for a 1-hour GitHub App
+    installation token and refreshes it before each push if it's near expiry.
+    """
+
+    token_url: Optional[str] = None
+    install_ticket_env: str = "ROSETTA_INSTALL_TICKET"
+
+
+@dataclass
 class GitHubConfig:
     token_env: str = "ROSETTA_GITHUB_TOKEN"
     repo: str = ""
@@ -52,6 +67,7 @@ class WatchdogConfig:
     include_drift_files: bool = False
     parser_backend: str = "auto"
     github: GitHubConfig = field(default_factory=GitHubConfig)
+    auth: AuthConfig = field(default_factory=AuthConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     state_file: str = "processed_files.json"
 
@@ -75,6 +91,12 @@ def load_config(path: Path) -> WatchdogConfig:
         commit_prefix=gh_raw.get("commit_prefix", "[edge-watchdog]"),
     )
 
+    auth_raw = raw.get("auth", {}) or {}
+    auth = AuthConfig(
+        token_url=auth_raw.get("token_url"),
+        install_ticket_env=auth_raw.get("install_ticket_env", "ROSETTA_INSTALL_TICKET"),
+    )
+
     log_raw = raw.get("logging", {})
     logging_cfg = LoggingConfig(
         level=log_raw.get("level", "INFO"),
@@ -87,6 +109,7 @@ def load_config(path: Path) -> WatchdogConfig:
         include_drift_files=raw.get("include_drift_files", False),
         parser_backend=raw.get("parser_backend", "auto"),
         github=github,
+        auth=auth,
         logging=logging_cfg,
         state_file=raw.get("state_file", "processed_files.json"),
     )

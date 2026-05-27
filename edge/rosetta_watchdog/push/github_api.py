@@ -1,6 +1,8 @@
 """Push parsed metadata JSON to a GitHub repository via the Contents API.
 
-Uses the GitHub REST API (no local git installation required).
+Uses the GitHub REST API (no local git installation required). Tokens come
+from the :class:`TokenProvider`, which transparently refreshes Worker-issued
+App installation tokens when they near expiry.
 """
 
 from __future__ import annotations
@@ -13,7 +15,8 @@ from typing import Optional, Tuple
 
 import requests
 
-from ..config import GitHubConfig
+from ..config import GitHubConfig, AuthConfig
+from .token_provider import TokenProvider
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +24,11 @@ API_BASE = "https://api.github.com"
 
 
 class GitHubPusher:
-    """Pushes files to a GitHub repo using a Personal Access Token."""
+    """Pushes files to a GitHub repo using a (rotating) install token or PAT."""
 
-    def __init__(self, config: GitHubConfig):
+    def __init__(self, config: GitHubConfig, auth: Optional[AuthConfig] = None):
         self._config = config
+        self._tokens = TokenProvider(config, auth or AuthConfig())
         self._session = requests.Session()
         self._session.headers.update({
             "Accept": "application/vnd.github+json",
@@ -32,14 +36,27 @@ class GitHubPusher:
         })
 
     @property
-    def _auth_headers(self) -> dict:
-        token = self._config.token
-        if token:
-            return {"Authorization": f"Bearer {token}"}
-        return {}
+    def token_provider(self) -> TokenProvider:
+        return self._tokens
+
+    def _auth_headers(self, *, force_refresh: bool = False) -> dict:
+        token = self._tokens.get(force_refresh=force_refresh)
+        return {"Authorization": f"Bearer {token}"} if token else {}
 
     def _repo_url(self, path: str = "") -> str:
         return f"{API_BASE}/repos/{self._config.owner}/{self._config.repo_name}{path}"
+
+    def _request_with_retry(self, method: str, url: str, **kwargs) -> requests.Response:
+        """Send a request, transparently refreshing the token on 401 once."""
+        headers = dict(kwargs.pop("headers", {}) or {})
+        headers.update(self._auth_headers())
+        resp = self._session.request(method, url, headers=headers, **kwargs)
+        if resp.status_code == 401 and self._tokens.uses_worker:
+            logger.warning("GitHub returned 401 — forcing token refresh and retrying once")
+            self._tokens.invalidate()
+            headers.update(self._auth_headers(force_refresh=True))
+            resp = self._session.request(method, url, headers=headers, **kwargs)
+        return resp
 
     def _get_existing_file(self, remote_path: str) -> Tuple[Optional[str], Optional[str]]:
         """Fetch an existing file's git blob SHA and its sha256 field (if JSON).
@@ -47,11 +64,7 @@ class GitHubPusher:
         Returns (blob_sha, content_sha256). Either may be None.
         """
         url = self._repo_url(f"/contents/{remote_path}")
-        resp = self._session.get(
-            url,
-            headers=self._auth_headers,
-            params={"ref": self._config.branch},
-        )
+        resp = self._request_with_retry("GET", url, params={"ref": self._config.branch})
         if resp.status_code != 200:
             return None, None
 
@@ -80,20 +93,20 @@ class GitHubPusher:
         If the file already exists on GitHub with the same sha256, the push
         is skipped (duplicate detection).
 
-        Args:
-            content: Raw file bytes to upload.
-            remote_path: Path within the repo (e.g. ``data/scan.txrm.json``).
-            commit_message: Git commit message.
-            content_sha256: SHA-256 of the source scan file. When provided,
-                the remote file is checked first and the push is skipped if
-                the sha256 already matches.
-
-        Returns:
-            True on success (or already up-to-date), False on failure.
+        Returns True on success (or already up-to-date), False on failure.
         """
-        token = self._config.token
+        token = self._tokens.get()
         if not token:
-            logger.error("No GitHub token available (env var: %s)", self._config.token_env)
+            if self._tokens.uses_worker:
+                logger.error(
+                    "No GitHub token available -- Worker token refresh failed "
+                    "(check %s and Worker connectivity)",
+                    "ROSETTA_INSTALL_TICKET",
+                )
+            else:
+                logger.error(
+                    "No GitHub token available (env var: %s)", self._config.token_env
+                )
             return False
 
         t0 = time.monotonic()
@@ -127,7 +140,7 @@ class GitHubPusher:
 
         try:
             t1 = time.monotonic()
-            resp = self._session.put(url, json=body, headers=self._auth_headers)
+            resp = self._request_with_retry("PUT", url, json=body)
             push_ms = (time.monotonic() - t1) * 1000
 
             if resp.status_code in (200, 201):

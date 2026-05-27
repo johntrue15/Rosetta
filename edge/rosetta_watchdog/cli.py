@@ -92,6 +92,13 @@ def _log_startup_banner(log, config, config_path: Path) -> None:
     log.info("Polling interval: %ds", config.polling_interval_seconds)
     log.info("Parser backend: %s", config.parser_backend)
     log.info("Drift files: %s", "included" if config.include_drift_files else "excluded")
+    if config.auth.token_url:
+        log.info(
+            "Auth mode: Worker (%s, ticket env=%s)",
+            config.auth.token_url, config.auth.install_ticket_env,
+        )
+    else:
+        log.info("Auth mode: static PAT (env=%s)", config.github.token_env)
     log.info("=" * 60)
 
 
@@ -106,7 +113,13 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--once", action="store_true",
                     help="Run one scan cycle then exit (useful for cron)")
     ap.add_argument("--token",
-                    help="GitHub PAT (alternative to setting the env var)")
+                    help="GitHub PAT (alternative to setting the env var, legacy install)")
+    ap.add_argument("--auth-token-url",
+                    help="Cloudflare Worker URL that mints rotating App tokens "
+                         "(overrides auth.token_url in config.yml)")
+    ap.add_argument("--install-ticket",
+                    help="Install ticket from the setup wizard (alternative to "
+                         "setting ROSETTA_INSTALL_TICKET in the environment)")
     ap.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = ap.parse_args(argv)
 
@@ -115,6 +128,12 @@ def main(argv: list[str] | None = None) -> None:
 
     config_path = Path(args.config)
     config = load_config(config_path)
+
+    if args.auth_token_url:
+        config.auth.token_url = args.auth_token_url
+    if args.install_ticket:
+        os.environ[config.auth.install_ticket_env] = args.install_ticket
+
     _setup_logging(config.logging.level, config.logging.file)
     log = logging.getLogger(__name__)
 
@@ -127,31 +146,48 @@ def main(argv: list[str] | None = None) -> None:
              type(txrm_parser).__name__, type(pca_parser).__name__)
 
     pusher = None
-    token_ok = bool(config.github.token)
     repo_ok = bool(config.github.repo)
+    worker_auth = bool(config.auth.token_url)
+    static_token_ok = bool(config.github.token)
+    install_ticket_ok = bool(os.environ.get(config.auth.install_ticket_env))
+    auth_ok = (worker_auth and install_ticket_ok) or static_token_ok
+
     log.info(
-        "GitHub config: token_env=%s token_set=%s repo=%r",
-        config.github.token_env, token_ok, config.github.repo,
+        "GitHub config: repo=%r  worker_auth=%s  install_ticket_set=%s  static_token_set=%s",
+        config.github.repo, worker_auth, install_ticket_ok, static_token_ok,
     )
-    if token_ok and repo_ok:
-        pusher = GitHubPusher(config.github)
-        log.info("GitHub push enabled → %s (%s)", config.github.repo, config.github.branch)
+
+    if auth_ok and repo_ok:
+        pusher = GitHubPusher(config.github, config.auth)
+        mode = "Worker (rotating App token)" if worker_auth and install_ticket_ok else "static PAT"
+        log.info(
+            "GitHub push enabled via %s → %s (%s)",
+            mode, config.github.repo, config.github.branch,
+        )
     else:
         reasons = []
-        if not token_ok:
-            reasons.append(
-                f"env var ${config.github.token_env} is not set"
-            )
+        if not auth_ok:
+            if worker_auth:
+                reasons.append(
+                    f"Worker auth configured but ${config.auth.install_ticket_env} "
+                    f"is not set in the environment"
+                )
+            else:
+                reasons.append(
+                    f"no PAT in ${config.github.token_env} and no Worker auth configured"
+                )
         if not repo_ok:
-            reasons.append(
-                "github.repo is empty in config.yml"
-            )
+            reasons.append("github.repo is empty in config.yml")
         log.warning(
             "GitHub push disabled — %s\n"
-            "  PowerShell:  $env:%s = \"ghp_...\"\n"
-            "  CMD:         set %s=ghp_...\n"
-            "  Mac/Linux:   export %s=\"ghp_...\"",
+            "  Modern install (managed by the wizard):\n"
+            "    set %s=<install-ticket from the setup wizard>\n"
+            "  Legacy PAT install:\n"
+            "    PowerShell:  $env:%s = \"ghp_...\"\n"
+            "    CMD:         set %s=ghp_...\n"
+            "    Mac/Linux:   export %s=\"ghp_...\"",
             "; ".join(reasons),
+            config.auth.install_ticket_env,
             config.github.token_env, config.github.token_env, config.github.token_env,
         )
 
