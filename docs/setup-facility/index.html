@@ -227,13 +227,13 @@
         </div>
         <div id="dev-config-status" style="font-size:0.82rem;margin-bottom:0.75rem"></div>
         <div class="form-actions" style="margin-top:0">
-          <button class="btn btn-primary" id="dev-start-btn">Go to Step 4 — test device install</button>
+          <button class="btn btn-primary" id="dev-start-btn">Go to Step 3 — test device install</button>
           <button class="btn" id="dev-check-config-btn">Check config.yml</button>
         </div>
         <p style="margin-top:0.75rem;margin-bottom:0;font-size:0.78rem;color:var(--muted)">
           Bookmark:
           <code id="dev-bookmark-url"></code>
-          &middot; Optional: <button type="button" class="btn btn-sm" id="dev-login-btn" style="vertical-align:middle">Sign in</button> for Step 5 verify
+          &middot; Optional: <button type="button" class="btn btn-sm" id="dev-login-btn" style="vertical-align:middle">Sign in</button> for Step 4 verify
         </p>
       </div>
     </div>
@@ -470,7 +470,7 @@
       devModeActive = true;
       document.getElementById("dev-banner").style.display = "block";
       document.getElementById("auth-intro").textContent =
-        "Developer mode — use the panel above to jump straight to Step 4, or sign in below for the full wizard.";
+        "Developer mode — use the panel above to jump straight to Step 3, or sign in below for the full wizard.";
 
       const params = new URLSearchParams(window.location.search);
       const slugParam = params.get("slug") || localStorage.getItem("rosetta_dev_slug") || "dev-install-test";
@@ -488,7 +488,7 @@
       document.getElementById("dev-check-config-btn").addEventListener("click", () => checkDevConfig(slugInput.value.trim()));
       document.getElementById("dev-start-btn").addEventListener("click", () => startDevInstallTest(slugInput.value.trim()));
 
-      if (params.get("step") === "4" && slugParam) {
+      if ((params.get("step") === "4" || params.get("step") === "3") && slugParam) {
         startDevInstallTest(slugParam);
       } else {
         checkDevConfig(slugParam);
@@ -539,7 +539,7 @@
 
       authSection.style.display = "none";
       wizard.classList.add("visible");
-      goToStep(4);
+      goToStep(3);
       renderStep4();
     }
 
@@ -825,9 +825,12 @@
       document.getElementById("device-code-area").style.display = "none";
       document.getElementById("bootstrap-panel").style.display = "none";
       document.getElementById("deploy-status-panel").style.display = "none";
-      document.getElementById("start-device-btn").disabled = false;
-
-      document.getElementById("start-device-btn").onclick = startDeviceFlow;
+      const startBtn = document.getElementById("start-device-btn");
+      startBtn.disabled = false;
+      if (!startBtn.dataset.bound) {
+        startBtn.addEventListener("click", startDeviceFlow);
+        startBtn.dataset.bound = "1";
+      }
       document.getElementById("goto-verify-btn").onclick = () => { goToStep(4); runVerify(); };
     }
 
