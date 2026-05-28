@@ -19,11 +19,18 @@ https://github.com/user-attachments/assets/62d49389-fbd3-42f5-875f-0c6faad48917
 
 ## How It Works
 
-1. **Sign in** with GitHub — you must be a collaborator on this repo.
+### Manual upload (web UI)
+1. **Sign in** with GitHub — collaborator access is required to push files via the upload page.
 2. **Upload** metadata files (`.rtf`, `.pca`, `.xtekct`, `.log`, `.txrm`) via drag & drop or remote URL.
 3. **GitHub Actions** parses each file into JSON, aggregates results into `data/metadata.json`, and exports a flat CSV at `data/metadata.csv`.
 
-For automated uploads from a CT scanner, use the **[Setup Facility](https://johntrue15.github.io/Rosetta/docs/setup-facility/)** wizard. It walks you through approval, then runs a **device-code OAuth** against the **Rosetta Upload** GitHub App and gives you a single PowerShell / bash one-liner that installs a self-hosted runner + the [Edge Watchdog](edge/) as a service on your CT machine — no PAT, no `git clone`, no `pip install`.
+### Automated facility install (recommended for CT scanners)
+Use the **[Setup Facility](https://johntrue15.github.io/Rosetta/docs/setup-facility/)** wizard — **no collaborator access** on the main repo required:
+
+1. **Request** a facility via a GitHub issue (from the wizard or issue template).
+2. **Maintainer approves** by adding the `facility-approved` label.
+3. **Device-code OAuth** authorizes the **Rosetta Upload** GitHub App (short code at `github.com/login/device` — no PAT).
+4. **Bootstrap one-liner** registers a self-hosted runner on a private `rosetta-facility-<slug>` companion repo and deploys the [Edge Watchdog](edge/) as a service.
 
 ## Repository Layout
 

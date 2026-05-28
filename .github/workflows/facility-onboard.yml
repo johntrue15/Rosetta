@@ -210,12 +210,13 @@ jobs:
         env:
           COMPANION_OK:   ${{ steps.companion.outputs.ok }}
           COMPANION_REPO: ${{ steps.companion.outputs.repo }}
+          MACHINES_JSON:  ${{ steps.parse.outputs.machines_json }}
         with:
           script: |
             const facility   = `${{ steps.parse.outputs.facility }}`;
             const slug       = `${{ steps.parse.outputs.slug }}`;
             const uploadPath = `${{ steps.parse.outputs.upload_path }}`;
-            const machines   = JSON.parse(`${{ steps.parse.outputs.machines_json }}`);
+            const machines   = JSON.parse(process.env.MACHINES_JSON);
             const companionOk   = process.env.COMPANION_OK === 'true';
             const companionRepo = process.env.COMPANION_REPO || `johntrue15/rosetta-facility-${slug}`;
 

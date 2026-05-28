@@ -197,9 +197,9 @@
   <main>
     <div id="auth-section">
       <p>
-        Sign in with your GitHub account to set up a new facility for the
-        <a href="https://github.com/johntrue15/Rosetta" style="color:var(--accent)">Rosetta</a>
-        CT metadata pipeline. This wizard will walk you through every step.
+        Sign in with your GitHub account to request a facility and install the
+        Rosetta Edge Watchdog on your CT machine. You do not need collaborator
+        access to the main Rosetta repository.
       </p>
       <button class="btn btn-primary" id="login-btn">
         <svg height="16" viewBox="0 0 16 16" width="16" style="fill:currentColor">
@@ -220,28 +220,17 @@
     <div id="wizard">
       <div class="progress-bar">
         <div class="progress-line"><div class="progress-line-fill" id="progress-fill"></div></div>
-        <div class="progress-step active" data-step="1"><span class="step-num">1</span><span class="step-label">Access</span></div>
-        <div class="progress-step" data-step="2"><span class="step-num">2</span><span class="step-label">Request</span></div>
-        <div class="progress-step" data-step="3"><span class="step-num">3</span><span class="step-label">Approval</span></div>
-        <div class="progress-step" data-step="4"><span class="step-num">4</span><span class="step-label">Install</span></div>
-        <div class="progress-step" data-step="5"><span class="step-num">5</span><span class="step-label">Verify</span></div>
+        <div class="progress-step active" data-step="1"><span class="step-num">1</span><span class="step-label">Request</span></div>
+        <div class="progress-step" data-step="2"><span class="step-num">2</span><span class="step-label">Approval</span></div>
+        <div class="progress-step" data-step="3"><span class="step-num">3</span><span class="step-label">Install</span></div>
+        <div class="progress-step" data-step="4"><span class="step-num">4</span><span class="step-label">Verify</span></div>
       </div>
 
-      <!-- Step 1: Confirm collaborator access -->
+      <!-- Step 1: Facility request form -->
       <div class="step-panel active" id="step-1">
         <div class="step-card">
-          <h2>Step 1 — Confirm Collaborator Access</h2>
-          <p class="subtitle">You need collaborator (write) access to the Rosetta repository before you can create a facility.</p>
-          <div id="access-status"></div>
-          <div id="access-actions" style="margin-top:1.25rem"></div>
-        </div>
-      </div>
-
-      <!-- Step 2: Facility request form (with existing facilities + multi-machine) -->
-      <div class="step-panel" id="step-2">
-        <div class="step-card">
-          <h2>Step 2 — Request Facility</h2>
-          <p class="subtitle">Join an existing facility or create a new one. Each facility can have multiple X-ray machines.</p>
+          <h2>Step 1 — Request Facility</h2>
+          <p class="subtitle">Submit a facility request issue. A maintainer will review it and approve — you do not need access to the Rosetta repository.</p>
 
           <div id="existing-facilities" style="margin-bottom:1.5rem">
             <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem">Existing Facilities</div>
@@ -285,10 +274,10 @@
         </div>
       </div>
 
-      <!-- Step 3: Await approval -->
-      <div class="step-panel" id="step-3">
+      <!-- Step 2: Await approval -->
+      <div class="step-panel" id="step-2">
         <div class="step-card">
-          <h2>Step 3 — Awaiting Approval</h2>
+          <h2>Step 2 — Awaiting Approval</h2>
           <p class="subtitle">Your facility request has been submitted. A maintainer will review it and add the <code>facility-approved</code> label. This page checks automatically.</p>
           <div class="poll-status" id="approval-poll">
             <span class="spinner-inline"></span>
@@ -298,10 +287,10 @@
         </div>
       </div>
 
-      <!-- Step 4: Install watchdog (device flow + self-hosted runner) -->
-      <div class="step-panel" id="step-4">
+      <!-- Step 3: Install watchdog (device flow + self-hosted runner) -->
+      <div class="step-panel" id="step-3">
         <div class="step-card">
-          <h2>Step 4 — Install the Rosetta Watchdog</h2>
+          <h2>Step 3 — Install the Rosetta Watchdog</h2>
           <p class="subtitle">
             We'll register a small self-hosted GitHub Actions runner on the CT machine.
             The runner deploys the watchdog as a background service and keeps both
@@ -371,10 +360,10 @@
         </div>
       </div>
 
-      <!-- Step 5: Verify data -->
-      <div class="step-panel" id="step-5">
+      <!-- Step 4: Verify data -->
+      <div class="step-panel" id="step-4">
         <div class="step-card">
-          <h2>Step 5 — Verify Data Upload</h2>
+          <h2>Step 4 — Verify Data Upload</h2>
           <p class="subtitle">Let's check if the watchdog is successfully pushing data to your facility directory on <code>main</code>.</p>
           <div id="verify-status"></div>
           <div style="margin-top:1rem">
@@ -449,7 +438,7 @@
         showUserChrome(currentUser);
         authSection.style.display = "none";
         wizard.classList.add("visible");
-        await runStep1();
+        await routeAfterSignIn();
       } catch (err) { console.error("verifyAndRoute error:", err); signOut(); }
     }
 
@@ -480,12 +469,12 @@
         const sn = parseInt(s.dataset.step); s.classList.remove("active", "done");
         if (sn < n) s.classList.add("done"); else if (sn === n) s.classList.add("active");
       });
-      document.getElementById("progress-fill").style.width = ((n - 1) / 4 * 100) + "%";
+      document.getElementById("progress-fill").style.width = ((n - 1) / 3 * 100) + "%";
     }
 
     const realGoToStep = goToStep;
     goToStep = function(n) {
-      if (n === 6) {
+      if (n === 5) {
         document.querySelectorAll(".progress-step").forEach(s => { s.classList.add("done"); s.classList.remove("active"); });
         document.getElementById("progress-fill").style.width = "100%";
         return;
@@ -494,51 +483,18 @@
     };
 
     /* ============================================================== */
-    /*  Step 1: Confirm access                                         */
+    /*  Route after sign-in (no repo collaborator required)            */
     /* ============================================================== */
-    async function runStep1() {
-      const statusEl = document.getElementById("access-status");
-      const actionsEl = document.getElementById("access-actions");
-      statusEl.innerHTML = '<span class="status-badge waiting"><span class="spinner-inline"></span> Checking permissions…</span>';
-      actionsEl.innerHTML = "";
-
+    async function routeAfterSignIn() {
       if (facility && facility.issueNumber) {
         const approved = await checkApproval(facility.issueNumber);
-        if (approved) { goToStep(4); renderStep4(); return; }
-        goToStep(3); startApprovalPoll(); return;
+        if (approved) { goToStep(3); renderStep4(); return; }
+        goToStep(2); startApprovalPoll(); return;
       }
-
-      try {
-        const repoRes = await ghFetch("/repos/" + OWNER + "/" + REPO);
-        if (repoRes.ok) {
-          const repo = await repoRes.json();
-          if (repo.permissions && repo.permissions.push) {
-            statusEl.innerHTML = '<span class="status-badge success">&#10003; You have collaborator access</span>';
-            const nextBtn = document.createElement("button"); nextBtn.className = "btn btn-primary";
-            nextBtn.textContent = "Continue to facility setup";
-            nextBtn.addEventListener("click", () => { goToStep(2); loadExistingFacilities(); addMachineEntry(); addMachineEntry(); });
-            actionsEl.appendChild(nextBtn);
-            return;
-          }
-        }
-        statusEl.innerHTML = '<span class="status-badge waiting">You don\'t have write access yet</span>';
-        const requestBtn = document.createElement("button"); requestBtn.className = "btn btn-warning"; requestBtn.textContent = "Request Access";
-        requestBtn.addEventListener("click", () => requestCollabAccess(statusEl, actionsEl));
-        const recheckBtn = document.createElement("button"); recheckBtn.className = "btn"; recheckBtn.textContent = "Re-check";
-        recheckBtn.addEventListener("click", runStep1);
-        actionsEl.append(requestBtn, document.createTextNode(" "), recheckBtn);
-      } catch (err) { statusEl.innerHTML = '<span class="status-badge error">Error: ' + err.message + '</span>'; }
-    }
-
-    function requestCollabAccess(statusEl, actionsEl) {
-      const title = "Access request: @" + currentUser.login;
-      const body = "**@" + currentUser.login + "** is requesting write access.\n\n- Profile: https://github.com/" + currentUser.login + "\n- Requested: " + new Date().toUTCString() + "\n\n_To approve: add this user as a collaborator, then close this issue._";
-      window.open("https://github.com/" + OWNER + "/" + REPO + "/issues/new?title=" + encodeURIComponent(title) + "&body=" + encodeURIComponent(body), "_blank");
-      statusEl.innerHTML = '<span class="status-badge waiting">Issue page opened — submit on GitHub, then re-check below</span>';
-      actionsEl.innerHTML = "";
-      const recheckBtn = document.createElement("button"); recheckBtn.className = "btn"; recheckBtn.textContent = "Re-check access";
-      recheckBtn.addEventListener("click", runStep1);
-      actionsEl.appendChild(recheckBtn);
+      goToStep(1);
+      loadExistingFacilities();
+      addMachineEntry();
+      addMachineEntry();
     }
 
     /* ============================================================== */
@@ -575,7 +531,7 @@
       }
 
       localStorage.setItem("rosetta_facility", JSON.stringify(facility));
-      goToStep(4); renderStep4();
+      goToStep(3); renderStep4();
     }
 
     /* ============================================================== */
@@ -672,7 +628,7 @@
 
         facility = { name, institution, email, notes, machines, slug, uploadPath: "data/" + slug + "/", issueNumber: issue.number, issueUrl: issue.html_url };
         localStorage.setItem("rosetta_facility", JSON.stringify(facility));
-        goToStep(3); startApprovalPoll();
+        goToStep(2); startApprovalPoll();
       } catch (err) {
         const fallbackUrl = "https://github.com/" + OWNER + "/" + REPO + "/issues/new?title=" + encodeURIComponent("Facility request: " + name) + "&body=" + encodeURIComponent(issueBody) + "&labels=" + encodeURIComponent("request-facility");
         formStatus.innerHTML = '<span style="color:var(--danger)">API error: ' + err.message + '</span><br><a href="' + fallbackUrl + '" target="_blank" style="color:var(--accent);font-size:0.85rem">Open issue manually on GitHub instead</a>';
@@ -700,7 +656,7 @@
           pollEl.style.display = "none";
           statusEl.innerHTML = '<span class="status-badge success">&#10003; Facility approved!</span>';
           if (approvalTimer) { clearInterval(approvalTimer); approvalTimer = null; }
-          setTimeout(() => { goToStep(4); renderStep4(); }, 800);
+          setTimeout(() => { goToStep(3); renderStep4(); }, 800);
         } else { approvalTimer = setTimeout(checkAndPoll, 15000); }
       }
     }
@@ -733,7 +689,7 @@
       document.getElementById("start-device-btn").disabled = false;
 
       document.getElementById("start-device-btn").onclick = startDeviceFlow;
-      document.getElementById("goto-verify-btn").onclick = () => { goToStep(5); runVerify(); };
+      document.getElementById("goto-verify-btn").onclick = () => { goToStep(4); runVerify(); };
     }
 
     async function startDeviceFlow() {
@@ -922,7 +878,7 @@
               const verifyBtn = document.createElement("button");
               verifyBtn.className = "btn btn-primary";
               verifyBtn.textContent = "Verify data uploads";
-              verifyBtn.onclick = () => { goToStep(5); runVerify(); };
+              verifyBtn.onclick = () => { goToStep(4); runVerify(); };
               actionsEl.appendChild(verifyBtn);
             } else {
               statusEl.innerHTML = '<span class="status-badge error">Deploy ' + run.conclusion + '</span> &middot; <a href="' + url + '" target="_blank" style="color:var(--accent)">run #' + run.run_number + '</a>';
@@ -972,7 +928,7 @@
           statusEl.innerHTML = '<span class="status-badge success">&#10003; Data detected!</span>';
           resultEl.innerHTML = '<div class="verify-result found"><strong>Your facility is live!</strong> Found ' + nonConfig.length + ' data file(s) in <code>' + uploadPath + '</code>.<br><br>The watchdog is pushing data. The parse-and-aggregate workflow will process it automatically.</div>' +
             '<div class="completion-links" style="margin-top:1.25rem"><a class="btn btn-primary" href="https://github.com/' + OWNER + '/' + REPO + '/tree/main/' + dirPath + '" target="_blank">View facility data</a><a class="btn" href="../">Go to Upload page</a></div>';
-          goToStep(6);
+          goToStep(5);
         } else {
           statusEl.innerHTML = '<span class="status-badge waiting">Directory exists, no data yet</span>';
           resultEl.innerHTML = '<div class="verify-result not-found">The directory <code>' + uploadPath + '</code> exists but no data files were found yet. Copy the <code>example.pca</code> from <code>edge/test_data/</code> into your watch folder to test the loop.</div>';

@@ -28,12 +28,22 @@ $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIden
 )
 if (-not $isAdmin) { Fail "Run this script in PowerShell as Administrator." }
 
-# --- Prerequisite checks (warn only for python/git — facility deploy needs them on this machine) ---
+# --- Prerequisite checks (warn only for python/git - facility deploy needs them on this machine) ---
 foreach ($cmd in @("python", "git")) {
-    if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
+    $found = $false
+    if (Get-Command $cmd -ErrorAction SilentlyContinue) {
+        try {
+            $version = & $cmd --version 2>&1 | Select-Object -First 1
+            if ($LASTEXITCODE -eq 0 -or $version -match "version|Python") {
+                Info "$cmd OK: $version"
+                $found = $true
+            }
+        } catch {
+            # e.g. Windows Store python.exe stub
+        }
+    }
+    if (-not $found) {
         Write-Warning "$cmd not found on PATH. Install before running E2E tests (see DELL_SETUP.md)."
-    } else {
-        Info "$cmd OK: $(& $cmd --version 2>&1 | Select-Object -First 1)"
     }
 }
 
@@ -55,28 +65,25 @@ if (-not (Test-Path ".\config.cmd")) {
     Remove-Item $zipPath -Force
     Info "Runner binaries extracted."
 } else {
-    Info "Runner binaries already present — reconfiguring in place."
+    Info "Runner binaries already present - reconfiguring in place."
 }
 
 # --- Stop existing service before reconfigure ---
 if (Test-Path ".\svc.cmd") {
     Info "Stopping existing runner service (if any)..."
     & .\svc.cmd stop 2>$null
+    & .\svc.cmd uninstall 2>$null
 }
 
-# --- Configure runner ---
+# --- Configure runner (runasservice installs the Windows service on v2.334+) ---
 Info "Configuring runner '$RunnerName' with label '$RunnerLabel'..."
 & .\config.cmd --unattended `
     --url $RepoUrl `
     --token $RegistrationToken `
     --name $RunnerName `
     --labels $RunnerLabel `
-    --replace
-
-# --- Install and start Windows service ---
-Info "Installing runner as a Windows service..."
-& .\svc.cmd install
-& .\svc.cmd start
+    --replace `
+    --runasservice
 
 Start-Sleep -Seconds 5
 
@@ -92,5 +99,5 @@ if ($svc -and $svc.Status -eq "Running") {
 }
 
 Info "Setup complete."
-Info "Verify online: gh api repos/johntrue15/Rosetta/actions/runners --jq '.runners[] | {name, status, labels: [.labels[].name]}'"
-Info "Then set ROSETTA_E2E_ENABLED=true on the repo and run: gh workflow run watchdog-windows-e2e.yml -R johntrue15/Rosetta"
+Info 'Verify online: gh api repos/johntrue15/Rosetta/actions/runners --jq ''.runners[] | {name, status, labels: [.labels[].name]}'''
+Info 'Then set ROSETTA_E2E_ENABLED=true on the repo and run: gh workflow run watchdog-windows-e2e.yml -R johntrue15/Rosetta'
