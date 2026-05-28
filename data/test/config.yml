@@ -3,8 +3,8 @@
 
 watch_directories:
   - path: "D:/watchthis"
-    machine_name: "Rad"
-  - path: "D:/watchthis"
+    machine_name: "Radia"
+  - path: "D:/watchthis2"
     machine_name: "GE"
 
 polling_interval_seconds: 30
