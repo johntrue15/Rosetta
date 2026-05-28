@@ -26,3 +26,4 @@ Then verify the runner is online and run a smoke test per DELL_SETUP.md Step 4â€
 | Cloudflare Worker secrets / deploy | [`cloudflare/README.md`](cloudflare/README.md) |
 | Edge watchdog development | [`edge/README.md`](edge/README.md) |
 | Facility setup wizard | [`docs/setup-facility/`](docs/setup-facility/) |
+| **Dev install test (`?dev=1`)** | [`docs/setup-facility/DEV.md`](docs/setup-facility/DEV.md) |

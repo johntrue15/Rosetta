@@ -183,6 +183,23 @@
     footer { padding: 1.25rem; text-align: center; color: var(--muted); font-size: 0.78rem; }
     footer a { color: var(--accent); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
+
+    .dev-banner {
+      width: 100%;
+      max-width: 760px;
+      margin: 0 auto 0;
+      padding: 0 1rem;
+    }
+    .dev-card {
+      background: rgba(210,153,34,0.08);
+      border: 1px solid rgba(210,153,34,0.35);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .dev-card h2 { font-size: 1rem; color: var(--warning); margin-bottom: 0.35rem; }
+    .dev-card p { color: var(--muted); font-size: 0.85rem; line-height: 1.55; margin-bottom: 0.75rem; }
+    .dev-card code { font-size: 0.82rem; }
   </style>
 </head>
 <body>
@@ -195,8 +212,34 @@
   </header>
 
   <main>
+    <div class="dev-banner" id="dev-banner" style="display:none">
+      <div class="dev-card">
+        <h2>Developer / new-account install test</h2>
+        <p>
+          Test <strong>Step 4 only</strong> — device OAuth + bootstrap — without signing into the wizard.
+          Use a <strong>secondary GitHub account</strong> (or your own) at
+          <code>github.com/login/device</code>. No collaborator access or PAT required for this step.
+        </p>
+        <div class="form-group">
+          <label>Facility slug</label>
+          <div class="hint">Must already exist on <code>main</code> as <code>data/&lt;slug&gt;/config.yml</code> (approved facility).</div>
+          <input type="text" id="dev-slug" placeholder="e.g. dell-e2e-test" />
+        </div>
+        <div id="dev-config-status" style="font-size:0.82rem;margin-bottom:0.75rem"></div>
+        <div class="form-actions" style="margin-top:0">
+          <button class="btn btn-primary" id="dev-start-btn">Go to Step 4 — test device install</button>
+          <button class="btn" id="dev-check-config-btn">Check config.yml</button>
+        </div>
+        <p style="margin-top:0.75rem;margin-bottom:0;font-size:0.78rem;color:var(--muted)">
+          Bookmark:
+          <code id="dev-bookmark-url"></code>
+          &middot; Optional: <button type="button" class="btn btn-sm" id="dev-login-btn" style="vertical-align:middle">Sign in</button> for Step 5 verify
+        </p>
+      </div>
+    </div>
+
     <div id="auth-section">
-      <p>
+      <p id="auth-intro">
         Sign in with your GitHub account to request a facility and install the
         Rosetta Edge Watchdog on your CT machine. You do not need collaborator
         access to the main Rosetta repository.
@@ -380,7 +423,8 @@
 
   <footer>
     Powered by <a href="https://github.com/johntrue15/Rosetta">Rosetta</a> &middot;
-    <a href="../">Upload interface</a>
+    <a href="../">Upload interface</a> &middot;
+    <a href="DEV.md">Developer install test</a>
   </footer>
 
   <script>
@@ -396,6 +440,8 @@
     let currentStep = 1;
     let facility    = JSON.parse(localStorage.getItem("rosetta_facility") || "null");
     let machineCount = 0;
+    let devMode     = new URLSearchParams(window.location.search).get("dev") === "1";
+    let devModeActive = false;
 
     const authSection = document.getElementById("auth-section");
     const authWaiting = document.getElementById("auth-waiting");
@@ -403,12 +449,105 @@
     const userInfo    = document.getElementById("user-info");
     const wizard      = document.getElementById("wizard");
 
-    (async () => { if (token) await verifyAndRoute(token); })();
+    (async () => {
+      if (devMode) {
+        initDevMode();
+        return;
+      }
+      if (token) await verifyAndRoute(token);
+    })();
 
     /* ============================================================== */
     /*  Auth                                                           */
     /* ============================================================== */
     loginBtn.addEventListener("click", startOAuth);
+    document.getElementById("dev-login-btn").addEventListener("click", startOAuth);
+
+    /* ============================================================== */
+    /*  Developer mode (?dev=1) — test device install as any account   */
+    /* ============================================================== */
+    function initDevMode() {
+      devModeActive = true;
+      document.getElementById("dev-banner").style.display = "block";
+      document.getElementById("auth-intro").textContent =
+        "Developer mode — use the panel above to jump straight to Step 4, or sign in below for the full wizard.";
+
+      const params = new URLSearchParams(window.location.search);
+      const slugParam = params.get("slug") || localStorage.getItem("rosetta_dev_slug") || "dev-install-test";
+      const slugInput = document.getElementById("dev-slug");
+      slugInput.value = slugParam;
+      document.getElementById("dev-bookmark-url").textContent =
+        window.location.origin + window.location.pathname + "?dev=1&slug=" + encodeURIComponent(slugParam);
+
+      slugInput.addEventListener("input", () => {
+        const s = slugInput.value.trim();
+        document.getElementById("dev-bookmark-url").textContent =
+          window.location.origin + window.location.pathname + "?dev=1&slug=" + encodeURIComponent(s || "your-slug");
+      });
+
+      document.getElementById("dev-check-config-btn").addEventListener("click", () => checkDevConfig(slugInput.value.trim()));
+      document.getElementById("dev-start-btn").addEventListener("click", () => startDevInstallTest(slugInput.value.trim()));
+
+      if (params.get("step") === "4" && slugParam) {
+        startDevInstallTest(slugParam);
+      } else {
+        checkDevConfig(slugParam);
+      }
+    }
+
+    function sanitizeSlug(raw) {
+      return String(raw || "").toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/(^-+|-+$)/g, "").slice(0, 64);
+    }
+
+    async function checkDevConfig(slug) {
+      const statusEl = document.getElementById("dev-config-status");
+      slug = sanitizeSlug(slug);
+      if (!slug) {
+        statusEl.innerHTML = '<span style="color:var(--danger)">Enter a facility slug.</span>';
+        return false;
+      }
+      statusEl.innerHTML = '<span class="spinner-inline"></span> Checking <code>data/' + slug + '/config.yml</code>…';
+      try {
+        const res = await publicFetch("/repos/" + OWNER + "/" + REPO + "/contents/data/" + slug + "/config.yml?ref=main");
+        if (res.ok) {
+          statusEl.innerHTML = '<span class="status-badge success">&#10003; config.yml found on main</span>';
+          return true;
+        }
+        statusEl.innerHTML = '<span class="status-badge error">Not found — approve a facility request first or use an existing slug.</span>';
+        return false;
+      } catch (err) {
+        statusEl.innerHTML = '<span style="color:var(--danger)">Check failed: ' + err.message + '</span>';
+        return false;
+      }
+    }
+
+    async function startDevInstallTest(rawSlug) {
+      const slug = sanitizeSlug(rawSlug);
+      if (!slug) return;
+      localStorage.setItem("rosetta_dev_slug", slug);
+
+      const ok = await checkDevConfig(slug);
+      if (!ok) return;
+
+      facility = {
+        name: slug,
+        slug: slug,
+        uploadPath: "data/" + slug + "/",
+        devTest: true,
+      };
+      localStorage.setItem("rosetta_facility", JSON.stringify(facility));
+
+      authSection.style.display = "none";
+      wizard.classList.add("visible");
+      goToStep(4);
+      renderStep4();
+    }
+
+    function publicFetch(path) {
+      return fetch(API + path, {
+        headers: { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
+      });
+    }
 
     function startOAuth() {
       loginBtn.disabled = true;
@@ -801,14 +940,17 @@
       document.getElementById("bootstrap-repo-name").textContent = companionRepo;
 
       const winCmd =
+        '$env:ROSETTA_WORKER_URL = "' + WORKER_URL + '"\n' +
         '$env:ROSETTA_SLUG = "' + facility.slug + '"\n' +
         '$env:ROSETTA_INSTALL_TICKET = "' + installTicket + '"\n' +
-        'irm ' + WORKER_URL + '/bootstrap-windows.ps1 | iex';
+        '$script = (Invoke-WebRequest -UseBasicParsing -Uri "$env:ROSETTA_WORKER_URL/bootstrap-windows.ps1").Content\n' +
+        'Invoke-Expression $script';
 
       const unixCmd =
+        'export ROSETTA_WORKER_URL="' + WORKER_URL + '"\n' +
         'export ROSETTA_SLUG=' + facility.slug + '\n' +
         'export ROSETTA_INSTALL_TICKET="' + installTicket + '"\n' +
-        'curl -fsSL ' + WORKER_URL + '/bootstrap-unix.sh | bash';
+        'curl -fsSL "$ROSETTA_WORKER_URL/bootstrap-unix.sh" | bash';
 
       setInstallCmd("install-cmd-win-ps", winCmd);
       setInstallCmd("install-cmd-mac", unixCmd);
@@ -913,8 +1055,10 @@
       statusEl.innerHTML = '<span class="status-badge waiting"><span class="spinner-inline"></span> Checking <code>' + uploadPath + '</code> on main…</span>';
       resultEl.innerHTML = "";
 
+      const fetchFn = token ? ghFetch : publicFetch;
+
       try {
-        const contentsRes = await ghFetch("/repos/" + OWNER + "/" + REPO + "/contents/" + dirPath + "?ref=main");
+        const contentsRes = await fetchFn("/repos/" + OWNER + "/" + REPO + "/contents/" + dirPath + "?ref=main");
         if (!contentsRes.ok) {
           statusEl.innerHTML = '<span class="status-badge waiting">Directory not found yet</span>';
           resultEl.innerHTML = '<div class="verify-result not-found">The directory <code>' + uploadPath + '</code> hasn\'t been created yet. If you just got approved, wait a moment and check again.</div>';
