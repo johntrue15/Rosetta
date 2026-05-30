@@ -1035,8 +1035,8 @@
         '$CompanionRepo = "' + companionRepo + '"',
         '$WorkerUrl     = "' + WORKER_URL + '"',
         '$InstallTicket = "' + installTicket + '"',
-        '$WatchPath     = "' + watchPath + '"',
-        '$MachineName   = "' + machineName + '"',
+        "$WatchPath     = '" + watchPath.replace(/'/g, "''") + "'",
+        "$MachineName   = '" + machineName.replace(/'/g, "''") + "'",
         '$MainRepo      = "' + OWNER + "/" + REPO + '"',
         '$InstallDir    = Join-Path $env:USERPROFILE "rosetta-watchdog"',
         "",
@@ -1095,8 +1095,8 @@
         'companion="' + companionRepo + '"',
         'worker="' + WORKER_URL + '"',
         'ticket="' + installTicket + '"',
-        'watch="' + watchPath + '"',
-        'machine="' + machineName + '"',
+        "watch='" + watchPath.replace(/'/g, "'\\''") + "'",
+        "machine='" + machineName.replace(/'/g, "'\\''") + "'",
         'mainRepo="' + OWNER + "/" + REPO + '"',
         'installDir="$HOME/rosetta-watchdog"',
         "",
@@ -1144,8 +1144,10 @@
 
     function downloadInstaller(os) {
       if (!companionRepo || !installTicket) return;
-      const watchPath = document.getElementById("qi-watch-path").value.trim() || defaultWatchPath(os);
-      const machineName = document.getElementById("qi-machine-name").value.trim() || defaultMachineName();
+      // Strip surrounding quotes (Windows "Copy as path" wraps the path in ")
+      const stripQuotes = (s) => s.trim().replace(/^["']+|["']+$/g, "").trim();
+      const watchPath = stripQuotes(document.getElementById("qi-watch-path").value) || defaultWatchPath(os);
+      const machineName = stripQuotes(document.getElementById("qi-machine-name").value) || defaultMachineName();
       const content = os === "win"
         ? buildWindowsInstaller(watchPath, machineName)
         : buildUnixInstaller(watchPath, machineName);
