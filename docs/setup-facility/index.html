@@ -379,6 +379,16 @@
               <label>Machine name</label>
               <input type="text" id="qi-machine-name" placeholder="e.g. Xradia-520" />
             </div>
+            <div class="form-group" style="margin-bottom:0.75rem">
+              <label style="display:flex;align-items:center;gap:0.5rem;font-weight:400;cursor:pointer">
+                <input type="checkbox" id="qi-autostart" checked style="width:auto" />
+                Start automatically at login (recommended)
+              </label>
+              <div class="hint" style="margin-top:0.25rem">
+                Restarts the watchdog after a reboot. Runs as the logged-in user, so it keeps access to
+                mapped/network drives. No administrator rights required.
+              </div>
+            </div>
             <div class="os-tabs">
               <div class="os-tab active" data-qios="win" onclick="switchQuickOS('win')">Windows</div>
               <div class="os-tab" data-qios="unix" onclick="switchQuickOS('unix')">macOS / Linux</div>
@@ -1031,8 +1041,8 @@
       document.getElementById("qi-download-unix").onclick = () => downloadInstaller("unix");
     }
 
-    function buildWindowsInstaller(watchPath, machineName) {
-      return [
+    function buildWindowsInstaller(watchPath, machineName, autostart) {
+      const lines = [
         "# Rosetta Watchdog quick installer - " + facility.name + " (" + facility.slug + ")",
         "# Run:  powershell -ExecutionPolicy Bypass -File .\\rosetta-watchdog-" + facility.slug + ".ps1",
         "# Self-contained: installs Python automatically if missing; no Git required.",
@@ -1107,7 +1117,7 @@
         'polling_interval_seconds: 30',
         'include_drift_files: false',
         'parser_backend: "auto"',
-        'state_file: "processed_files.json"',
+        "state_file: '$InstallDir\\processed_files.json'",
         'github:',
         '  repo: "$CompanionRepo"',
         '  branch: "main"',
@@ -1118,23 +1128,54 @@
         '  install_ticket_env: "ROSETTA_INSTALL_TICKET"',
         'logging:',
         '  level: "INFO"',
-        '  file: "rosetta-watchdog.log"',
+        "  file: '$InstallDir\\rosetta-watchdog.log'",
         '"@',
         '$ConfigPath = Join-Path $InstallDir "config.yml"',
         'Set-Content -Path $ConfigPath -Value $config -Encoding UTF8',
         'New-Item -ItemType Directory -Force -Path $WatchPath | Out-Null',
         '$env:ROSETTA_INSTALL_TICKET = $InstallTicket',
+      ];
+
+      if (autostart) {
+        lines.push(
+          "",
+          '# --- Configure auto-start at login (per-user Startup shortcut, no admin) ---',
+          'Info "Configuring auto-start at login..."',
+          '$LauncherPath = Join-Path $InstallDir "run-watchdog.ps1"',
+          '$launcher = @"',
+          '`$env:ROSETTA_INSTALL_TICKET = "$InstallTicket"',
+          'Set-Location "$InstallDir"',
+          '& "$Py" -m rosetta_watchdog.cli -c "$ConfigPath"',
+          '"@',
+          'Set-Content -Path $LauncherPath -Value $launcher -Encoding UTF8',
+          '$startup = [Environment]::GetFolderPath("Startup")',
+          '$lnkPath = Join-Path $startup "RosettaWatchdog-$Slug.lnk"',
+          '$ws = New-Object -ComObject WScript.Shell',
+          '$sc = $ws.CreateShortcut($lnkPath)',
+          '$sc.TargetPath = Join-Path $PSHOME "powershell.exe"',
+          '$sc.Arguments = "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$LauncherPath`""',
+          '$sc.WorkingDirectory = $InstallDir',
+          '$sc.Description = "Rosetta Watchdog ($Slug)"',
+          '$sc.Save()',
+          'Info "Auto-start enabled: $lnkPath (runs hidden at each login)."'
+        );
+      }
+
+      lines.push(
         "",
         'Info "Watch folder: $WatchPath"',
         'Info "Data uploads to https://github.com/$CompanionRepo/tree/main/data/$Slug/"',
-        'Info "Starting watchdog. Drop a .pca/.txrm into the watch folder. Ctrl+C to stop."',
+        autostart
+          ? 'Info "Running now in this window (auto-starts on future logins). Drop a .pca/.txrm into the watch folder. Ctrl+C to stop this session."'
+          : 'Info "Starting watchdog. Drop a .pca/.txrm into the watch folder. Ctrl+C to stop."',
         '& $Py -m rosetta_watchdog.cli -c $ConfigPath',
-        "",
-      ].join("\r\n");
+        ""
+      );
+      return lines.join("\r\n");
     }
 
-    function buildUnixInstaller(watchPath, machineName) {
-      return [
+    function buildUnixInstaller(watchPath, machineName, autostart) {
+      const lines = [
         "#!/usr/bin/env bash",
         "# Rosetta Watchdog quick installer - " + facility.name + " (" + facility.slug + ")",
         "# Run:  bash ./rosetta-watchdog-" + facility.slug + ".sh",
@@ -1183,7 +1224,7 @@
         'polling_interval_seconds: 30',
         'include_drift_files: false',
         'parser_backend: "auto"',
-        'state_file: "processed_files.json"',
+        'state_file: "$installDir/processed_files.json"',
         'github:',
         '  repo: "$companion"',
         '  branch: "main"',
@@ -1194,16 +1235,46 @@
         '  install_ticket_env: "ROSETTA_INSTALL_TICKET"',
         'logging:',
         '  level: "INFO"',
-        '  file: "rosetta-watchdog.log"',
+        '  file: "$installDir/rosetta-watchdog.log"',
         'EOF',
         "",
         'export ROSETTA_INSTALL_TICKET="$ticket"',
+      ];
+
+      if (autostart) {
+        lines.push(
+          "",
+          '# --- Configure auto-start at reboot (no root) ---',
+          'echo "[rosetta] Configuring auto-start at reboot..."',
+          'launcher="$installDir/run-watchdog.sh"',
+          'cat > "$launcher" <<LAUNCH',
+          '#!/usr/bin/env bash',
+          'export ROSETTA_INSTALL_TICKET="$ticket"',
+          'cd "$installDir"',
+          'exec python3 -m rosetta_watchdog.cli -c "$installDir/config.yml" >> "$installDir/rosetta-watchdog.log" 2>&1',
+          'LAUNCH',
+          'chmod +x "$launcher"',
+          'if command -v crontab >/dev/null 2>&1; then',
+          '  ( crontab -l 2>/dev/null | grep -v "rosetta-watchdog/run-watchdog.sh" ; echo "@reboot $launcher" ) | crontab - \\',
+          '    && echo "[rosetta] Auto-start enabled via @reboot cron ($launcher)." \\',
+          '    || echo "[rosetta] Could not set @reboot cron; start $launcher manually at login."',
+          'else',
+          '  echo "[rosetta] cron not available. To auto-start, run $launcher at login (e.g. a launchd/systemd unit)."',
+          'fi'
+        );
+      }
+
+      lines.push(
+        "",
         'echo "[rosetta] Watch folder: $watch"',
         'echo "[rosetta] Data uploads to https://github.com/$companion/tree/main/data/$slug/"',
-        'echo "[rosetta] Starting watchdog. Drop a .pca/.txrm into the watch folder. Ctrl+C to stop."',
+        autostart
+          ? 'echo "[rosetta] Running now (auto-starts on reboot). Drop a .pca/.txrm into the watch folder. Ctrl+C to stop this session."'
+          : 'echo "[rosetta] Starting watchdog. Drop a .pca/.txrm into the watch folder. Ctrl+C to stop."',
         'python3 -m rosetta_watchdog.cli -c "$installDir/config.yml"',
-        "",
-      ].join("\n");
+        ""
+      );
+      return lines.join("\n");
     }
 
     function downloadInstaller(os) {
@@ -1212,9 +1283,10 @@
       const stripQuotes = (s) => s.trim().replace(/^["']+|["']+$/g, "").trim();
       const watchPath = stripQuotes(document.getElementById("qi-watch-path").value) || defaultWatchPath(os);
       const machineName = stripQuotes(document.getElementById("qi-machine-name").value) || defaultMachineName();
+      const autostart = document.getElementById("qi-autostart").checked;
       const content = os === "win"
-        ? buildWindowsInstaller(watchPath, machineName)
-        : buildUnixInstaller(watchPath, machineName);
+        ? buildWindowsInstaller(watchPath, machineName, autostart)
+        : buildUnixInstaller(watchPath, machineName, autostart);
       const ext = os === "win" ? "ps1" : "sh";
       const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
       const a = document.createElement("a");
