@@ -6,6 +6,8 @@
 !**/*.example.env
 !**/.dev.vars.example
 cloudflare/credentials.env
+cloudflare/.onboard_hmac_key.local
+*.pem
 .wrangler/
 
 # Python

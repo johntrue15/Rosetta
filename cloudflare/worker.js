@@ -41,7 +41,7 @@
 const PAGES_ORIGIN = "https://johntrue15.github.io";
 const GH_API = "https://api.github.com";
 const DEFAULT_MAIN_REPO = "johntrue15/Rosetta";
-const DEFAULT_FACILITY_OWNER = "johntrue15";
+const DEFAULT_FACILITY_OWNER = "x-raymetadata";
 
 const INSTALL_TICKET_TTL_SECONDS = 90 * 24 * 60 * 60;
 const APP_JWT_TTL_SECONDS = 540;
@@ -214,7 +214,20 @@ async function handleCreateCompanionRepo(request, env) {
 
   const installationToken = await getAppInstallationToken(env);
 
-  const createRes = await fetch(`${GH_API}/user/repos`, {
+  // GitHub Apps can only create repositories inside an Organization
+  // (POST /orgs/{org}/repos). Personal user accounts are not supported by the
+  // App API — POST /user/repos returns "Resource not accessible by integration".
+  if (installationToken.account_type !== "Organization") {
+    return jsonResponse({
+      error: "owner_not_an_org",
+      message: `FACILITY_OWNER "${owner}" is a ${installationToken.account_type} account. ` +
+        `GitHub Apps cannot create repositories in personal accounts; the facility ` +
+        `owner must be a GitHub Organization with the Rosetta Upload app installed ` +
+        `(Administration: read & write).`,
+    }, 409);
+  }
+
+  const createRes = await fetch(`${GH_API}/orgs/${owner}/repos`, {
     method: "POST",
     headers: githubAppHeaders(installationToken),
     body: JSON.stringify({
@@ -566,7 +579,11 @@ async function authenticateCaller(request, env, body) {
   if (auth.startsWith("Bearer ")) {
     const userToken = auth.slice(7).trim();
     const userRes = await fetch(`${GH_API}/user`, {
-      headers: { Authorization: `Bearer ${userToken}`, Accept: "application/vnd.github+json" },
+      headers: {
+        Authorization: `Bearer ${userToken}`,
+        Accept: "application/vnd.github+json",
+        "User-Agent": "rosetta-upload-worker",
+      },
     });
     if (!userRes.ok) return { ok: false, status: 401, error: "invalid_user_token" };
     const user = await userRes.json();
@@ -618,28 +635,41 @@ async function getAppInstallationToken(env) {
   }
 
   const jwt = await signAppJwt(env);
+  // GitHub's REST API rejects requests without a User-Agent header (HTTP 403),
+  // so every app-JWT request must include one.
+  const jwtHeaders = {
+    Authorization: `Bearer ${jwt}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "rosetta-upload-worker",
+  };
 
   const owner = env.FACILITY_OWNER || DEFAULT_FACILITY_OWNER;
   const instRes = await fetch(`${GH_API}/users/${owner}/installation`, {
-    headers: { Authorization: `Bearer ${jwt}`, Accept: "application/vnd.github+json" },
+    headers: jwtHeaders,
   });
 
   let installationId;
+  let accountType = "User";
   if (instRes.ok) {
-    installationId = (await instRes.json()).id;
+    const inst = await instRes.json();
+    installationId = inst.id;
+    accountType = (inst.account && inst.account.type) || "User";
   } else {
     const orgRes = await fetch(`${GH_API}/orgs/${owner}/installation`, {
-      headers: { Authorization: `Bearer ${jwt}`, Accept: "application/vnd.github+json" },
+      headers: jwtHeaders,
     });
     if (!orgRes.ok) {
       throw new Error(`Could not resolve installation for ${owner}: ${instRes.status}/${orgRes.status}`);
     }
-    installationId = (await orgRes.json()).id;
+    const inst = await orgRes.json();
+    installationId = inst.id;
+    accountType = (inst.account && inst.account.type) || "Organization";
   }
 
   const tokenRes = await fetch(`${GH_API}/app/installations/${installationId}/access_tokens`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${jwt}`, Accept: "application/vnd.github+json" },
+    headers: jwtHeaders,
   });
   if (!tokenRes.ok) {
     const detail = await tokenRes.text();
@@ -649,6 +679,7 @@ async function getAppInstallationToken(env) {
 
   cachedInstallationToken = {
     token: data.token,
+    account_type: accountType,
     expires_at: data.expires_at,
     expires_epoch: Math.floor(new Date(data.expires_at).getTime() / 1000),
   };
@@ -679,11 +710,16 @@ async function signAppJwt(env) {
 }
 
 async function importRsaPrivateKey(pem) {
+  // GitHub App keys are issued in PKCS#1 form ("BEGIN RSA PRIVATE KEY"), but
+  // WebCrypto's importKey only accepts PKCS#8 ("BEGIN PRIVATE KEY"). Detect
+  // PKCS#1 and wrap it in a PKCS#8 envelope so either format works.
+  const isPkcs1 = /BEGIN RSA PRIVATE KEY/.test(pem);
   const cleaned = pem
     .replace(/-----BEGIN [^-]+-----/g, "")
     .replace(/-----END [^-]+-----/g, "")
     .replace(/\s+/g, "");
-  const der = Uint8Array.from(atob(cleaned), c => c.charCodeAt(0));
+  let der = Uint8Array.from(atob(cleaned), c => c.charCodeAt(0));
+  if (isPkcs1) der = pkcs1ToPkcs8(der);
   return crypto.subtle.importKey(
     "pkcs8",
     der,
@@ -691,6 +727,30 @@ async function importRsaPrivateKey(pem) {
     false,
     ["sign"],
   );
+}
+
+function derLength(n) {
+  if (n < 0x80) return [n];
+  const bytes = [];
+  let v = n;
+  while (v > 0) { bytes.unshift(v & 0xff); v >>>= 8; }
+  return [0x80 | bytes.length, ...bytes];
+}
+
+function pkcs1ToPkcs8(pkcs1) {
+  // PrivateKeyInfo ::= SEQUENCE { version INTEGER(0),
+  //   privateKeyAlgorithm AlgorithmIdentifier(rsaEncryption),
+  //   privateKey OCTET STRING (the PKCS#1 RSAPrivateKey) }
+  const version = [0x02, 0x01, 0x00];
+  const algId = [
+    0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86,
+    0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00,
+  ];
+  const pkcs1Arr = Array.from(pkcs1);
+  const octet = [0x04, ...derLength(pkcs1Arr.length), ...pkcs1Arr];
+  const inner = [...version, ...algId, ...octet];
+  const seq = [0x30, ...derLength(inner.length), ...inner];
+  return new Uint8Array(seq);
 }
 
 function githubAppHeaders(installationToken) {
