@@ -1,0 +1,27 @@
+# Copy to .dev.vars in this directory (repo root, next to wrangler.toml).
+# Used by: wrangler dev, wrangler secret bulk .dev.vars
+#
+#   cp .dev.vars.example .dev.vars    # macOS/Linux
+#   copy .dev.vars.example .dev.vars  # Windows
+#
+# Fill in real values, then upload to Cloudflare once:
+#   npm run worker:secrets
+
+# --- GitHub OAuth (wizard browser sign-in) ---
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+GITHUB_REDIRECT_URI=https://rosetta.jtrue15.workers.dev
+
+# --- GitHub App (device flow, companion repos, watchdog tokens) ---
+GITHUB_APP_ID=
+# Paste full PEM including -----BEGIN/END----- lines, or use \n for newlines on one line
+GITHUB_APP_PRIVATE_KEY=
+
+# --- Rosetta Worker secrets (generate random 32+ byte strings) ---
+INSTALL_TICKET_KEY=
+ONBOARD_HMAC_KEY=
+
+# --- Optional overrides (defaults shown) ---
+ALLOWED_ORIGIN=https://johntrue15.github.io
+MAIN_REPO=johntrue15/Rosetta
+FACILITY_OWNER=johntrue15

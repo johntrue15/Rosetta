@@ -66,26 +66,84 @@ In the App settings page (`https://github.com/settings/apps/rosetta-upload`):
 4. **Install** the App on the account/org named in `FACILITY_OWNER` and on
    the main `johntrue15/Rosetta` repository.
 
-## Local development / deploy
+## Local credentials and deploy (no Cloudflare dashboard)
 
-```bash
-# Install wrangler if you haven't
-npm install -g wrangler
+All secrets stay in **gitignored local files**. Copy the examples once, fill in
+values, then deploy from the repo root.
 
-# Set secrets (interactive; never commit values)
-cd cloudflare
-wrangler secret put GITHUB_APP_ID
-wrangler secret put GITHUB_APP_PRIVATE_KEY
-wrangler secret put INSTALL_TICKET_KEY
-wrangler secret put ONBOARD_HMAC_KEY
-# (and the existing GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_REDIRECT_URI)
+### 1. Cloudflare API credentials (for `wrangler deploy`)
 
-# Deploy
-wrangler deploy
+```powershell
+# Windows (PowerShell, from repo root)
+copy cloudflare\credentials.example.env cloudflare\credentials.env
+# Edit cloudflare\credentials.env — set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
 ```
 
-The Worker config in `wrangler.toml` only pins `name`, `main`, and the
-public `ALLOWED_ORIGIN` var.
+```bash
+# macOS/Linux
+cp cloudflare/credentials.example.env cloudflare/credentials.env
+```
+
+Create a token at https://dash.cloudflare.com/profile/api-tokens  
+Use template **Edit Cloudflare Workers** (Account + Workers Scripts: Edit).
+
+**Account ID:** Cloudflare dashboard → any zone/workers overview → right sidebar.
+
+### 2. Worker secrets (GitHub App, OAuth, HMAC keys)
+
+```powershell
+copy .dev.vars.example .dev.vars
+# Edit .dev.vars — GITHUB_CLIENT_ID, GITHUB_APP_PRIVATE_KEY, etc.
+```
+
+Upload to Cloudflare (once, or after changing secrets):
+
+```powershell
+npm install
+npm run worker:secrets
+```
+
+### 3. Deploy
+
+```powershell
+npm run worker:deploy
+# or directly:
+.\cloudflare\deploy.ps1
+```
+
+```bash
+npm run worker:deploy
+# or: bash cloudflare/deploy.sh deploy
+```
+
+### 4. Local dev (optional)
+
+```powershell
+npm run worker:dev
+# Worker at http://127.0.0.1:8787 — uses .dev.vars automatically
+```
+
+### Alternative: `wrangler login` (interactive, no API token file)
+
+```powershell
+npx wrangler login
+npx wrangler deploy
+```
+
+Still need `wrangler secret bulk .dev.vars` for GitHub secrets on first setup.
+
+### File reference
+
+| File | Gitignored | Purpose |
+|------|------------|---------|
+| `cloudflare/credentials.env` | yes | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` |
+| `.dev.vars` | yes | Worker runtime secrets (GitHub App, OAuth, HMAC) |
+| `cloudflare/credentials.example.env` | no | Template for Cloudflare API |
+| `.dev.vars.example` | no | Template for Worker secrets |
+
+---
+
+## Local development / deploy (legacy one-liners)
 
 ## Drift between Worker templates and `templates/facility-repo/`
 

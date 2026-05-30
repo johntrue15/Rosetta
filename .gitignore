@@ -1,0 +1,26 @@
+# Cloudflare / Wrangler (never commit secrets)
+.dev.vars
+.env
+.env.*
+!.env.example
+!**/*.example.env
+!**/.dev.vars.example
+cloudflare/credentials.env
+.wrangler/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Local test / scan data (large binaries)
+data/tests/*.txrm
