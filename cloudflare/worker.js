@@ -208,11 +208,23 @@ async function handleCreateCompanionRepo(request, env) {
   const requester = await authenticateCaller(request, env, body);
   if (!requester.ok) return jsonResponse({ error: requester.error }, requester.status);
 
+  // Untrusted (device-flow) callers may only act on facilities that the
+  // maintainer has already approved (data/<slug>/config.yml in the main repo).
+  if (!requester.trusted && !(await isApprovedFacility(env, slug))) {
+    return jsonResponse({ error: "facility_not_approved", slug }, 403);
+  }
+
   const mainRepo = env.MAIN_REPO || DEFAULT_MAIN_REPO;
   const owner = env.FACILITY_OWNER || DEFAULT_FACILITY_OWNER;
   const repoName = `rosetta-facility-${slug}`;
 
-  const installationToken = await getAppInstallationToken(env);
+  // Repo creation cannot be scoped to a not-yet-existing repo, so this token is
+  // org-scoped with only the permissions needed to create + seed the repo. It
+  // is used server-side only and never returned to the caller.
+  const installationToken = await mintInstallationToken(env, {
+    owner,
+    permissions: { administration: "write", contents: "write", workflows: "write" },
+  });
 
   // GitHub Apps can only create repositories inside an Organization
   // (POST /orgs/{org}/repos). Personal user accounts are not supported by the
@@ -266,8 +278,9 @@ async function seedCompanionRepo({ env, installationToken, owner, repoName, slug
   const workerUrl = new URL(env.GITHUB_REDIRECT_URI || "https://rosetta.jtrue15.workers.dev");
   const workerOrigin = workerUrl.origin;
 
+  const dataRepo = `${owner}/${repoName}`;
   const templates = {
-    ".github/workflows/deploy-watchdog.yml": deployWorkflowYaml({ slug, mainRepo, workerOrigin }),
+    ".github/workflows/deploy-watchdog.yml": deployWorkflowYaml({ slug, mainRepo, workerOrigin, dataRepo }),
     ".github/workflows/update-watchdog.yml": updateWorkflowYaml({ slug }),
     "README.md": companionReadme({ slug, facility, mainRepo, owner, repoName }),
   };
@@ -327,11 +340,19 @@ async function handleRunnerRegistrationToken(request, env) {
   if (requester.slug && sanitizeSlug(requester.slug) !== slug) {
     return jsonResponse({ error: "slug_mismatch" }, 403);
   }
+  if (!requester.trusted && !(await isApprovedFacility(env, slug))) {
+    return jsonResponse({ error: "facility_not_approved", slug }, 403);
+  }
 
   const owner = env.FACILITY_OWNER || DEFAULT_FACILITY_OWNER;
   const repoName = `rosetta-facility-${slug}`;
 
-  const installationToken = await getAppInstallationToken(env);
+  // Runner registration needs administration:write, but only on this one repo.
+  const installationToken = await mintInstallationToken(env, {
+    owner,
+    repositories: [repoName],
+    permissions: { administration: "write" },
+  });
 
   const tokenRes = await fetch(
     `${GH_API}/repos/${owner}/${repoName}/actions/runners/registration-token`,
@@ -375,13 +396,25 @@ async function handleWatchdogToken(request, env) {
   const verified = await verifyInstallTicket(env, body.install_ticket);
   if (!verified.ok) return jsonResponse({ error: verified.error }, 401);
 
-  const installationToken = await getAppInstallationToken(env);
+  const slug = sanitizeSlug(verified.claims.slug || "");
+  if (!slug) return jsonResponse({ error: "ticket_missing_slug" }, 400);
+
+  // The watchdog only ever pushes scan data into its own facility's companion
+  // repo. The token is scoped to that single repo with contents:write only — it
+  // cannot reach the main repo, other facilities, workflows, or org admin.
+  const dataRepo = facilityDataRepo(env, slug);
+  const installationToken = await mintInstallationToken(env, {
+    owner: dataRepo.owner,
+    repositories: [dataRepo.name],
+    permissions: { contents: "write" },
+  });
 
   return jsonResponse({
     token: installationToken.token,
     expires_at: installationToken.expires_at,
-    repo: env.MAIN_REPO || DEFAULT_MAIN_REPO,
-    facility_slug: verified.claims.slug,
+    repo: dataRepo.full,
+    upload_path_prefix: "data/",
+    facility_slug: slug,
   });
 }
 
@@ -411,7 +444,11 @@ async function handleDeployStatus(request, env) {
 
   const owner = env.FACILITY_OWNER || DEFAULT_FACILITY_OWNER;
   const repoName = `rosetta-facility-${sanitizeSlug(slug)}`;
-  const installationToken = await getAppInstallationToken(env);
+  const installationToken = await mintInstallationToken(env, {
+    owner,
+    repositories: [repoName],
+    permissions: { actions: "read" },
+  });
 
   const res = await fetch(
     `${GH_API}/repos/${owner}/${repoName}/actions/workflows/deploy-watchdog.yml/runs?per_page=1`,
@@ -454,11 +491,18 @@ async function handleDispatchDeploy(request, env) {
   if (requester.slug && sanitizeSlug(requester.slug) !== slug) {
     return jsonResponse({ error: "slug_mismatch" }, 403);
   }
+  if (!requester.trusted && !(await isApprovedFacility(env, slug))) {
+    return jsonResponse({ error: "facility_not_approved", slug }, 403);
+  }
 
   const owner = env.FACILITY_OWNER || DEFAULT_FACILITY_OWNER;
   const repoName = `rosetta-facility-${slug}`;
   const ref = body.ref || "main";
-  const installationToken = await getAppInstallationToken(env);
+  const installationToken = await mintInstallationToken(env, {
+    owner,
+    repositories: [repoName],
+    permissions: { actions: "write" },
+  });
 
   const res = await fetch(
     `${GH_API}/repos/${owner}/${repoName}/actions/workflows/deploy-watchdog.yml/dispatches`,
@@ -488,62 +532,89 @@ async function handleE2eCleanup(request, env) {
   const slug = sanitizeSlug(body.slug);
   const requester = await authenticateCaller(request, env, body);
   if (!requester.ok) return jsonResponse({ error: requester.error }, requester.status);
+  // Cleanup is destructive (deletes a repo, removes data, deletes issues), so it
+  // is restricted to trusted callers: the maintainer onboarding workflow
+  // (onboard HMAC) or an install ticket bound to this exact slug. An ordinary
+  // device-flow user token can never trigger it.
+  if (!requester.trusted) {
+    return jsonResponse({ error: "cleanup_requires_trusted_caller" }, 403);
+  }
+  if (requester.slug && sanitizeSlug(requester.slug) !== slug) {
+    return jsonResponse({ error: "slug_mismatch" }, 403);
+  }
 
   const owner = env.FACILITY_OWNER || DEFAULT_FACILITY_OWNER;
   const mainRepo = env.MAIN_REPO || DEFAULT_MAIN_REPO;
   const [mainOwner, mainName] = mainRepo.split("/");
   const companionName = `rosetta-facility-${slug}`;
-  const installationToken = await getAppInstallationToken(env);
-  const headers = githubAppHeaders(installationToken);
   const results = {};
 
-  // Delete companion repo (ignore 404)
+  // Delete companion repo (ignore 404) — token scoped to that one repo.
+  const orgToken = await mintInstallationToken(env, {
+    owner,
+    repositories: [companionName],
+    permissions: { administration: "write" },
+  });
   const delRepo = await fetch(`${GH_API}/repos/${owner}/${companionName}`, {
     method: "DELETE",
-    headers,
+    headers: githubAppHeaders(orgToken),
   });
   results.companion_repo = delRepo.status === 204 ? "deleted" : `status_${delRepo.status}`;
 
-  // Remove data/<slug>/ from main repo
-  const dirPath = `data/${slug}`;
-  const contentsRes = await fetch(
-    `${GH_API}/repos/${mainOwner}/${mainName}/contents/${dirPath}?ref=main`,
-    { headers },
-  );
-  if (contentsRes.ok) {
-    const items = await contentsRes.json();
-    for (const item of items) {
-      if (item.type === "file") {
-        await fetch(`${GH_API}/repos/${mainOwner}/${mainName}/contents/${item.path}`, {
-          method: "DELETE",
-          headers,
-          body: JSON.stringify({
-            message: `chore(e2e): remove ${item.path} [skip ci]`,
-            sha: item.sha,
-            branch: "main",
-          }),
-        });
-      }
-    }
-    // Remove README + config if present as individual deletes above; remove dir marker files
-    results.facility_dir = "cleared";
-  } else {
-    results.facility_dir = `status_${contentsRes.status}`;
+  // Main-repo cleanup (approval marker dir + onboarding issue) uses a separate
+  // token from the main repo's installation, scoped to the main repo with only
+  // contents:write + issues:write. This installation is distinct from the org's.
+  let mainHeaders;
+  try {
+    const mainToken = await mintInstallationToken(env, {
+      owner: mainOwner,
+      repositories: [mainName],
+      permissions: { contents: "write", issues: "write" },
+    });
+    mainHeaders = githubAppHeaders(mainToken);
+  } catch (e) {
+    results.facility_dir = "skipped_no_main_installation";
   }
 
-  // Close + delete issue when provided
-  if (body.issue_number) {
-    const issueNum = parseInt(body.issue_number, 10);
-    await fetch(`${GH_API}/repos/${mainOwner}/${mainName}/issues/${issueNum}`, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify({ state: "closed" }),
-    });
-    const delIssue = await fetch(`${GH_API}/repos/${mainOwner}/${mainName}/issues/${issueNum}`, {
-      method: "DELETE",
-      headers,
-    });
-    results.issue = delIssue.status === 204 ? "deleted" : `closed_status_${delIssue.status}`;
+  if (mainHeaders) {
+    const dirPath = `data/${slug}`;
+    const contentsRes = await fetch(
+      `${GH_API}/repos/${mainOwner}/${mainName}/contents/${dirPath}?ref=main`,
+      { headers: mainHeaders },
+    );
+    if (contentsRes.ok) {
+      const items = await contentsRes.json();
+      for (const item of items) {
+        if (item.type === "file") {
+          await fetch(`${GH_API}/repos/${mainOwner}/${mainName}/contents/${item.path}`, {
+            method: "DELETE",
+            headers: mainHeaders,
+            body: JSON.stringify({
+              message: `chore(e2e): remove ${item.path} [skip ci]`,
+              sha: item.sha,
+              branch: "main",
+            }),
+          });
+        }
+      }
+      results.facility_dir = "cleared";
+    } else {
+      results.facility_dir = `status_${contentsRes.status}`;
+    }
+
+    if (body.issue_number) {
+      const issueNum = parseInt(body.issue_number, 10);
+      await fetch(`${GH_API}/repos/${mainOwner}/${mainName}/issues/${issueNum}`, {
+        method: "PATCH",
+        headers: mainHeaders,
+        body: JSON.stringify({ state: "closed" }),
+      });
+      const delIssue = await fetch(`${GH_API}/repos/${mainOwner}/${mainName}/issues/${issueNum}`, {
+        method: "DELETE",
+        headers: mainHeaders,
+      });
+      results.issue = delIssue.status === 204 ? "deleted" : `closed_status_${delIssue.status}`;
+    }
   }
 
   return jsonResponse({ ok: true, slug, results });
@@ -587,7 +658,10 @@ async function authenticateCaller(request, env, body) {
     });
     if (!userRes.ok) return { ok: false, status: 401, error: "invalid_user_token" };
     const user = await userRes.json();
-    return { ok: true, login: user.login };
+    // `bearer` = an authenticated but otherwise untrusted GitHub user (anyone
+    // who completed device auth). These callers are gated by the approved-
+    // facility allow-list before they can create repos or mint tokens.
+    return { ok: true, login: user.login, via: "bearer", trusted: false };
   }
 
   if (body && body.onboard_signature) {
@@ -596,7 +670,7 @@ async function authenticateCaller(request, env, body) {
       canonicalOnboardPayload(body),
       body.onboard_signature,
     );
-    if (ok) return { ok: true, login: "facility-onboard-workflow" };
+    if (ok) return { ok: true, login: "facility-onboard-workflow", via: "onboard", trusted: true };
     return { ok: false, status: 401, error: "invalid_onboard_signature" };
   }
 
@@ -607,6 +681,8 @@ async function authenticateCaller(request, env, body) {
         ok: true,
         login: verified.claims.sub || "install-ticket",
         slug: verified.claims.slug,
+        via: "install_ticket",
+        trusted: true,
       };
     }
     return { ok: false, status: 401, error: verified.error };
@@ -627,63 +703,101 @@ function canonicalOnboardPayload(body) {
 /* GitHub App helpers                                                     */
 /* ===================================================================== */
 
-let cachedInstallationToken = null;
+// Installation IDs are stable per account, so cache the lookup. We deliberately
+// do NOT cache access tokens: every endpoint mints a fresh, narrowly scoped
+// token (specific repositories + least-privilege permissions) so a token that
+// leaves the Worker (e.g. the watchdog data-push token) can never be reused to
+// reach the main repo, other facilities, or org administration.
+const installationCache = {}; // owner -> { id, account_type }
 
-async function getAppInstallationToken(env) {
-  if (cachedInstallationToken && cachedInstallationToken.expires_epoch > nowSeconds() + 60) {
-    return cachedInstallationToken;
-  }
-
-  const jwt = await signAppJwt(env);
-  // GitHub's REST API rejects requests without a User-Agent header (HTTP 403),
-  // so every app-JWT request must include one.
-  const jwtHeaders = {
+function appJwtHeaders(jwt) {
+  // GitHub's REST API rejects requests without a User-Agent header (HTTP 403).
+  return {
     Authorization: `Bearer ${jwt}`,
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
     "User-Agent": "rosetta-upload-worker",
+    "Content-Type": "application/json",
   };
+}
 
-  const owner = env.FACILITY_OWNER || DEFAULT_FACILITY_OWNER;
-  const instRes = await fetch(`${GH_API}/users/${owner}/installation`, {
-    headers: jwtHeaders,
-  });
+async function resolveInstallation(env, owner) {
+  if (installationCache[owner]) return installationCache[owner];
+  const jwt = await signAppJwt(env);
+  const headers = appJwtHeaders(jwt);
 
-  let installationId;
+  let res = await fetch(`${GH_API}/users/${owner}/installation`, { headers });
   let accountType = "User";
-  if (instRes.ok) {
-    const inst = await instRes.json();
-    installationId = inst.id;
-    accountType = (inst.account && inst.account.type) || "User";
-  } else {
-    const orgRes = await fetch(`${GH_API}/orgs/${owner}/installation`, {
-      headers: jwtHeaders,
-    });
-    if (!orgRes.ok) {
-      throw new Error(`Could not resolve installation for ${owner}: ${instRes.status}/${orgRes.status}`);
-    }
-    const inst = await orgRes.json();
-    installationId = inst.id;
-    accountType = (inst.account && inst.account.type) || "Organization";
+  if (!res.ok) {
+    res = await fetch(`${GH_API}/orgs/${owner}/installation`, { headers });
+    accountType = "Organization";
   }
+  if (!res.ok) {
+    throw new Error(`Could not resolve installation for ${owner}: ${res.status}`);
+  }
+  const inst = await res.json();
+  installationCache[owner] = {
+    id: inst.id,
+    account_type: (inst.account && inst.account.type) || accountType,
+  };
+  return installationCache[owner];
+}
 
-  const tokenRes = await fetch(`${GH_API}/app/installations/${installationId}/access_tokens`, {
+/**
+ * Mint a GitHub App installation token.
+ * @param {object} opts
+ *   owner        - account that owns the target repos (defaults to FACILITY_OWNER)
+ *   repositories - array of repo names to restrict the token to (omit only for
+ *                  org-level operations like repo creation)
+ *   permissions  - least-privilege permission map, e.g. { contents: "write" }
+ */
+async function mintInstallationToken(env, opts = {}) {
+  const owner = opts.owner || env.FACILITY_OWNER || DEFAULT_FACILITY_OWNER;
+  const { id, account_type } = await resolveInstallation(env, owner);
+  const jwt = await signAppJwt(env);
+
+  const body = {};
+  if (opts.repositories && opts.repositories.length) body.repositories = opts.repositories;
+  if (opts.permissions) body.permissions = opts.permissions;
+
+  const res = await fetch(`${GH_API}/app/installations/${id}/access_tokens`, {
     method: "POST",
-    headers: jwtHeaders,
+    headers: appJwtHeaders(jwt),
+    body: JSON.stringify(body),
   });
-  if (!tokenRes.ok) {
-    const detail = await tokenRes.text();
-    throw new Error(`Installation token mint failed: ${tokenRes.status} ${detail}`);
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Installation token mint failed for ${owner}: ${res.status} ${detail}`);
   }
-  const data = await tokenRes.json();
-
-  cachedInstallationToken = {
+  const data = await res.json();
+  return {
     token: data.token,
-    account_type: accountType,
+    account_type,
     expires_at: data.expires_at,
     expires_epoch: Math.floor(new Date(data.expires_at).getTime() / 1000),
   };
-  return cachedInstallationToken;
+}
+
+// Per-facility data repository (the facility's own companion repo). Scan data is
+// pushed here, never to the main repo, so the watchdog's contents:write token
+// cannot touch upstream code or workflows.
+function facilityDataRepo(env, slug) {
+  const owner = env.FACILITY_OWNER || DEFAULT_FACILITY_OWNER;
+  return { owner, name: `rosetta-facility-${slug}`, full: `${owner}/rosetta-facility-${slug}` };
+}
+
+/**
+ * A facility is "approved" once the maintainer-side onboarding workflow has
+ * committed data/<slug>/config.yml to the (public) main repo. Untrusted
+ * device-flow callers may only act on approved facilities.
+ */
+async function isApprovedFacility(env, slug) {
+  const mainRepo = env.MAIN_REPO || DEFAULT_MAIN_REPO;
+  const res = await fetch(
+    `${GH_API}/repos/${mainRepo}/contents/data/${sanitizeSlug(slug)}/config.yml?ref=main`,
+    { headers: { Accept: "application/vnd.github+json", "User-Agent": "rosetta-upload-worker" } },
+  );
+  return res.ok;
 }
 
 async function signAppJwt(env) {
@@ -821,7 +935,7 @@ function timingSafeEqual(a, b) {
 /* Workflow + script templates                                            */
 /* ===================================================================== */
 
-function deployWorkflowYaml({ slug, mainRepo, workerOrigin }) {
+function deployWorkflowYaml({ slug, mainRepo, workerOrigin, dataRepo }) {
   return `name: Deploy Rosetta Watchdog
 on:
   workflow_dispatch:
@@ -872,6 +986,13 @@ jobs:
           cfg.setdefault('auth', {})
           cfg['auth']['token_url'] = '${workerOrigin}/watchdog/token'
           cfg['auth']['install_ticket_env'] = 'ROSETTA_INSTALL_TICKET'
+          # Scan data is pushed to this facility's own companion repo, never the
+          # main repo. The Worker-issued token is scoped to this repo with
+          # contents:write only, so it cannot reach upstream code or workflows.
+          cfg.setdefault('github', {})
+          cfg['github']['repo'] = '${dataRepo}'
+          cfg['github']['branch'] = 'main'
+          cfg['github']['upload_path'] = 'data/${slug}/'
           p.write_text(yaml.safe_dump(cfg, sort_keys=False))
           "
 
