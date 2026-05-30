@@ -361,9 +361,50 @@
             </div>
           </div>
 
-          <!-- 4b: bootstrap one-liner panel -->
+          <!-- 4b: quick install — download a fresh repo + run a single command -->
+          <div id="quick-install-panel" style="display:none;margin-top:1.75rem;border-top:1px solid var(--border);padding-top:1.5rem">
+            <div class="code-label">2. Download &amp; run (recommended)</div>
+            <p style="color:var(--muted);font-size:0.85rem;margin:0.25rem 0 0.75rem">
+              Download a ready-to-run installer for this facility. It pulls a fresh copy of the
+              watchdog, writes your config (with the install ticket baked in), and starts monitoring
+              your scan folder. Then run the single command shown below on the CT machine.
+            </p>
+            <div class="form-group">
+              <label>Watch folder on the CT machine</label>
+              <div class="hint">The folder the watchdog monitors for new scans. Use a local path for a quick test.</div>
+              <input type="text" id="qi-watch-path" placeholder="C:\\rosetta-data" />
+            </div>
+            <div class="form-group">
+              <label>Machine name</label>
+              <input type="text" id="qi-machine-name" placeholder="e.g. Xradia-520" />
+            </div>
+            <div class="os-tabs">
+              <div class="os-tab active" data-qios="win" onclick="switchQuickOS('win')">Windows</div>
+              <div class="os-tab" data-qios="unix" onclick="switchQuickOS('unix')">macOS / Linux</div>
+            </div>
+            <div class="os-panel active" id="qi-os-win">
+              <div class="form-actions" style="margin-top:0.75rem">
+                <button class="btn btn-primary" id="qi-download-win">&#11015; Download installer (.ps1)</button>
+              </div>
+              <div class="code-label">Then run this single command (PowerShell, in the download folder):</div>
+              <div class="code-block" id="qi-cmd-win"><span class="qi-cmd"></span><button class="copy-btn" onclick="copyBlock('qi-cmd-win')">Copy</button></div>
+            </div>
+            <div class="os-panel" id="qi-os-unix">
+              <div class="form-actions" style="margin-top:0.75rem">
+                <button class="btn btn-primary" id="qi-download-unix">&#11015; Download installer (.sh)</button>
+              </div>
+              <div class="code-label">Then run this single command (in the download folder):</div>
+              <div class="code-block" id="qi-cmd-unix"><span class="qi-cmd"></span><button class="copy-btn" onclick="copyBlock('qi-cmd-unix')">Copy</button></div>
+            </div>
+            <p style="color:var(--muted);font-size:0.78rem;margin:0.75rem 0 0">
+              Requires Python 3.9+ and Git on the machine. Scan metadata uploads to your private
+              <code id="qi-repo-name">companion repo</code>.
+            </p>
+          </div>
+
+          <!-- 4b-alt: bootstrap one-liner panel (advanced: auto-start service via self-hosted runner) -->
           <div id="bootstrap-panel" style="display:none;margin-top:1.75rem;border-top:1px solid var(--border);padding-top:1.5rem">
-            <div class="code-label">2. Run the one-liner on the CT machine</div>
+            <div class="code-label">Advanced — install as an auto-start service (self-hosted runner)</div>
             <p style="color:var(--muted);font-size:0.85rem;margin:0.25rem 0 0.5rem">
               Open a terminal <strong>as administrator</strong> on the CT machine and paste this:
             </p>
@@ -817,6 +858,8 @@
     let deviceState = null; // { user_code, device_code, interval, expires_at }
     let companionRepo = null;
     let installTicket = null;
+    let deviceUserToken = null; // OAuth token from the device flow (read access for verify)
+    let quickOS = "win";
 
     function renderStep4() {
       if (!facility) return;
@@ -900,6 +943,7 @@
 
     async function onDeviceApproved(userToken) {
       if (devicePollTimer) { clearTimeout(devicePollTimer); devicePollTimer = null; }
+      deviceUserToken = userToken;
 
       const statusEl = document.getElementById("device-status");
       statusEl.innerHTML = '<span class="spinner-inline"></span> Preparing your facility runner&hellip;';
@@ -932,11 +976,188 @@
         return;
       }
 
-      statusEl.innerHTML = '<span class="status-badge success">&#10003; Runner ready &mdash; companion repo <a href="https://github.com/' + companionRepo + '" target="_blank" style="color:var(--accent)">' + companionRepo + '</a></span>';
+      statusEl.innerHTML = '<span class="status-badge success">&#10003; Ready &mdash; companion repo <a href="https://github.com/' + companionRepo + '" target="_blank" style="color:var(--accent)">' + companionRepo + '</a></span>';
+      renderQuickInstall();
       renderBootstrapCommands();
+      document.getElementById("quick-install-panel").style.display = "block";
       document.getElementById("bootstrap-panel").style.display = "block";
       document.getElementById("deploy-status-panel").style.display = "block";
       startDeployPolling();
+    }
+
+    /* ---- Quick install: download a fresh repo + run a single command ---- */
+    function defaultWatchPath(os) {
+      if (facility && facility.machines && facility.machines[0] && facility.machines[0].path) {
+        return facility.machines[0].path;
+      }
+      return os === "win" ? "C:\\rosetta-data" : "/opt/rosetta-data";
+    }
+
+    function defaultMachineName() {
+      if (facility && facility.machines && facility.machines[0] && facility.machines[0].name) {
+        return facility.machines[0].name;
+      }
+      return "ct-machine";
+    }
+
+    window.switchQuickOS = function(os) {
+      quickOS = os;
+      document.querySelectorAll('#quick-install-panel .os-tab').forEach(t => t.classList.remove("active"));
+      document.querySelectorAll('#quick-install-panel .os-panel').forEach(p => p.classList.remove("active"));
+      document.querySelector('#quick-install-panel .os-tab[data-qios="' + os + '"]').classList.add("active");
+      document.getElementById("qi-os-" + os).classList.add("active");
+      const wp = document.getElementById("qi-watch-path");
+      wp.placeholder = defaultWatchPath(os);
+    };
+
+    function renderQuickInstall() {
+      document.getElementById("qi-repo-name").textContent = companionRepo;
+      const wp = document.getElementById("qi-watch-path");
+      if (!wp.value) wp.value = defaultWatchPath(quickOS);
+      const mn = document.getElementById("qi-machine-name");
+      if (!mn.value) mn.value = defaultMachineName();
+      document.querySelector('#qi-cmd-win .qi-cmd').textContent =
+        'powershell -ExecutionPolicy Bypass -File .\\rosetta-watchdog-' + facility.slug + '.ps1';
+      document.querySelector('#qi-cmd-unix .qi-cmd').textContent =
+        'bash ./rosetta-watchdog-' + facility.slug + '.sh';
+      document.getElementById("qi-download-win").onclick = () => downloadInstaller("win");
+      document.getElementById("qi-download-unix").onclick = () => downloadInstaller("unix");
+    }
+
+    function buildWindowsInstaller(watchPath, machineName) {
+      return [
+        "# Rosetta Watchdog quick installer - " + facility.name + " (" + facility.slug + ")",
+        "# Run:  powershell -ExecutionPolicy Bypass -File .\\rosetta-watchdog-" + facility.slug + ".ps1",
+        '$ErrorActionPreference = "Stop"',
+        'function Info($m){ Write-Host "[rosetta] $m" -ForegroundColor Cyan }',
+        "",
+        '$Slug          = "' + facility.slug + '"',
+        '$CompanionRepo = "' + companionRepo + '"',
+        '$WorkerUrl     = "' + WORKER_URL + '"',
+        '$InstallTicket = "' + installTicket + '"',
+        '$WatchPath     = "' + watchPath + '"',
+        '$MachineName   = "' + machineName + '"',
+        '$MainRepo      = "' + OWNER + "/" + REPO + '"',
+        '$InstallDir    = Join-Path $env:USERPROFILE "rosetta-watchdog"',
+        "",
+        'New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null',
+        '$RepoDir = Join-Path $InstallDir "Rosetta"',
+        'Info "Downloading a fresh copy of the Rosetta repo..."',
+        'if (Test-Path $RepoDir) { Remove-Item -Recurse -Force $RepoDir }',
+        'git clone --depth 1 "https://github.com/$MainRepo.git" $RepoDir',
+        "",
+        'Info "Installing the watchdog (pip)..."',
+        'python -m pip install --upgrade pip | Out-Null',
+        'python -m pip install "$RepoDir\\edge"',
+        "",
+        'Info "Writing config.yml..."',
+        '$config = @"',
+        'watch_directories:',
+        "  - path: '$WatchPath'",
+        "    machine_name: '$MachineName'",
+        'polling_interval_seconds: 30',
+        'include_drift_files: false',
+        'parser_backend: "auto"',
+        'state_file: "processed_files.json"',
+        'github:',
+        '  repo: "$CompanionRepo"',
+        '  branch: "main"',
+        '  upload_path: "data/$Slug/"',
+        '  commit_prefix: "[edge-watchdog]"',
+        'auth:',
+        '  token_url: "$WorkerUrl/watchdog/token"',
+        '  install_ticket_env: "ROSETTA_INSTALL_TICKET"',
+        'logging:',
+        '  level: "INFO"',
+        '  file: "rosetta-watchdog.log"',
+        '"@',
+        '$ConfigPath = Join-Path $InstallDir "config.yml"',
+        'Set-Content -Path $ConfigPath -Value $config -Encoding UTF8',
+        'New-Item -ItemType Directory -Force -Path $WatchPath | Out-Null',
+        '$env:ROSETTA_INSTALL_TICKET = $InstallTicket',
+        "",
+        'Info "Watch folder: $WatchPath"',
+        'Info "Data uploads to https://github.com/$CompanionRepo/tree/main/data/$Slug/"',
+        'Info "Starting watchdog. Drop a .pca/.txrm into the watch folder. Ctrl+C to stop."',
+        'python -m rosetta_watchdog.cli -c $ConfigPath',
+        "",
+      ].join("\r\n");
+    }
+
+    function buildUnixInstaller(watchPath, machineName) {
+      return [
+        "#!/usr/bin/env bash",
+        "# Rosetta Watchdog quick installer - " + facility.name + " (" + facility.slug + ")",
+        "# Run:  bash ./rosetta-watchdog-" + facility.slug + ".sh",
+        "set -euo pipefail",
+        "",
+        'slug="' + facility.slug + '"',
+        'companion="' + companionRepo + '"',
+        'worker="' + WORKER_URL + '"',
+        'ticket="' + installTicket + '"',
+        'watch="' + watchPath + '"',
+        'machine="' + machineName + '"',
+        'mainRepo="' + OWNER + "/" + REPO + '"',
+        'installDir="$HOME/rosetta-watchdog"',
+        "",
+        'mkdir -p "$installDir"',
+        'repoDir="$installDir/Rosetta"',
+        'echo "[rosetta] Downloading a fresh copy of the Rosetta repo..."',
+        'rm -rf "$repoDir"',
+        'git clone --depth 1 "https://github.com/$mainRepo.git" "$repoDir"',
+        "",
+        'echo "[rosetta] Installing the watchdog (pip)..."',
+        'python3 -m pip install --upgrade pip >/dev/null',
+        'python3 -m pip install "$repoDir/edge"',
+        "",
+        'echo "[rosetta] Writing config.yml..."',
+        'mkdir -p "$watch"',
+        'cat > "$installDir/config.yml" <<EOF',
+        'watch_directories:',
+        "  - path: '$watch'",
+        "    machine_name: '$machine'",
+        'polling_interval_seconds: 30',
+        'include_drift_files: false',
+        'parser_backend: "auto"',
+        'state_file: "processed_files.json"',
+        'github:',
+        '  repo: "$companion"',
+        '  branch: "main"',
+        '  upload_path: "data/$slug/"',
+        '  commit_prefix: "[edge-watchdog]"',
+        'auth:',
+        '  token_url: "$worker/watchdog/token"',
+        '  install_ticket_env: "ROSETTA_INSTALL_TICKET"',
+        'logging:',
+        '  level: "INFO"',
+        '  file: "rosetta-watchdog.log"',
+        'EOF',
+        "",
+        'export ROSETTA_INSTALL_TICKET="$ticket"',
+        'echo "[rosetta] Watch folder: $watch"',
+        'echo "[rosetta] Data uploads to https://github.com/$companion/tree/main/data/$slug/"',
+        'echo "[rosetta] Starting watchdog. Drop a .pca/.txrm into the watch folder. Ctrl+C to stop."',
+        'python3 -m rosetta_watchdog.cli -c "$installDir/config.yml"',
+        "",
+      ].join("\n");
+    }
+
+    function downloadInstaller(os) {
+      if (!companionRepo || !installTicket) return;
+      const watchPath = document.getElementById("qi-watch-path").value.trim() || defaultWatchPath(os);
+      const machineName = document.getElementById("qi-machine-name").value.trim() || defaultMachineName();
+      const content = os === "win"
+        ? buildWindowsInstaller(watchPath, machineName)
+        : buildUnixInstaller(watchPath, machineName);
+      const ext = os === "win" ? "ps1" : "sh";
+      const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "rosetta-watchdog-" + facility.slug + "." + ext;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
 
     function renderBootstrapCommands() {
@@ -1051,20 +1272,38 @@
       const statusEl = document.getElementById("verify-status");
       const resultEl = document.getElementById("verify-result");
       const spinner = document.getElementById("verify-spinner");
-      const uploadPath = facility.uploadPath || "data/" + facility.slug + "/";
+      const uploadPath = "data/" + facility.slug + "/";
       const dirPath = uploadPath.replace(/\/$/, "");
 
+      // Scan data lands in the private companion repo (not the main repo).
+      const verifyRepo = companionRepo || (OWNER + "/" + REPO);
+      const [vOwner, vRepo] = verifyRepo.split("/");
+      const repoTreeUrl = "https://github.com/" + verifyRepo + "/tree/main/" + dirPath;
+
       spinner.style.display = "inline-block";
-      statusEl.innerHTML = '<span class="status-badge waiting"><span class="spinner-inline"></span> Checking <code>' + uploadPath + '</code> on main…</span>';
+      statusEl.innerHTML = '<span class="status-badge waiting"><span class="spinner-inline"></span> Checking <code>' + uploadPath + '</code> in <code>' + verifyRepo + '</code>…</span>';
       resultEl.innerHTML = "";
 
-      const fetchFn = token ? ghFetch : publicFetch;
+      // The companion repo is private; prefer the device-flow token, then the
+      // signed-in token, then an unauthenticated request (works only if public).
+      const authToken = deviceUserToken || token;
+      const doFetch = (path) => fetch(API + path, {
+        headers: Object.assign(
+          { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
+          authToken ? { Authorization: "Bearer " + authToken } : {}
+        ),
+      });
 
       try {
-        const contentsRes = await fetchFn("/repos/" + OWNER + "/" + REPO + "/contents/" + dirPath + "?ref=main");
+        const contentsRes = await doFetch("/repos/" + vOwner + "/" + vRepo + "/contents/" + dirPath + "?ref=main");
         if (!contentsRes.ok) {
-          statusEl.innerHTML = '<span class="status-badge waiting">Directory not found yet</span>';
-          resultEl.innerHTML = '<div class="verify-result not-found">The directory <code>' + uploadPath + '</code> hasn\'t been created yet. If you just got approved, wait a moment and check again.</div>';
+          if (contentsRes.status === 404) {
+            statusEl.innerHTML = '<span class="status-badge waiting">No data uploaded yet</span>';
+            resultEl.innerHTML = '<div class="verify-result not-found"><code>' + dirPath + '</code> doesn\'t exist in <code>' + verifyRepo + '</code> yet. Drop a <code>.pca</code>/<code>.txrm</code> into your watch folder, give the watchdog ~30s, then check again.<br><br><a href="' + repoTreeUrl + '" target="_blank" style="color:var(--accent)">Open the companion repo on GitHub</a></div>';
+          } else {
+            statusEl.innerHTML = '<span class="status-badge waiting">Can\'t read the companion repo (HTTP ' + contentsRes.status + ')</span>';
+            resultEl.innerHTML = '<div class="verify-result not-found">The companion repo is private. Confirm directly on GitHub:<br><br><a href="' + repoTreeUrl + '" target="_blank" style="color:var(--accent)">' + repoTreeUrl + '</a></div>';
+          }
           spinner.style.display = "none"; return;
         }
         const files = await contentsRes.json();
@@ -1073,12 +1312,12 @@
 
         if (nonConfig.length > 0) {
           statusEl.innerHTML = '<span class="status-badge success">&#10003; Data detected!</span>';
-          resultEl.innerHTML = '<div class="verify-result found"><strong>Your facility is live!</strong> Found ' + nonConfig.length + ' data file(s) in <code>' + uploadPath + '</code>.<br><br>The watchdog is pushing data. The parse-and-aggregate workflow will process it automatically.</div>' +
-            '<div class="completion-links" style="margin-top:1.25rem"><a class="btn btn-primary" href="https://github.com/' + OWNER + '/' + REPO + '/tree/main/' + dirPath + '" target="_blank">View facility data</a><a class="btn" href="../">Go to Upload page</a></div>';
+          resultEl.innerHTML = '<div class="verify-result found"><strong>It works!</strong> Found ' + nonConfig.length + ' data file(s) in <code>' + verifyRepo + '/' + dirPath + '</code>.<br><br>The watchdog is parsing scans and pushing metadata to your companion repo.</div>' +
+            '<div class="completion-links" style="margin-top:1.25rem"><a class="btn btn-primary" href="' + repoTreeUrl + '" target="_blank">View facility data</a><a class="btn" href="../">Go to Upload page</a></div>';
           goToStep(5);
         } else {
           statusEl.innerHTML = '<span class="status-badge waiting">Directory exists, no data yet</span>';
-          resultEl.innerHTML = '<div class="verify-result not-found">The directory <code>' + uploadPath + '</code> exists but no data files were found yet. Copy the <code>example.pca</code> from <code>edge/test_data/</code> into your watch folder to test the loop.</div>';
+          resultEl.innerHTML = '<div class="verify-result not-found"><code>' + dirPath + '</code> exists but has no scan files yet. Drop a <code>.pca</code>/<code>.txrm</code> into your watch folder and check again.<br><br><a href="' + repoTreeUrl + '" target="_blank" style="color:var(--accent)">Open the companion repo on GitHub</a></div>';
         }
       } catch (err) { statusEl.innerHTML = '<span class="status-badge error">Error: ' + err.message + '</span>'; }
       spinner.style.display = "none";
