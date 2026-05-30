@@ -7,3 +7,21 @@ compatibility_date = "2024-01-01"
 
 [vars]
 ALLOWED_ORIGIN = "https://johntrue15.github.io"
+
+# Fleet monitoring (Phase 1). The Worker stores the latest watchdog heartbeat
+# per facility in this KV namespace and the dashboard reads it back.
+#
+# One-time setup (creates the namespace, prints an id):
+#   npx wrangler kv namespace create FLEET
+# then uncomment the block below and paste the printed id. The heartbeat and
+# /fleet/status endpoints degrade gracefully (no-op) until this is configured,
+# so deploying before creating the namespace will not break the other routes.
+#
+# [[kv_namespaces]]
+# binding = "FLEET"
+# id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# Stale-facility detection runs on a schedule and flags facilities whose
+# watchdog has gone silent. Harmless (no-op) until FLEET KV is configured.
+[triggers]
+crons = ["*/15 * * * *"]

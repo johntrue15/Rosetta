@@ -32,6 +32,8 @@
  *                                     Create + seed rosetta-facility-<slug>
  *   POST /runner/registration-token   Mint runner reg token + install ticket
  *   POST /watchdog/token              Mint short-lived push token for the watchdog
+ *   POST /watchdog/heartbeat          Ingest a watchdog status heartbeat (KV)
+ *   GET  /fleet/status                Org-gated fleet status for the dashboard
  *   POST /workflow/dispatch-deploy    Trigger deploy-watchdog.yml (App token)
  *   POST /e2e/cleanup                 Tear down companion repo + facility data + issue
  *   GET  /bootstrap-windows.ps1       PowerShell installer
@@ -68,6 +70,10 @@ export default {
           return await handleRunnerRegistrationToken(request, env);
         case "/watchdog/token":
           return await handleWatchdogToken(request, env);
+        case "/watchdog/heartbeat":
+          return await handleHeartbeat(request, env);
+        case "/fleet/status":
+          return await handleFleetStatus(request, env);
         case "/deploy/status":
           return await handleDeployStatus(request, env);
         case "/workflow/dispatch-deploy":
@@ -84,6 +90,17 @@ export default {
     } catch (err) {
       console.log("Worker error:", err && (err.stack || err.message || err));
       return jsonResponse({ error: "internal_error", message: String(err && err.message || err) }, 500);
+    }
+  },
+
+  // Stale-facility detection. Runs on the cron schedule in wrangler.toml and
+  // flags facilities whose watchdog has not sent a heartbeat within
+  // STALE_THRESHOLD_SECONDS. No-op until the FLEET KV namespace is configured.
+  async scheduled(event, env, ctx) {
+    try {
+      await detectStaleFacilities(env);
+    } catch (err) {
+      console.log("Scheduled error:", err && (err.stack || err.message || err));
     }
   },
 };
@@ -162,10 +179,14 @@ async function handleDeviceInit(request, env) {
   if (request.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
 
   const clientId = env.GITHUB_CLIENT_ID;
+  const body = await safeJson(request);
+  // The install flow needs no scopes; the fleet dashboard asks for "read:org"
+  // so /fleet/status can verify org membership with the caller's own token.
+  const scope = body && body.scope === "read:org" ? "read:org" : "";
   const res = await fetch("https://github.com/login/device/code", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ client_id: clientId, scope: "" }),
+    body: JSON.stringify({ client_id: clientId, scope }),
   });
   const data = await res.json();
   return jsonResponse(data, res.status);
@@ -416,6 +437,192 @@ async function handleWatchdogToken(request, env) {
     upload_path_prefix: "data/",
     facility_slug: slug,
   });
+}
+
+/* ===================================================================== */
+/* 5b. Fleet monitoring: heartbeat ingest + dashboard read + stale alerts  */
+/* ===================================================================== */
+
+const HEARTBEAT_TTL_SECONDS = 30 * 24 * 60 * 60; // keep last-seen for 30 days
+const STALE_THRESHOLD_SECONDS = 15 * 60;         // silent longer than this = stale
+
+// Cap the size/shape of what we persist so a compromised or buggy watchdog
+// cannot write arbitrary blobs into KV.
+function sanitizeHeartbeatStatus(raw) {
+  if (!raw || typeof raw !== "object") return {};
+  const s = {};
+  const str = (v, n = 200) => (v == null ? undefined : String(v).slice(0, n));
+  const num = (v) => (typeof v === "number" && isFinite(v) ? v : undefined);
+  s.version = str(raw.version, 40);
+  s.hostname = str(raw.hostname, 120);
+  s.platform = str(raw.platform, 120);
+  s.pid = num(raw.pid);
+  s.state = str(raw.state, 20);               // "running" | "stopped"
+  s.started_at = str(raw.started_at, 40);
+  s.last_cycle_at = str(raw.last_cycle_at, 40);
+  s.cycle_count = num(raw.cycle_count);
+  s.processed = num(raw.processed);
+  s.errors = num(raw.errors);
+  s.state_count = num(raw.state_count);
+  s.polling_interval = num(raw.polling_interval);
+  s.repo = str(raw.repo, 140);
+  if (Array.isArray(raw.watch_dirs)) {
+    s.watch_dirs = raw.watch_dirs.slice(0, 25).map((d) => ({
+      path: str(d && d.path, 300),
+      ok: !!(d && d.ok),
+    }));
+  }
+  // Drop undefined keys for compactness.
+  return JSON.parse(JSON.stringify(s));
+}
+
+async function handleHeartbeat(request, env) {
+  if (request.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
+
+  const body = await safeJson(request);
+  if (!body || !body.install_ticket) {
+    return jsonResponse({ error: "missing_install_ticket" }, 400);
+  }
+
+  const verified = await verifyInstallTicket(env, body.install_ticket);
+  if (!verified.ok) return jsonResponse({ error: verified.error }, 401);
+
+  const slug = sanitizeSlug(verified.claims.slug || "");
+  if (!slug) return jsonResponse({ error: "ticket_missing_slug" }, 400);
+
+  const serverTime = new Date().toISOString();
+
+  // KV is optional: without it the watchdog still runs, we just can't store
+  // status. Acknowledge so the watchdog doesn't treat this as an error.
+  if (!env.FLEET) {
+    return jsonResponse({ ok: true, stored: false, reason: "kv_not_configured", server_time: serverTime });
+  }
+
+  const record = {
+    slug,
+    received_at: serverTime,
+    ip: request.headers.get("CF-Connecting-IP") || null,
+    status: sanitizeHeartbeatStatus(body.status),
+  };
+  await env.FLEET.put(`hb:${slug}`, JSON.stringify(record), {
+    expirationTtl: HEARTBEAT_TTL_SECONDS,
+  });
+
+  return jsonResponse({ ok: true, stored: true, server_time: serverTime });
+}
+
+// Read-only fleet status for the org dashboard. Gated to members of the
+// facility-owner org: the dashboard runs device OAuth with `read:org` and we
+// verify membership with the caller's own token (no extra App permission).
+async function handleFleetStatus(request, env) {
+  if (request.method !== "GET") return jsonResponse({ error: "method_not_allowed" }, 405);
+
+  const member = await requireOrgMember(request, env);
+  if (!member.ok) return jsonResponse({ error: member.error }, member.status);
+
+  if (!env.FLEET) {
+    return jsonResponse({ facilities: [], generated_at: new Date().toISOString(), kv_configured: false });
+  }
+
+  const now = Date.now();
+  const facilities = [];
+  let cursor;
+  do {
+    const page = await env.FLEET.list({ prefix: "hb:", cursor });
+    for (const key of page.keys) {
+      const raw = await env.FLEET.get(key.name);
+      if (!raw) continue;
+      let rec;
+      try { rec = JSON.parse(raw); } catch { continue; }
+      const seen = Date.parse(rec.received_at || "") || 0;
+      const ageSeconds = seen ? Math.round((now - seen) / 1000) : null;
+      const stale = ageSeconds == null || ageSeconds > STALE_THRESHOLD_SECONDS;
+      const stopped = rec.status && rec.status.state === "stopped";
+      facilities.push({
+        slug: rec.slug,
+        received_at: rec.received_at,
+        age_seconds: ageSeconds,
+        health: stopped ? "stopped" : (stale ? "stale" : "online"),
+        ip: rec.ip || null,
+        status: rec.status || {},
+      });
+    }
+    cursor = page.cursor;
+  } while (cursor);
+
+  facilities.sort((a, b) => (a.slug || "").localeCompare(b.slug || ""));
+  return jsonResponse({
+    facilities,
+    generated_at: new Date().toISOString(),
+    stale_threshold_seconds: STALE_THRESHOLD_SECONDS,
+    kv_configured: true,
+  });
+}
+
+async function requireOrgMember(request, env) {
+  const auth = request.headers.get("Authorization") || "";
+  if (!auth.startsWith("Bearer ")) return { ok: false, status: 401, error: "missing_bearer_token" };
+  const userToken = auth.slice(7).trim();
+  const org = env.FACILITY_OWNER || DEFAULT_FACILITY_OWNER;
+
+  const res = await fetch(`${GH_API}/user/memberships/orgs/${org}`, {
+    headers: {
+      Authorization: `Bearer ${userToken}`,
+      Accept: "application/vnd.github+json",
+      "User-Agent": "rosetta-upload-worker",
+    },
+  });
+  if (res.status === 401) return { ok: false, status: 401, error: "invalid_user_token" };
+  if (!res.ok) {
+    // 403 usually means the token lacks the read:org scope; 404 = not a member.
+    return { ok: false, status: 403, error: "not_org_member_or_missing_read_org_scope" };
+  }
+  const data = await res.json();
+  if (data.state !== "active") return { ok: false, status: 403, error: "org_membership_inactive" };
+  return { ok: true, login: data.user && data.user.login, role: data.role, org };
+}
+
+async function detectStaleFacilities(env) {
+  if (!env.FLEET) return;
+  const now = Date.now();
+  const stale = [];
+  let cursor;
+  do {
+    const page = await env.FLEET.list({ prefix: "hb:", cursor });
+    for (const key of page.keys) {
+      const raw = await env.FLEET.get(key.name);
+      if (!raw) continue;
+      let rec;
+      try { rec = JSON.parse(raw); } catch { continue; }
+      const seen = Date.parse(rec.received_at || "") || 0;
+      const ageSeconds = seen ? Math.round((now - seen) / 1000) : null;
+      if (ageSeconds == null || ageSeconds > STALE_THRESHOLD_SECONDS) {
+        stale.push({ slug: rec.slug, age_seconds: ageSeconds, last_seen: rec.received_at });
+      }
+    }
+    cursor = page.cursor;
+  } while (cursor);
+
+  if (!stale.length) return;
+  console.log(`Stale facilities (${stale.length}):`, JSON.stringify(stale));
+
+  // Optional Slack alert. Set ALERT_SLACK_WEBHOOK as a Worker secret to enable.
+  if (env.ALERT_SLACK_WEBHOOK) {
+    const lines = stale.map(
+      (s) => `• *${s.slug}* — last seen ${s.last_seen || "never"} (${s.age_seconds == null ? "no heartbeat" : s.age_seconds + "s ago"})`,
+    );
+    try {
+      await fetch(env.ALERT_SLACK_WEBHOOK, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: `:warning: Rosetta watchdog stale (${stale.length}):\n${lines.join("\n")}`,
+        }),
+      });
+    } catch (err) {
+      console.log("Slack alert failed:", err && err.message);
+    }
+  }
 }
 
 /* ===================================================================== */

@@ -23,6 +23,8 @@ pipeline:
 | `POST /facility/create-companion-repo` | Create + seed `rosetta-facility-<slug>` private repo. Auth: bearer device token OR onboard HMAC. |
 | `POST /runner/registration-token`    | Mint a runner-registration token + install ticket for the bootstrap script.                       |
 | `POST /watchdog/token`               | Trade install ticket for a 1-hour App installation token (used by the watchdog).                  |
+| `POST /watchdog/heartbeat`           | Ingest a watchdog status heartbeat into KV (auth: install ticket). No-op until `FLEET` KV is set. |
+| `GET  /fleet/status`                 | Aggregated fleet status for the dashboard (auth: bearer token of an active `FACILITY_OWNER` org member). |
 | `POST /deploy/status` or `GET ?…`    | Proxy the latest `deploy-watchdog.yml` run for a facility (auth: install ticket).                 |
 | `POST /workflow/dispatch-deploy`   | Trigger `deploy-watchdog.yml` on the companion repo (auth: install ticket or HMAC).                 |
 | `POST /e2e/cleanup`                  | Delete companion repo, facility data dir, and facility issue (auth: HMAC).                        |
@@ -45,6 +47,7 @@ Set these via `wrangler secret put` (don't commit them to `wrangler.toml`).
 | `ONBOARD_HMAC_KEY`         | Shared with `facility-onboard.yml` (`secrets.ROSETTA_ONBOARD_HMAC_KEY`).                  |
 | `MAIN_REPO`                | Optional override, default `johntrue15/Rosetta`.                                         |
 | `FACILITY_OWNER`           | Optional override, default `x-raymetadata` (org where companion repos live). GitHub Apps cannot create repos under a personal account, so this must be an org.                    |
+| `ALERT_SLACK_WEBHOOK`      | Optional. Slack incoming-webhook URL for stale-facility alerts (fleet monitoring).        |
 
 Equivalent main-repo secrets for `facility-onboard.yml`:
 
@@ -52,6 +55,33 @@ Equivalent main-repo secrets for `facility-onboard.yml`:
 | ---------------------------- | ------------------------------------------------------ |
 | `ROSETTA_WORKER_URL`         | Base URL of this Worker, e.g. `https://rosetta.jtrue15.workers.dev`. |
 | `ROSETTA_ONBOARD_HMAC_KEY`   | Matches `ONBOARD_HMAC_KEY` on the Worker.              |
+
+## Fleet monitoring (Phase 1)
+
+The watchdog periodically POSTs a status heartbeat (version, host, processed/
+error counts, watch-dir health) to `POST /watchdog/heartbeat`, authenticated by
+the same install ticket it uses for data pushes. The Worker stores the latest
+heartbeat per facility in a KV namespace, and the org dashboard at
+`docs/fleet/` reads it back via `GET /fleet/status`.
+
+**Enable it (one-time):**
+
+```bash
+npx wrangler kv namespace create FLEET
+```
+
+Copy the printed `id` into the commented `[[kv_namespaces]]` block in
+`wrangler.toml` (binding `FLEET`), uncomment it, and redeploy. Until then the
+heartbeat and fleet endpoints **degrade gracefully** (return `ok` / empty) so
+the rest of the Worker keeps working.
+
+- **Dashboard access** is gated to **active members of the `FACILITY_OWNER`
+  org**. The dashboard runs device OAuth requesting the `read:org` scope, and
+  `/fleet/status` verifies membership with the caller's own token — no extra
+  GitHub App permission required.
+- **Stale alerts**: a cron (`*/15 * * * *` in `wrangler.toml`) flags facilities
+  silent for >15 min. Set the optional `ALERT_SLACK_WEBHOOK` secret to receive
+  Slack notifications; otherwise stale facilities just surface in the dashboard.
 
 ## GitHub App "Rosetta Upload" — required permissions
 

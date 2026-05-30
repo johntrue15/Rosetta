@@ -99,6 +99,13 @@ def _log_startup_banner(log, config, config_path: Path) -> None:
         )
     else:
         log.info("Auth mode: static PAT (env=%s)", config.github.token_env)
+    if config.monitoring.heartbeat_url:
+        log.info(
+            "Fleet monitoring: ON (heartbeat → %s every %ds)",
+            config.monitoring.heartbeat_url, config.monitoring.interval_seconds,
+        )
+    else:
+        log.info("Fleet monitoring: off (no monitoring.heartbeat_url in config)")
     log.info("=" * 60)
 
 
@@ -235,7 +242,14 @@ def main(argv: list[str] | None = None) -> None:
 
         return True
 
-    watcher = DirectoryWatcher(config, process_file)
+    heartbeat = None
+    if config.monitoring.heartbeat_url and (worker_auth and install_ticket_ok):
+        from .push.heartbeat import HeartbeatReporter
+        heartbeat = HeartbeatReporter(
+            config.monitoring, config.auth, config.github, __version__,
+        )
+
+    watcher = DirectoryWatcher(config, process_file, heartbeat=heartbeat)
 
     if args.once:
         count = watcher.run_once()

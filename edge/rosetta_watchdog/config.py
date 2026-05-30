@@ -55,6 +55,20 @@ class GitHubConfig:
 
 
 @dataclass
+class MonitoringConfig:
+    """Optional fleet monitoring: the watchdog periodically POSTs a status
+    heartbeat to the Rosetta Upload Worker so the org dashboard can show which
+    facilities are online, their version, and recent activity.
+
+    Reuses the same install ticket as ``auth`` (``install_ticket_env``); no
+    extra credentials are needed. Disabled when ``heartbeat_url`` is unset.
+    """
+
+    heartbeat_url: Optional[str] = None
+    interval_seconds: int = 300
+
+
+@dataclass
 class LoggingConfig:
     level: str = "INFO"
     file: Optional[str] = None
@@ -68,6 +82,7 @@ class WatchdogConfig:
     parser_backend: str = "auto"
     github: GitHubConfig = field(default_factory=GitHubConfig)
     auth: AuthConfig = field(default_factory=AuthConfig)
+    monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     state_file: str = "processed_files.json"
 
@@ -97,6 +112,12 @@ def load_config(path: Path) -> WatchdogConfig:
         install_ticket_env=auth_raw.get("install_ticket_env", "ROSETTA_INSTALL_TICKET"),
     )
 
+    mon_raw = raw.get("monitoring", {}) or {}
+    monitoring = MonitoringConfig(
+        heartbeat_url=mon_raw.get("heartbeat_url"),
+        interval_seconds=mon_raw.get("interval_seconds", 300),
+    )
+
     log_raw = raw.get("logging", {})
     logging_cfg = LoggingConfig(
         level=log_raw.get("level", "INFO"),
@@ -110,6 +131,7 @@ def load_config(path: Path) -> WatchdogConfig:
         parser_backend=raw.get("parser_backend", "auto"),
         github=github,
         auth=auth,
+        monitoring=monitoring,
         logging=logging_cfg,
         state_file=raw.get("state_file", "processed_files.json"),
     )

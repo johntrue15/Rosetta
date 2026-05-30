@@ -67,10 +67,12 @@ class DirectoryWatcher:
         self,
         config: WatchdogConfig,
         process_callback: Callable[[str, str], bool],
+        heartbeat=None,
     ):
         self._config = config
         self._process = process_callback
         self._state = ProcessedState(config.state_file)
+        self._heartbeat = heartbeat
         self._total_processed = 0
         self._total_errors = 0
         self._total_skipped_duplicates = 0
@@ -189,6 +191,9 @@ class DirectoryWatcher:
                 self._cycle_count, elapsed, self._state.count,
             )
 
+        if self._heartbeat is not None:
+            self._heartbeat.maybe_send(self, force=(total > 0))
+
         return total
 
     def run_forever(self) -> None:
@@ -200,6 +205,9 @@ class DirectoryWatcher:
         logger.info("Starting continuous watch — monitoring: %s", dirs_str)
         logger.info("Polling every %ds — press Ctrl+C to stop",
                      self._config.polling_interval_seconds)
+
+        if self._heartbeat is not None:
+            self._heartbeat.maybe_send(self, state="running", force=True)
 
         consecutive_errors = 0
         max_consecutive = 10
@@ -233,3 +241,5 @@ class DirectoryWatcher:
                 "(%d processed, %d errors)",
                 self._cycle_count, self._total_processed, self._total_errors,
             )
+            if self._heartbeat is not None:
+                self._heartbeat.maybe_send(self, state="stopped", force=True)
