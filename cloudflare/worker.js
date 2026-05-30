@@ -1094,6 +1094,11 @@ if (-not $worker) {
   throw "Set ROSETTA_WORKER_URL to the Rosetta Upload Worker base URL."
 }
 
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+  throw "This advanced installer registers a Windows service and must run in an elevated PowerShell. Re-open PowerShell as Administrator, or use the simpler 'Download & run' installer from the setup wizard (no admin required)."
+}
+
 $runnerDir  = if ($env:ROSETTA_RUNNER_DIR) { $env:ROSETTA_RUNNER_DIR } else { "C:\\rosetta-runner" }
 $runnerName = if ($env:ROSETTA_RUNNER_NAME) { $env:ROSETTA_RUNNER_NAME } else { "rosetta-$slug" }
 

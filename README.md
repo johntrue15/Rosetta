@@ -30,7 +30,9 @@ Use the **[Setup Facility](https://johntrue15.github.io/Rosetta/docs/setup-facil
 1. **Request** a facility via a GitHub issue (from the wizard or issue template).
 2. **Maintainer approves** by adding the `facility-approved` label.
 3. **Device-code OAuth** authorizes the **Rosetta Upload** GitHub App (short code at `github.com/login/device` — no PAT).
-4. **Bootstrap one-liner** registers a self-hosted runner on a private `rosetta-facility-<slug>` companion repo and deploys the [Edge Watchdog](edge/) as a service.
+4. **Download & run** the installer the wizard generates: a single command that installs Python automatically if needed (Windows, no admin), downloads the [Edge Watchdog](edge/), and starts monitoring your scan folder. Metadata is pushed to a private `x-raymetadata/rosetta-facility-<slug>` companion repo.
+
+> _Advanced:_ the wizard also offers a self-hosted-runner one-liner that installs the watchdog as an auto-start service (requires an administrator terminal).
 
 ## Repository Layout
 

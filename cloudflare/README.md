@@ -7,8 +7,11 @@ pipeline:
    for maintainer sign-in.
 2. **Device-code self-service install** (`POST /device/*`,
    `/facility/create-companion-repo`, `/runner/registration-token`,
-   `/watchdog/token`, `/deploy/status`) used by the new wizard Step 4 +
-   per-facility runner bootstrap. No PATs touch the user.
+   `/watchdog/token`, `/deploy/status`) used by the wizard's Install step.
+   The primary path is **download-and-run** (the wizard generates a script
+   that installs the watchdog directly); the `bootstrap-*` scripts +
+   `/deploy/status` back the **Advanced** self-hosted-runner path. No PATs
+   touch the user.
 
 ## Routes
 
@@ -41,7 +44,7 @@ Set these via `wrangler secret put` (don't commit them to `wrangler.toml`).
 | `INSTALL_TICKET_KEY`       | Random 32+ byte secret used to HMAC install tickets handed to the bootstrap + watchdog. |
 | `ONBOARD_HMAC_KEY`         | Shared with `facility-onboard.yml` (`secrets.ROSETTA_ONBOARD_HMAC_KEY`).                  |
 | `MAIN_REPO`                | Optional override, default `johntrue15/Rosetta`.                                         |
-| `FACILITY_OWNER`           | Optional override, default `johntrue15` (where companion repos live).                    |
+| `FACILITY_OWNER`           | Optional override, default `x-raymetadata` (org where companion repos live). GitHub Apps cannot create repos under a personal account, so this must be an org.                    |
 
 Equivalent main-repo secrets for `facility-onboard.yml`:
 

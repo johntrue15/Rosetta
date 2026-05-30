@@ -4,24 +4,32 @@ Standalone service that monitors Xradia / Phoenix CT scanner output
 directories for new `.txrm` / `.pca` files, extracts metadata, and pushes it
 to the Rosetta GitHub repository for aggregation.
 
-## Recommended install — Setup Facility wizard (no PAT, no clone)
+## Recommended install — Setup Facility wizard (download & run)
 
 Go to **<https://johntrue15.github.io/Rosetta/docs/setup-facility/>** and
-follow the wizard. After approval Step 4 will:
+follow the wizard. After approval, the Install step will:
 
 1. Run a device-code flow against the **Rosetta Upload** GitHub App
    (you type a short code at `github.com/login/device` — no token to copy).
-2. Auto-create your private `johntrue15/rosetta-facility-<slug>` companion
-   repo, which owns a self-hosted GitHub Actions runner on your CT machine.
-3. Give you a single PowerShell / bash one-liner. Paste it as administrator
-   on the CT machine — the script downloads the runner, registers it, and
-   triggers `deploy-watchdog.yml` which installs the watchdog as a service.
+2. Auto-create your private `x-raymetadata/rosetta-facility-<slug>` companion
+   repo, where this facility's scan metadata is stored.
+3. Generate a **download-and-run installer** (`.ps1` for Windows, `.sh` for
+   macOS/Linux). Download it and run a single command on the CT machine. The
+   installer:
+   - installs **Python automatically** if missing (Windows, per-user, no admin),
+   - downloads the watchdog from a repo **ZIP** (no Git required),
+   - `pip install`s the watchdog and writes a `config.yml`, and
+   - starts monitoring your scan folder.
 
-After that the runner self-updates (`actions/runner` built-in) and the
-companion repo's daily `update-watchdog.yml` redeploys the watchdog
-whenever upstream `edge/` changes. The watchdog itself never holds a PAT —
-it refreshes a 1-hour GitHub App installation token from the Cloudflare
-Worker before each push.
+The watchdog never holds a PAT — it refreshes a 1-hour GitHub App installation
+token from the Cloudflare Worker (using the embedded install ticket) before
+each push.
+
+> **Advanced (auto-start service):** the wizard also offers a self-hosted
+> GitHub Actions runner one-liner that installs the watchdog as a background
+> service via `deploy-watchdog.yml`. This requires an **administrator**
+> terminal and is mainly useful for unattended machines. Most users should
+> prefer the download-and-run installer above.
 
 See `cloudflare/README.md` for the Worker + GitHub App configuration that
 backs this flow.
@@ -66,10 +74,11 @@ Add multiple entries under `watch_directories` — each tagged with a
 1. Polls configured directories for new `.txrm` / `.pca` files.
 2. Parses metadata using XradiaPy (preferred) or olefile (fallback) for `.txrm`;
    built-in parser for `.pca`.
-3. Pushes a Rosetta-compatible JSON file to `data/<facility>/` in
-   `johntrue15/Rosetta` (auth: Worker-issued App token or PAT fallback).
-4. The existing `parse-and-aggregate.yml` workflow aggregates it into
-   `metadata.json` and `metadata.csv`.
+3. Pushes a Rosetta-compatible JSON file to `data/<slug>/` in the facility's
+   private companion repo `x-raymetadata/rosetta-facility-<slug>` (auth:
+   Worker-issued, repo-scoped App token; PAT fallback for legacy installs that
+   target `johntrue15/Rosetta`).
+4. Aggregation workflows process it into `metadata.json` / `metadata.csv`.
 
 ## Manual end-to-end test of the new install flow
 
@@ -83,28 +92,29 @@ Manual checklist (when changing install components):
 `templates/facility-repo/` workflows.
 
 1. **Request a facility** in the wizard with a throw-away name like
-   `e2e-<date>` and one fake machine entry.
+   `e2e-<date>` and one machine entry (watch path can be a local test folder).
 2. **Maintainer approval**: add the `facility-approved` label on the issue.
    - `facility-onboard.yml` should create `data/e2e-<date>/config.yml`.
    - `Request companion repo from Rosetta Upload Worker` step should report
      `ok=true` and the comment should link to the wizard.
-3. **Wizard Step 4 device flow**: reload the wizard signed in as the
-   requester; you should land directly on Step 4.
+3. **Wizard Install step (device flow)**: reload the wizard signed in as the
+   requester; you should land directly on the Install step.
    - Click *Start device authorization*, approve at github.com/login/device.
-   - `bootstrap-panel` should reveal a one-liner; `deploy-status-panel`
-     should appear with "No deploy run yet".
-4. **Run the one-liner** in a Windows VM / Mac / Linux box. Confirm:
-   - `actions-runner` directory created.
-   - Runner registers (visible at
-     `https://github.com/johntrue15/rosetta-facility-<slug>/settings/actions/runners`).
-   - `deploy-watchdog.yml` triggers and turns green.
-   - Service `RosettaWatchdog` (Windows) or `rosetta-watchdog` (Linux/macOS)
-     is running.
-5. **Push a test file** into the watch directory (use
-   `edge/test_data/example.pca`). The wizard's Step 5 should detect the new
-   file in `data/<slug>/` within ~30s.
-6. **Update path**: bump `edge/` SHA on `main`. Trigger
-   `update-watchdog.yml` from `Actions` on the companion repo; confirm a
-   new `deploy-watchdog.yml` run starts and completes.
-7. **Auth rotation**: tail the watchdog log; you should see at least one
+   - The **Download & run** panel should appear with a watch-folder field and
+     a *Download installer* button.
+4. **Download and run the installer** on a Windows / Mac / Linux box.
+   Confirm in the console:
+   - On Windows without Python: it auto-installs Python, then continues.
+   - It downloads the repo ZIP, `pip install`s the watchdog, writes
+     `config.yml`, and prints the startup banner with `[OK] <watch folder>`.
+5. **Drop a test file** (`edge/test_data/example.pca`) into the watch folder.
+   Within ~30s the log should show it parsing and pushing
+   `<name>.pca.json` to `data/<slug>/` in the companion repo. The wizard's
+   verify step should detect it in the companion repo.
+6. **Auth rotation**: tail the watchdog log; you should see at least one
    "Refreshed GitHub App installation token" entry within an hour.
+
+> The **Advanced** self-hosted-runner path (`bootstrap-windows.ps1` →
+> `deploy-watchdog.yml` → `RosettaWatchdog` service) is exercised by the
+> automated Dell E2E (`watchdog-windows-e2e.yml`); see
+> [`.github/scripts/e2e/README.md`](../.github/scripts/e2e/README.md).

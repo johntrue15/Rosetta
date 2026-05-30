@@ -216,7 +216,7 @@
       <div class="dev-card">
         <h2>Developer / new-account install test</h2>
         <p>
-          Test <strong>Step 4 only</strong> — device OAuth + bootstrap — without signing into the wizard.
+          Test <strong>the install step only</strong> — device OAuth + download-and-run installer — without signing into the wizard.
           Use a <strong>secondary GitHub account</strong> (or your own) at
           <code>github.com/login/device</code>. No collaborator access or PAT required for this step.
         </p>
@@ -335,10 +335,11 @@
         <div class="step-card">
           <h2>Step 3 — Install the Rosetta Watchdog</h2>
           <p class="subtitle">
-            We'll register a small self-hosted GitHub Actions runner on the CT machine.
-            The runner deploys the watchdog as a background service and keeps both
-            itself and the watchdog up to date.
-            <strong>No personal access tokens, no <code>git clone</code>.</strong>
+            Approve the GitHub App on this device, then download a ready-to-run installer
+            for your facility and run a single command on the CT machine. It installs the
+            watchdog and starts monitoring your scan folder.
+            <strong>No personal access tokens, no <code>git clone</code> — Python is installed
+            automatically on Windows if needed.</strong>
           </p>
 
           <!-- 4a: device code panel -->
@@ -427,7 +428,11 @@
               This downloads the GitHub Actions runner, registers it against your private
               <code id="bootstrap-repo-name">rosetta-facility-…</code> companion repo, installs it as a service,
               and triggers the initial <code>deploy-watchdog.yml</code> workflow which installs the watchdog.
+              Requires an <strong>administrator</strong> terminal.
             </p>
+            <div class="form-actions" style="margin-top:0.75rem">
+              <button class="btn btn-sm" id="watch-deploy-btn">Watch deploy progress</button>
+            </div>
           </div>
 
           <!-- 4c: live deploy status -->
@@ -982,8 +987,9 @@
       renderBootstrapCommands();
       document.getElementById("quick-install-panel").style.display = "block";
       document.getElementById("bootstrap-panel").style.display = "block";
-      document.getElementById("deploy-status-panel").style.display = "block";
-      startDeployPolling();
+      // The deploy-status panel polls the runner-based deploy workflow, which only
+      // applies to the Advanced bootstrap path. Show + poll it only if the user opts
+      // into that path (see the Advanced "watch deploy" button below).
     }
 
     /* ---- Quick install: download a fresh repo + run a single command ---- */
@@ -1239,6 +1245,15 @@
       setInstallCmd("install-cmd-win-ps", winCmd);
       setInstallCmd("install-cmd-mac", unixCmd);
       setInstallCmd("install-cmd-linux", unixCmd);
+
+      const watchBtn = document.getElementById("watch-deploy-btn");
+      if (watchBtn) {
+        watchBtn.onclick = () => {
+          document.getElementById("deploy-status-panel").style.display = "block";
+          watchBtn.disabled = true;
+          startDeployPolling();
+        };
+      }
     }
 
     function setInstallCmd(blockId, text) {

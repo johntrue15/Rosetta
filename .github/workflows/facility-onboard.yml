@@ -218,7 +218,7 @@ jobs:
             const uploadPath = `${{ steps.parse.outputs.upload_path }}`;
             const machines   = JSON.parse(process.env.MACHINES_JSON);
             const companionOk   = process.env.COMPANION_OK === 'true';
-            const companionRepo = process.env.COMPANION_REPO || `johntrue15/rosetta-facility-${slug}`;
+            const companionRepo = process.env.COMPANION_REPO || `x-raymetadata/rosetta-facility-${slug}`;
 
             const machineList = machines.map(m => `- **${m.name}** (${m.format}) → \`${m.path}\``).join('\n');
             const wizardUrl   = `https://${context.repo.owner}.github.io/${context.repo.repo}/docs/setup-facility/`;
@@ -235,18 +235,21 @@ jobs:
               `### Install the watchdog (no PAT required)`,
               ``,
               `1. Go to the setup wizard: **[${wizardUrl}](${wizardUrl})**`,
-              `2. The wizard will jump straight to **Step 4 — Install** for facility \`${slug}\`.`,
+              `2. The wizard jumps straight to **Step 3 — Install** for facility \`${slug}\`.`,
               `3. Approve the **Rosetta Upload** GitHub App via the short device code shown on screen.`,
-              `4. Copy the one-line PowerShell / bash installer the wizard generates and paste it on the CT machine.`,
+              `4. Click **Download installer**, then run the single command it shows on the CT machine.`,
               ``,
-              `That command registers a self-hosted GitHub Actions runner against`,
+              `The installer downloads the watchdog, installs Python automatically if missing`,
+              `(Windows, no admin), writes your config, and starts monitoring your scan folder.`,
+              `Scan metadata is pushed to your private companion repo`,
               companionOk
                 ? `\`${companionRepo}\` (already created for you).`
                 : `\`${companionRepo}\` (the wizard will create it on first visit).`,
-              `The runner then deploys the watchdog as a service and self-updates from this repo daily.`,
               ``,
-              `> No personal access token. No \`git clone\`. No \`pip install\`.`,
+              `> No personal access token. No \`git clone\`. No self-hosted runner required.`,
               `> All credentials are scoped, rotating App installation tokens issued by the Rosetta Upload Worker.`,
+              `>`,
+              `> _Advanced:_ the wizard also offers a self-hosted-runner option that installs the watchdog as an auto-start service (requires an administrator terminal).`,
               ``,
               `<details><summary>Legacy manual install (still supported)</summary>`,
               ``,

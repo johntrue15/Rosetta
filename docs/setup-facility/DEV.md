@@ -1,7 +1,7 @@
 # Developer install test (new GitHub account)
 
-Use this to test **Step 4 only** — device OAuth, bootstrap one-liner, deploy
-status — without signing into the wizard or having collaborator access on
+Use this to test **the install step only** — device OAuth + the download-and-run
+installer — without signing into the wizard or having collaborator access on
 Rosetta.
 
 ## Quick start
@@ -20,24 +20,25 @@ Rosetta.
 
 3. Click **Check config.yml** → should show green checkmark.
 
-4. Click **Go to Step 4 — test device install**.
+4. Click **Go to Step 3 — test device install**.
 
 5. Click **Start device authorization** → at `github.com/login/device` sign in
    with your **test account** and approve **Rosetta Upload**.
 
-6. Copy the **Windows PowerShell** one-liner → paste on the CT machine / Dell
-   (Administrator PowerShell).
+6. In the **Download & run** panel, set a watch folder, click **Download
+   installer**, and run the single command it shows on the CT machine
+   (no admin required; installs Python automatically on Windows).
 
-7. Watch **Deploy progress** → when green, use **Verify data uploads** (works
-   without wizard sign-in for public repo reads).
+7. Drop a `.pca`/`.txrm` into the watch folder, then use **Verify data
+   uploads** — it checks the companion repo where data lands.
 
 ## URL parameters
 
 | Param | Example | Effect |
 |-------|---------|--------|
-| `dev=1` | required | Shows developer panel, skips wizard login for Step 4 |
+| `dev=1` | required | Shows developer panel, skips wizard login for the install step |
 | `slug` | `my-install-test` | Pre-fills facility slug |
-| `step=4` | with `slug` | Auto-jumps to Step 4 on load |
+| `step=3` (or `step=4`) | with `slug` | Auto-jumps to the install step on load |
 
 **Bookmark example:**
 
@@ -50,7 +51,7 @@ https://johntrue15.github.io/Rosetta/docs/setup-facility/?dev=1&slug=dev-install
 Device OAuth is **separate** from wizard sign-in (`gh_token` in localStorage).
 
 - Wizard login (Step 1) = browser OAuth popup → used for facility issues / API.
-- Step 4 device flow = short code at `github.com/login/device` → used for
+- Install-step device flow = short code at `github.com/login/device` → used for
   Rosetta Upload App + companion repo + install ticket.
 
 To simulate a new facility user:
@@ -69,8 +70,12 @@ That account does **not** need to be a Rosetta collaborator.
 
 ## Cleanup after a manual test
 
-- Delete companion repo: `johntrue15/rosetta-facility-<slug>`
+- Delete companion repo: `x-raymetadata/rosetta-facility-<slug>`
 - Remove `data/<slug>/` on main if desired
-- On the CT machine: stop `RosettaWatchdog` service and remove `C:\rosetta-runner`
+- On the CT machine (download-and-run install): stop the running watchdog
+  (Ctrl+C) and remove `%USERPROFILE%\rosetta-watchdog` (Windows) or
+  `$HOME/rosetta-watchdog` (macOS/Linux)
+- On the CT machine (Advanced runner install): stop `RosettaWatchdog` service
+  and remove `C:\rosetta-runner`
 
 Or re-run the automated E2E workflow which cleans up for you.
