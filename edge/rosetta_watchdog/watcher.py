@@ -14,6 +14,11 @@ from .config import WatchdogConfig, WatchDirectory
 logger = logging.getLogger(__name__)
 
 
+class RestartRequested(Exception):
+    """Raised to break out of run_forever so the CLI can re-exec the process
+    (used after a remote update or an explicit restart command)."""
+
+
 class ProcessedState:
     """Tracks which files have already been processed, persisted to disk."""
 
@@ -68,11 +73,18 @@ class DirectoryWatcher:
         config: WatchdogConfig,
         process_callback: Callable[[str, str], bool],
         heartbeat=None,
+        command_handler=None,
+        on_loop=None,
     ):
         self._config = config
         self._process = process_callback
         self._state = ProcessedState(config.state_file)
         self._heartbeat = heartbeat
+        # command_handler(cmd, watcher) -> True | False | "restart"
+        self._command_handler = command_handler
+        # on_loop(watcher) called once per poll loop (e.g. periodic auto-update)
+        self._on_loop = on_loop
+        self._paused = False
         self._total_processed = 0
         self._total_errors = 0
         self._total_skipped_duplicates = 0
@@ -191,10 +203,46 @@ class DirectoryWatcher:
                 self._cycle_count, elapsed, self._state.count,
             )
 
-        if self._heartbeat is not None:
-            self._heartbeat.maybe_send(self, force=(total > 0))
-
         return total
+
+    def _ack_and_flush(self, command_id) -> None:
+        """Ack a command and immediately flush it to the Worker. Used before a
+        restart so the command is not re-delivered to the new process."""
+        if self._heartbeat is None or command_id is None:
+            return
+        self._heartbeat.ack(command_id)
+        try:
+            self._heartbeat.maybe_send(self, state="updating", force=True)
+        except Exception:
+            pass
+
+    def _dispatch_command(self, cmd: dict) -> None:
+        """Execute one remote command. May raise RestartRequested."""
+        ctype = (cmd or {}).get("type")
+        cid = (cmd or {}).get("id")
+        logger.info("Received remote command: %s (id=%s)", ctype, cid)
+
+        if ctype == "pause":
+            self._paused = True
+            result = True
+        elif ctype == "resume":
+            self._paused = False
+            result = True
+        elif ctype == "run-once":
+            self.run_once()
+            result = True
+        elif self._command_handler is not None:
+            # reload-config / configure / update-now / restart
+            result = self._command_handler(cmd, self)
+        else:
+            logger.warning("No handler for command %s", ctype)
+            result = False
+
+        if result == "restart":
+            self._ack_and_flush(cid)
+            raise RestartRequested(ctype)
+        if result and self._heartbeat is not None:
+            self._heartbeat.ack(cid)
 
     def run_forever(self) -> None:
         """Poll watch directories in a loop until interrupted."""
@@ -214,25 +262,43 @@ class DirectoryWatcher:
 
         try:
             while True:
-                try:
-                    self.run_once()
-                    consecutive_errors = 0
-                except KeyboardInterrupt:
-                    raise
-                except Exception:
-                    consecutive_errors += 1
-                    logger.exception(
-                        "Unexpected error in scan cycle #%d "
-                        "(%d consecutive error(s))",
-                        self._cycle_count, consecutive_errors,
-                    )
-                    if consecutive_errors >= max_consecutive:
-                        logger.error(
-                            "Too many consecutive errors (%d) — stopping. "
-                            "Check directory permissions and network connectivity.",
-                            consecutive_errors,
-                        )
+                # Heartbeat + remote commands run outside the scan try/except so
+                # monitoring and control keep working even if scanning fails.
+                if self._heartbeat is not None:
+                    try:
+                        state = "paused" if self._paused else "running"
+                        commands = self._heartbeat.maybe_send(self, state=state, force=True)
+                    except RestartRequested:
                         raise
+                    except Exception:
+                        commands = []
+                        logger.debug("Heartbeat error (ignored)", exc_info=True)
+                    for cmd in commands or []:
+                        self._dispatch_command(cmd)  # may raise RestartRequested
+
+                if self._on_loop is not None:
+                    self._on_loop(self)  # periodic auto-update; may raise RestartRequested
+
+                if not self._paused:
+                    try:
+                        self.run_once()
+                        consecutive_errors = 0
+                    except KeyboardInterrupt:
+                        raise
+                    except Exception:
+                        consecutive_errors += 1
+                        logger.exception(
+                            "Unexpected error in scan cycle #%d "
+                            "(%d consecutive error(s))",
+                            self._cycle_count, consecutive_errors,
+                        )
+                        if consecutive_errors >= max_consecutive:
+                            logger.error(
+                                "Too many consecutive errors (%d) — stopping. "
+                                "Check directory permissions and network connectivity.",
+                                consecutive_errors,
+                            )
+                            raise
 
                 time.sleep(self._config.polling_interval_seconds)
         except KeyboardInterrupt:

@@ -32,8 +32,13 @@
  *                                     Create + seed rosetta-facility-<slug>
  *   POST /runner/registration-token   Mint runner reg token + install ticket
  *   POST /watchdog/token              Mint short-lived push token for the watchdog
- *   POST /watchdog/heartbeat          Ingest a watchdog status heartbeat (KV)
+ *   POST /watchdog/heartbeat          Ingest a watchdog status heartbeat (KV); returns commands
+ *   POST /watchdog/version            Target version for the facility's channel
  *   GET  /fleet/status                Org-gated fleet status for the dashboard
+ *   POST /fleet/command               Org-gated: queue a control command for a facility
+ *   POST /fleet/revoke|unrevoke       Org-gated: revoke/restore an install ticket (kill switch)
+ *   POST /fleet/set-channel           Org-gated: set a facility's update channel
+ *   GET  /fleet/audit                 Org-gated: recent security/control events for a facility
  *   POST /workflow/dispatch-deploy    Trigger deploy-watchdog.yml (App token)
  *   POST /e2e/cleanup                 Tear down companion repo + facility data + issue
  *   GET  /bootstrap-windows.ps1       PowerShell installer
@@ -72,8 +77,20 @@ export default {
           return await handleWatchdogToken(request, env);
         case "/watchdog/heartbeat":
           return await handleHeartbeat(request, env);
+        case "/watchdog/version":
+          return await handleWatchdogVersion(request, env);
         case "/fleet/status":
           return await handleFleetStatus(request, env);
+        case "/fleet/command":
+          return await handleFleetCommand(request, env);
+        case "/fleet/revoke":
+          return await handleFleetRevoke(request, env, true);
+        case "/fleet/unrevoke":
+          return await handleFleetRevoke(request, env, false);
+        case "/fleet/set-channel":
+          return await handleFleetSetChannel(request, env);
+        case "/fleet/audit":
+          return await handleFleetAudit(request, env);
         case "/deploy/status":
           return await handleDeployStatus(request, env);
         case "/workflow/dispatch-deploy":
@@ -420,6 +437,15 @@ async function handleWatchdogToken(request, env) {
   const slug = sanitizeSlug(verified.claims.slug || "");
   if (!slug) return jsonResponse({ error: "ticket_missing_slug" }, 400);
 
+  // Machine binding: record the machine_id the ticket is used from. When
+  // ENFORCE_MACHINE_BINDING is set, deny a ticket presented from a different
+  // machine than first seen (a leaked ticket is then useless elsewhere).
+  const machineId = body.machine_id ? String(body.machine_id).slice(0, 80) : null;
+  if (machineId) {
+    const denied = await enforceMachineBinding(env, slug, machineId);
+    if (denied) return jsonResponse({ error: denied }, 403);
+  }
+
   // The watchdog only ever pushes scan data into its own facility's companion
   // repo. The token is scoped to that single repo with contents:write only — it
   // cannot reach the main repo, other facilities, workflows, or org admin.
@@ -493,22 +519,293 @@ async function handleHeartbeat(request, env) {
   const serverTime = new Date().toISOString();
 
   // KV is optional: without it the watchdog still runs, we just can't store
-  // status. Acknowledge so the watchdog doesn't treat this as an error.
+  // status or deliver commands. Acknowledge so the watchdog doesn't error.
   if (!env.FLEET) {
-    return jsonResponse({ ok: true, stored: false, reason: "kv_not_configured", server_time: serverTime });
+    return jsonResponse({ ok: true, stored: false, reason: "kv_not_configured", server_time: serverTime, commands: [] });
   }
+
+  const machineId = body.machine_id ? String(body.machine_id).slice(0, 80) : null;
+  const binding = await checkMachineBinding(env, slug, machineId);
 
   const record = {
     slug,
     received_at: serverTime,
     ip: request.headers.get("CF-Connecting-IP") || null,
+    machine_id: machineId,
+    binding: binding.state,            // "first" | "match" | "conflict" | "unknown"
     status: sanitizeHeartbeatStatus(body.status),
   };
   await env.FLEET.put(`hb:${slug}`, JSON.stringify(record), {
     expirationTtl: HEARTBEAT_TTL_SECONDS,
   });
 
-  return jsonResponse({ ok: true, stored: true, server_time: serverTime });
+  // Pop acked commands, then return whatever is still pending.
+  const acked = Array.isArray(body.acked_command_ids) ? body.acked_command_ids.map(String) : [];
+  const commands = await popAndListCommands(env, slug, acked);
+
+  return jsonResponse({
+    ok: true,
+    stored: true,
+    server_time: serverTime,
+    binding: binding.state,
+    commands,
+  });
+}
+
+/* ----------------------------- machine binding ----------------------------- */
+
+// Records the first machine_id seen for a facility and compares subsequent
+// ones. A mismatch ("conflict") means the same install ticket is being used
+// from a different machine — surfaced in the dashboard and, when
+// ENFORCE_MACHINE_BINDING is set, rejected at token-mint time.
+async function checkMachineBinding(env, slug, machineId) {
+  if (!env.FLEET || !machineId) return { state: "unknown" };
+  const key = `machine:${slug}`;
+  const existing = await env.FLEET.get(key);
+  if (!existing) {
+    await env.FLEET.put(key, JSON.stringify({ machine_id: machineId, first_seen: new Date().toISOString() }));
+    await recordAudit(env, slug, { type: "machine_first_seen", machine_id: machineId });
+    return { state: "first" };
+  }
+  let rec;
+  try { rec = JSON.parse(existing); } catch { rec = {}; }
+  if (rec.machine_id === machineId) return { state: "match" };
+  await recordAudit(env, slug, { type: "machine_conflict", expected: rec.machine_id, got: machineId });
+  return { state: "conflict", expected: rec.machine_id };
+}
+
+async function enforceMachineBinding(env, slug, machineId) {
+  // Returns null if allowed, or an error string if it should be denied.
+  if (!env.FLEET || !truthy(env.ENFORCE_MACHINE_BINDING)) return null;
+  const b = await checkMachineBinding(env, slug, machineId);
+  if (b.state === "conflict") return "machine_binding_conflict";
+  return null;
+}
+
+/* ------------------------------- audit log -------------------------------- */
+
+const AUDIT_CAP = 100;
+
+async function recordAudit(env, slug, event) {
+  if (!env.FLEET) return;
+  const key = `audit:${sanitizeSlug(slug)}`;
+  let list = [];
+  try { list = JSON.parse((await env.FLEET.get(key)) || "[]"); } catch { list = []; }
+  list.push({ ts: new Date().toISOString(), ...event });
+  if (list.length > AUDIT_CAP) list = list.slice(-AUDIT_CAP);
+  await env.FLEET.put(key, JSON.stringify(list), { expirationTtl: HEARTBEAT_TTL_SECONDS });
+}
+
+async function handleFleetAudit(request, env) {
+  if (request.method !== "GET") return jsonResponse({ error: "method_not_allowed" }, 405);
+  const member = await requireOrgMember(request, env);
+  if (!member.ok) return jsonResponse({ error: member.error }, member.status);
+  const url = new URL(request.url);
+  const slug = sanitizeSlug(url.searchParams.get("slug") || "");
+  if (!slug) return jsonResponse({ error: "missing_slug" }, 400);
+  if (!env.FLEET) return jsonResponse({ slug, events: [], kv_configured: false });
+  let events = [];
+  try { events = JSON.parse((await env.FLEET.get(`audit:${slug}`)) || "[]"); } catch { events = []; }
+  return jsonResponse({ slug, events: events.reverse(), kv_configured: true });
+}
+
+/* ----------------------------- command queue ------------------------------ */
+
+const COMMAND_TTL_SECONDS = 7 * 24 * 60 * 60;
+const ALLOWED_COMMANDS = new Set([
+  "pause", "resume", "run-once", "reload-config", "update-now", "restart", "configure",
+]);
+
+async function popAndListCommands(env, slug, ackedIds) {
+  const key = `cmd:${slug}`;
+  let list = [];
+  try { list = JSON.parse((await env.FLEET.get(key)) || "[]"); } catch { list = []; }
+  if (ackedIds.length) {
+    const before = list.length;
+    list = list.filter((c) => !ackedIds.includes(String(c.id)));
+    if (list.length !== before) {
+      await env.FLEET.put(key, JSON.stringify(list), { expirationTtl: COMMAND_TTL_SECONDS });
+    }
+  }
+  return list;
+}
+
+async function handleFleetCommand(request, env) {
+  if (request.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
+  const member = await requireOrgMember(request, env);
+  if (!member.ok) return jsonResponse({ error: member.error }, member.status);
+
+  const body = await safeJson(request);
+  if (!body || !body.slug || !body.type) return jsonResponse({ error: "missing_slug_or_type" }, 400);
+  const slug = sanitizeSlug(body.slug);
+  const type = String(body.type);
+  if (!ALLOWED_COMMANDS.has(type)) return jsonResponse({ error: "unknown_command", type }, 400);
+  if (!env.FLEET) return jsonResponse({ error: "kv_not_configured" }, 503);
+
+  const cmd = {
+    id: (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()),
+    type,
+    args: body.args && typeof body.args === "object" ? body.args : {},
+    created_at: new Date().toISOString(),
+    by: member.login || "unknown",
+  };
+  const key = `cmd:${slug}`;
+  let list = [];
+  try { list = JSON.parse((await env.FLEET.get(key)) || "[]"); } catch { list = []; }
+  // De-dupe: at most one pending command of each type (latest wins).
+  list = list.filter((c) => c.type !== type);
+  list.push(cmd);
+  await env.FLEET.put(key, JSON.stringify(list), { expirationTtl: COMMAND_TTL_SECONDS });
+  await recordAudit(env, slug, { type: "command_queued", command: type, by: cmd.by });
+
+  return jsonResponse({ ok: true, slug, command: cmd });
+}
+
+/* --------------------------- revocation kill switch ------------------------ */
+
+async function handleFleetRevoke(request, env, revoke) {
+  if (request.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
+  const member = await requireOrgMember(request, env);
+  if (!member.ok) return jsonResponse({ error: member.error }, member.status);
+
+  const body = await safeJson(request);
+  if (!body || (!body.slug && !body.jti)) return jsonResponse({ error: "missing_slug_or_jti" }, 400);
+  if (!env.FLEET) return jsonResponse({ error: "kv_not_configured" }, 503);
+
+  const targets = [];
+  if (body.slug) targets.push(`revoked:slug:${sanitizeSlug(body.slug)}`);
+  if (body.jti) targets.push(`revoked:jti:${String(body.jti).slice(0, 80)}`);
+
+  for (const key of targets) {
+    if (revoke) {
+      await env.FLEET.put(key, JSON.stringify({ at: new Date().toISOString(), by: member.login || "unknown" }));
+    } else {
+      await env.FLEET.delete(key);
+    }
+  }
+  await recordAudit(env, sanitizeSlug(body.slug || "unknown"), {
+    type: revoke ? "ticket_revoked" : "ticket_unrevoked",
+    jti: body.jti || null,
+    by: member.login || "unknown",
+  });
+  return jsonResponse({ ok: true, revoked: revoke, targets });
+}
+
+/* ------------------------------- update channel ---------------------------- */
+
+const DEFAULT_CHANNEL = "stable";
+
+async function getChannelConfig(env, slug) {
+  const fallback = { channel: DEFAULT_CHANNEL, pin_version: null };
+  if (!env.FLEET) return fallback;
+  try {
+    const raw = await env.FLEET.get(`channel:${slug}`);
+    if (!raw) return fallback;
+    const c = JSON.parse(raw);
+    return { channel: c.channel || DEFAULT_CHANNEL, pin_version: c.pin_version || null };
+  } catch { return fallback; }
+}
+
+async function handleFleetSetChannel(request, env) {
+  if (request.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
+  const member = await requireOrgMember(request, env);
+  if (!member.ok) return jsonResponse({ error: member.error }, member.status);
+
+  const body = await safeJson(request);
+  if (!body || !body.slug || !body.channel) return jsonResponse({ error: "missing_slug_or_channel" }, 400);
+  const channel = String(body.channel);
+  if (!["stable", "beta", "pinned"].includes(channel)) return jsonResponse({ error: "bad_channel" }, 400);
+  if (!env.FLEET) return jsonResponse({ error: "kv_not_configured" }, 503);
+
+  const slug = sanitizeSlug(body.slug);
+  const cfg = { channel, pin_version: channel === "pinned" ? String(body.pin_version || "").slice(0, 40) : null };
+  await env.FLEET.put(`channel:${slug}`, JSON.stringify(cfg));
+  await recordAudit(env, slug, { type: "channel_set", channel, pin_version: cfg.pin_version, by: member.login || "unknown" });
+  return jsonResponse({ ok: true, slug, ...cfg });
+}
+
+// Tells a watchdog which version it should be running, based on its facility's
+// channel. Source of truth = GitHub Releases on the main repo:
+//   stable = latest non-prerelease, beta = latest prerelease,
+//   pinned  = the exact tag the maintainer set.
+// Falls back to tracking a branch (STABLE_REF / main) when no releases exist.
+async function handleWatchdogVersion(request, env) {
+  if (request.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
+  const body = await safeJson(request);
+  if (!body || !body.install_ticket) return jsonResponse({ error: "missing_install_ticket" }, 400);
+  const verified = await verifyInstallTicket(env, body.install_ticket);
+  if (!verified.ok) return jsonResponse({ error: verified.error }, 401);
+  const slug = sanitizeSlug(verified.claims.slug || "");
+  if (!slug) return jsonResponse({ error: "ticket_missing_slug" }, 400);
+
+  const { channel, pin_version } = await getChannelConfig(env, slug);
+  const target = await resolveTargetVersion(env, channel, pin_version);
+  return jsonResponse({ slug, channel, ...target });
+}
+
+async function resolveTargetVersion(env, channel, pinVersion) {
+  const mainRepo = env.MAIN_REPO || DEFAULT_MAIN_REPO;
+  const ghHeaders = { Accept: "application/vnd.github+json", "User-Agent": "rosetta-upload-worker" };
+
+  const tagTarget = (tag, body) => ({
+    version: normalizeVersion(tag),
+    ref: tag,
+    zip_url: `https://github.com/${mainRepo}/archive/refs/tags/${encodeURIComponent(tag)}.zip`,
+    sha256: parseSha256(body),
+    source: "release",
+  });
+
+  try {
+    if (channel === "pinned" && pinVersion) {
+      const res = await fetch(`${GH_API}/repos/${mainRepo}/releases/tags/${encodeURIComponent(pinVersion)}`, { headers: ghHeaders });
+      if (res.ok) { const r = await res.json(); return tagTarget(r.tag_name, r.body); }
+      // Pinned to a bare tag/branch with no release.
+      return { version: normalizeVersion(pinVersion), ref: pinVersion,
+        zip_url: `https://github.com/${mainRepo}/archive/refs/tags/${encodeURIComponent(pinVersion)}.zip`, sha256: null, source: "pinned-tag" };
+    }
+
+    if (channel === "beta") {
+      const res = await fetch(`${GH_API}/repos/${mainRepo}/releases?per_page=20`, { headers: ghHeaders });
+      if (res.ok) {
+        const rels = await res.json();
+        const pre = rels.find((r) => r.prerelease && !r.draft);
+        if (pre) return tagTarget(pre.tag_name, pre.body);
+        const stable = rels.find((r) => !r.prerelease && !r.draft);
+        if (stable) return tagTarget(stable.tag_name, stable.body);
+      }
+    } else {
+      // stable
+      const res = await fetch(`${GH_API}/repos/${mainRepo}/releases/latest`, { headers: ghHeaders });
+      if (res.ok) { const r = await res.json(); return tagTarget(r.tag_name, r.body); }
+    }
+  } catch (_) { /* fall through to branch tracking */ }
+
+  // No releases yet: track a branch. No auto-update signal (version "main"),
+  // but an explicit update-now command can still force a ref.
+  const ref = env.STABLE_REF || "main";
+  return {
+    version: ref,
+    ref,
+    zip_url: `https://github.com/${mainRepo}/archive/refs/heads/${encodeURIComponent(ref)}.zip`,
+    sha256: null,
+    source: "branch",
+  };
+}
+
+function normalizeVersion(tag) {
+  // "watchdog-v0.2.1" / "v0.2.1" -> "0.2.1"; leave non-semver tags as-is.
+  const m = String(tag || "").match(/(\d+\.\d+\.\d+)/);
+  return m ? m[1] : String(tag || "");
+}
+
+function parseSha256(body) {
+  if (!body) return null;
+  const m = String(body).match(/sha256[:=\s]+([a-f0-9]{64})/i);
+  return m ? m[1].toLowerCase() : null;
+}
+
+function truthy(v) {
+  return v === true || v === 1 || /^(1|true|yes|on)$/i.test(String(v || ""));
 }
 
 // Read-only fleet status for the org dashboard. Gated to members of the
@@ -538,12 +835,17 @@ async function handleFleetStatus(request, env) {
       const ageSeconds = seen ? Math.round((now - seen) / 1000) : null;
       const stale = ageSeconds == null || ageSeconds > STALE_THRESHOLD_SECONDS;
       const stopped = rec.status && rec.status.state === "stopped";
+      const ch = await getChannelConfig(env, rec.slug);
       facilities.push({
         slug: rec.slug,
         received_at: rec.received_at,
         age_seconds: ageSeconds,
         health: stopped ? "stopped" : (stale ? "stale" : "online"),
         ip: rec.ip || null,
+        machine_id: rec.machine_id || null,
+        binding: rec.binding || "unknown",
+        channel: ch.channel,
+        pin_version: ch.pin_version,
         status: rec.status || {},
       });
     }
@@ -1090,7 +1392,9 @@ function githubAppHeaders(installationToken) {
 
 async function signInstallTicket(env, claims) {
   const header = base64UrlJson({ alg: "HS256", typ: "RIT" });
-  const payload = base64UrlJson({ iat: nowSeconds(), ...claims });
+  // jti lets us revoke a single ticket (kill switch) without rotating the key.
+  const jti = (crypto.randomUUID && crypto.randomUUID()) || `${nowSeconds()}-${Math.random().toString(36).slice(2)}`;
+  const payload = base64UrlJson({ iat: nowSeconds(), jti, ...claims });
   const signingInput = `${header}.${payload}`;
   const sig = await hmacSign(env.INSTALL_TICKET_KEY || "", signingInput);
   return `${signingInput}.${base64Url(sig)}`;
@@ -1110,7 +1414,20 @@ async function verifyInstallTicket(env, ticket) {
     return { ok: false, error: "bad_payload" };
   }
   if (!claims.exp || claims.exp < nowSeconds()) return { ok: false, error: "ticket_expired" };
+  // Kill switch: a maintainer can revoke a single ticket (by jti) or every
+  // ticket for a facility (by slug) via /fleet/revoke. No-op without KV.
+  if (await isTicketRevoked(env, claims)) return { ok: false, error: "ticket_revoked" };
   return { ok: true, claims };
+}
+
+async function isTicketRevoked(env, claims) {
+  if (!env.FLEET) return false;
+  try {
+    if (claims.jti && (await env.FLEET.get(`revoked:jti:${claims.jti}`))) return true;
+    const slug = sanitizeSlug(claims.slug || "");
+    if (slug && (await env.FLEET.get(`revoked:slug:${slug}`))) return true;
+  } catch (_) { /* fail open on KV errors so a KV outage can't brick installs */ }
+  return false;
 }
 
 async function hmacSign(secret, input) {

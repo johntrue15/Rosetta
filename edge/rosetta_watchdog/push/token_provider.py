@@ -79,9 +79,10 @@ class TokenProvider:
             return None
 
         try:
+            from ..identity import machine_id
             resp = requests.post(
                 self._auth.token_url,
-                json={"install_ticket": ticket},
+                json={"install_ticket": ticket, "machine_id": machine_id()},
                 timeout=30,
             )
         except requests.RequestException as exc:

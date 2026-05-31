@@ -22,6 +22,7 @@ from typing import Optional
 import requests
 
 from ..config import AuthConfig, GitHubConfig, MonitoringConfig
+from ..identity import machine_id
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +50,17 @@ class HeartbeatReporter:
         self._pid = os.getpid()
         self._started_at = _utcnow_iso()
         self._last_sent = 0.0
+        self._machine_id = machine_id()
+        self._pending_acks: list[str] = []
 
     @property
     def enabled(self) -> bool:
         return bool(self._monitoring.heartbeat_url)
+
+    def ack(self, command_id) -> None:
+        """Queue a command id to acknowledge on the next heartbeat."""
+        if command_id is not None:
+            self._pending_acks.append(str(command_id))
 
     def _ticket(self) -> Optional[str]:
         return os.environ.get(self._auth.install_ticket_env)
@@ -83,28 +91,42 @@ class HeartbeatReporter:
             "watch_dirs": watch_dirs,
         }
 
-    def maybe_send(self, watcher, *, state: str = "running", force: bool = False) -> None:
-        """Send a heartbeat if enabled and the throttle interval has elapsed."""
+    def maybe_send(self, watcher, *, state: str = "running", force: bool = False) -> list:
+        """Send a heartbeat if enabled and due. Returns any pending commands."""
         if not self.enabled:
-            return
+            return []
         now = time.time()
         if not force and (now - self._last_sent) < self._monitoring.interval_seconds:
-            return
-        self._send(self._build_status(watcher, state))
+            return []
+        commands = self._send(self._build_status(watcher, state))
         self._last_sent = now
+        return commands
 
-    def _send(self, status: dict) -> None:
+    def _send(self, status: dict) -> list:
         ticket = self._ticket()
         if not ticket:
             logger.debug("Heartbeat skipped: no install ticket in %s", self._auth.install_ticket_env)
-            return
+            return []
+        acks = self._pending_acks
+        self._pending_acks = []
         try:
             resp = requests.post(
                 self._monitoring.heartbeat_url,
-                json={"install_ticket": ticket, "status": status},
+                json={
+                    "install_ticket": ticket,
+                    "machine_id": self._machine_id,
+                    "status": status,
+                    "acked_command_ids": acks,
+                },
                 timeout=15,
             )
             if resp.status_code != 200:
                 logger.debug("Heartbeat HTTP %d: %s", resp.status_code, resp.text[:200])
-        except requests.RequestException as exc:
+                self._pending_acks = acks + self._pending_acks  # retry acks next time
+                return []
+            data = resp.json()
+            return data.get("commands") or []
+        except (requests.RequestException, ValueError) as exc:
             logger.debug("Heartbeat failed (ignored): %s", exc)
+            self._pending_acks = acks + self._pending_acks
+            return []

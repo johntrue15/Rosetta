@@ -106,6 +106,14 @@
     .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
     .dot.ok { background: var(--ok); }
     .dot.bad { background: var(--danger); }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem; align-items: center; }
+    .mini { padding: 0.3rem 0.6rem; font-size: 0.78rem; border-radius: 5px; }
+    .mini.secondary { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); }
+    .mini.danger { background: rgba(248,81,73,0.15); color: var(--danger); border: 1px solid rgba(248,81,73,0.4); }
+    .mini-select { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 0.28rem 0.4rem; font-size: 0.78rem; }
+    .warn-row { color: var(--danger); font-size: 0.8rem; margin-top: 0.4rem; }
+    .audit { margin-top: 0.7rem; border-top: 1px solid var(--border); padding-top: 0.5rem; font-size: 0.8rem; max-height: 200px; overflow-y: auto; }
+    .audit-row { padding: 0.15rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
     .empty { color: var(--muted); text-align: center; padding: 3rem 1rem; }
     .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--muted); border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -288,6 +296,82 @@
       }
     }
 
+    async function api(path, opts) {
+      const res = await fetch(WORKER_URL + path, Object.assign({
+        headers: { Authorization: "Bearer " + userToken, "Content-Type": "application/json" },
+      }, opts || {}));
+      let data = {};
+      try { data = await res.json(); } catch (e) {}
+      if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+      return data;
+    }
+
+    async function sendCommand(slug, type, args) {
+      const labels = { "update-now": "update", "restart": "restart" };
+      if (labels[type] && !confirm("Send '" + type + "' to " + slug + "?")) return;
+      try {
+        await api("/fleet/command", { method: "POST", body: JSON.stringify({ slug, type, args }) });
+        toast(slug + ": queued '" + type + "'");
+        refresh();
+      } catch (e) { toast(slug + ": " + e.message, true); }
+    }
+
+    async function setChannel(slug) {
+      const sel = document.getElementById("ch-" + slug);
+      const channel = sel.value;
+      let pin = null;
+      if (channel === "pinned") {
+        pin = prompt("Pin to which release tag? (e.g. watchdog-v0.2.0)");
+        if (!pin) return;
+      }
+      try {
+        await api("/fleet/set-channel", { method: "POST", body: JSON.stringify({ slug, channel, pin_version: pin }) });
+        toast(slug + ": channel → " + channel + (pin ? " (" + pin + ")" : ""));
+        refresh();
+      } catch (e) { toast(slug + ": " + e.message, true); }
+    }
+
+    async function revoke(slug, on) {
+      if (on && !confirm("Revoke the install ticket for " + slug + "?\nIts watchdog will lose access until you restore it and reinstall.")) return;
+      try {
+        await api(on ? "/fleet/revoke" : "/fleet/unrevoke", { method: "POST", body: JSON.stringify({ slug }) });
+        toast(slug + (on ? ": ticket REVOKED" : ": ticket restored"));
+      } catch (e) { toast(slug + ": " + e.message, true); }
+    }
+
+    async function toggleAudit(slug) {
+      const box = document.getElementById("audit-" + slug);
+      if (box.style.display === "block") { box.style.display = "none"; return; }
+      box.style.display = "block";
+      box.innerHTML = '<span class="spinner"></span> Loading audit&hellip;';
+      try {
+        const data = await api("/fleet/audit?slug=" + encodeURIComponent(slug));
+        const events = data.events || [];
+        box.innerHTML = events.length
+          ? events.map((e) => '<div class="audit-row"><span class="muted">' +
+              esc(new Date(e.ts).toLocaleString()) + '</span> ' + esc(e.type) +
+              (e.by ? ' <span class="muted">by ' + esc(e.by) + '</span>' : '') +
+              (e.command ? ' <code>' + esc(e.command) + '</code>' : '') + '</div>').join("")
+          : '<div class="muted">No events recorded.</div>';
+      } catch (e) { box.innerHTML = '<span class="error">' + esc(e.message) + '</span>'; }
+    }
+
+    let toastTimer = null;
+    function toast(msg, isError) {
+      let el = document.getElementById("toast");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "toast";
+        el.style.cssText = "position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 1rem;z-index:50;max-width:90vw";
+        document.body.appendChild(el);
+      }
+      el.style.color = isError ? "var(--danger)" : "var(--text)";
+      el.textContent = msg;
+      el.style.display = "block";
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { el.style.display = "none"; }, 4000);
+    }
+
     function render(data) {
       const facilities = data.facilities || [];
       const summary = document.getElementById("summary");
@@ -320,16 +404,27 @@
           '<span>' + esc(d.path) + (d.ok ? "" : " (not found)") + '</span></div>'
         ).join("") || '<span class="muted">none reported</span>';
 
+        const slug = f.slug;
+        const channels = ["stable", "beta", "pinned"];
+        const chOptions = channels.map((c) =>
+          '<option value="' + c + '"' + (f.channel === c ? " selected" : "") + '>' + c + '</option>'
+        ).join("");
+        const bindingWarn = f.binding === "conflict"
+          ? '<div class="warn-row">&#9888; Ticket seen from a different machine (possible leak)</div>' : '';
+
         return '' +
           '<div class="card ' + esc(f.health) + '">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem">' +
-              '<h3>' + esc(f.slug) + '</h3>' +
+              '<h3>' + esc(slug) + '</h3>' +
               '<span class="badge ' + esc(f.health) + '">' + esc(f.health) + '</span>' +
             '</div>' +
             '<div class="muted" style="font-size:0.85rem">' + esc(s.hostname || "unknown host") + '</div>' +
+            bindingWarn +
             '<div class="kv">' +
               '<span class="k">Last seen</span><span>' + esc(fmtAge(f.age_seconds)) + '</span>' +
-              '<span class="k">Version</span><span>' + esc(s.version || "?") + '</span>' +
+              '<span class="k">Version</span><span>' + esc(s.version || "?") +
+                ' <span class="muted">(' + esc(f.channel || "stable") +
+                (f.pin_version ? " · " + esc(f.pin_version) : "") + ')</span></span>' +
               '<span class="k">Processed</span><span>' + esc(s.processed != null ? s.processed : "?") +
                 ' (' + esc(s.errors != null ? s.errors : "?") + ' errors)</span>' +
               '<span class="k">Cycles</span><span>' + esc(s.cycle_count != null ? s.cycle_count : "?") + '</span>' +
@@ -338,6 +433,21 @@
                 '" target="_blank" rel="noopener">' + esc(s.repo) + '</a></span>' : '') +
             '</div>' +
             '<div class="dirs"><div class="muted" style="margin-bottom:0.2rem">Watch directories</div>' + dirs + '</div>' +
+            '<div class="actions">' +
+              '<button class="mini" onclick="sendCommand(\'' + slug + '\',\'pause\')">Pause</button>' +
+              '<button class="mini" onclick="sendCommand(\'' + slug + '\',\'resume\')">Resume</button>' +
+              '<button class="mini" onclick="sendCommand(\'' + slug + '\',\'run-once\')">Run once</button>' +
+              '<button class="mini" onclick="sendCommand(\'' + slug + '\',\'update-now\')">Update</button>' +
+              '<button class="mini" onclick="sendCommand(\'' + slug + '\',\'restart\')">Restart</button>' +
+            '</div>' +
+            '<div class="actions">' +
+              '<select id="ch-' + slug + '" class="mini-select">' + chOptions + '</select>' +
+              '<button class="mini secondary" onclick="setChannel(\'' + slug + '\')">Set channel</button>' +
+              '<button class="mini secondary" onclick="toggleAudit(\'' + slug + '\')">Audit</button>' +
+              '<button class="mini danger" onclick="revoke(\'' + slug + '\',true)">Revoke</button>' +
+              '<button class="mini secondary" onclick="revoke(\'' + slug + '\',false)">Restore</button>' +
+            '</div>' +
+            '<div id="audit-' + slug + '" class="audit" style="display:none"></div>' +
           '</div>';
       }).join("");
 

@@ -106,6 +106,14 @@ def _log_startup_banner(log, config, config_path: Path) -> None:
         )
     else:
         log.info("Fleet monitoring: off (no monitoring.heartbeat_url in config)")
+    if config.updates.check_url:
+        log.info(
+            "Remote updates: %s (check → %s every %ds)",
+            "auto-apply" if config.updates.auto_apply else "manual",
+            config.updates.check_url, config.updates.interval_seconds,
+        )
+    else:
+        log.info("Remote updates: off (no updates.check_url in config)")
     log.info("=" * 60)
 
 
@@ -249,13 +257,82 @@ def main(argv: list[str] | None = None) -> None:
             config.monitoring, config.auth, config.github, __version__,
         )
 
-    watcher = DirectoryWatcher(config, process_file, heartbeat=heartbeat)
+    updater = None
+    if config.updates.check_url and (worker_auth and install_ticket_ok):
+        from .push.updater import Updater
+        updater = Updater(config.updates, config.auth, __version__)
+
+    last_update_check = [0.0]
+
+    def command_handler(cmd: dict, watcher) -> object:
+        ctype = (cmd or {}).get("type")
+        cargs = (cmd or {}).get("args") or {}
+        if ctype == "reload-config":
+            try:
+                watcher._config = load_config(config_path)
+                log.info("Config reloaded from %s", config_path)
+                return True
+            except Exception:
+                log.exception("reload-config failed")
+                return False
+        if ctype == "configure":
+            try:
+                if "polling_interval_seconds" in cargs:
+                    watcher._config.polling_interval_seconds = int(cargs["polling_interval_seconds"])
+                if "include_drift_files" in cargs:
+                    watcher._config.include_drift_files = bool(cargs["include_drift_files"])
+                log.info("Applied configure command: %s", cargs)
+                return True
+            except Exception:
+                log.exception("configure command failed")
+                return False
+        if ctype == "update-now":
+            if updater is None:
+                log.warning("update-now requested but updates are not configured")
+                return True
+            return "restart" if updater.update_now() else True
+        if ctype == "restart":
+            return "restart"
+        log.warning("Unknown command type: %s", ctype)
+        return False
+
+    def on_loop(watcher) -> None:
+        if updater is None or not config.updates.auto_apply:
+            return
+        now = time.time()
+        if now - last_update_check[0] < config.updates.interval_seconds:
+            return
+        last_update_check[0] = now
+        if updater.maybe_auto_update():
+            try:
+                if watcher._heartbeat is not None:
+                    watcher._heartbeat.maybe_send(watcher, state="updating", force=True)
+            except Exception:
+                pass
+            from .watcher import RestartRequested
+            raise RestartRequested("auto-update")
+
+    watcher = DirectoryWatcher(
+        config, process_file,
+        heartbeat=heartbeat,
+        command_handler=command_handler,
+        on_loop=on_loop,
+    )
 
     if args.once:
         count = watcher.run_once()
         log.info("Single scan complete — processed %d file(s)", count)
+        if heartbeat is not None:
+            heartbeat.maybe_send(watcher, state="stopped", force=True)
     else:
-        watcher.run_forever()
+        from .watcher import RestartRequested
+        try:
+            watcher.run_forever()
+        except RestartRequested as r:
+            log.info("Restarting watchdog to apply update (%s)...", r)
+            logging.shutdown()
+            os.execv(sys.executable, [sys.executable, "-m", "rosetta_watchdog.cli",
+                                      "-c", str(config_path)])
 
 
 if __name__ == "__main__":

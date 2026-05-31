@@ -69,6 +69,20 @@ class MonitoringConfig:
 
 
 @dataclass
+class UpdatesConfig:
+    """Optional remote, channel-based self-update. The watchdog asks the Worker
+    which version it should run (per the facility's channel) and, when
+    ``auto_apply`` is set, downloads + pip-installs it and restarts in place.
+
+    Disabled when ``check_url`` is unset.
+    """
+
+    check_url: Optional[str] = None
+    interval_seconds: int = 3600
+    auto_apply: bool = True
+
+
+@dataclass
 class LoggingConfig:
     level: str = "INFO"
     file: Optional[str] = None
@@ -83,6 +97,7 @@ class WatchdogConfig:
     github: GitHubConfig = field(default_factory=GitHubConfig)
     auth: AuthConfig = field(default_factory=AuthConfig)
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
+    updates: UpdatesConfig = field(default_factory=UpdatesConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     state_file: str = "processed_files.json"
 
@@ -118,6 +133,13 @@ def load_config(path: Path) -> WatchdogConfig:
         interval_seconds=mon_raw.get("interval_seconds", 300),
     )
 
+    upd_raw = raw.get("updates", {}) or {}
+    updates = UpdatesConfig(
+        check_url=upd_raw.get("check_url"),
+        interval_seconds=upd_raw.get("interval_seconds", 3600),
+        auto_apply=upd_raw.get("auto_apply", True),
+    )
+
     log_raw = raw.get("logging", {})
     logging_cfg = LoggingConfig(
         level=log_raw.get("level", "INFO"),
@@ -132,6 +154,7 @@ def load_config(path: Path) -> WatchdogConfig:
         github=github,
         auth=auth,
         monitoring=monitoring,
+        updates=updates,
         logging=logging_cfg,
         state_file=raw.get("state_file", "processed_files.json"),
     )

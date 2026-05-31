@@ -23,8 +23,13 @@ pipeline:
 | `POST /facility/create-companion-repo` | Create + seed `rosetta-facility-<slug>` private repo. Auth: bearer device token OR onboard HMAC. |
 | `POST /runner/registration-token`    | Mint a runner-registration token + install ticket for the bootstrap script.                       |
 | `POST /watchdog/token`               | Trade install ticket for a 1-hour App installation token (used by the watchdog).                  |
-| `POST /watchdog/heartbeat`           | Ingest a watchdog status heartbeat into KV (auth: install ticket). No-op until `FLEET` KV is set. |
+| `POST /watchdog/heartbeat`           | Ingest a watchdog status heartbeat into KV (auth: install ticket). Returns pending control commands. |
+| `POST /watchdog/version`             | Target version for the facility's channel (auth: install ticket). Drives self-update.             |
 | `GET  /fleet/status`                 | Aggregated fleet status for the dashboard (auth: bearer token of an active `FACILITY_OWNER` org member). |
+| `POST /fleet/command`                | Queue a control command (`pause`/`resume`/`run-once`/`reload-config`/`update-now`/`restart`/`configure`). Org-gated. |
+| `POST /fleet/revoke` / `unrevoke`    | Kill switch: revoke/restore an install ticket by `slug` (or `jti`). Org-gated.                     |
+| `POST /fleet/set-channel`            | Set a facility's update channel (`stable`/`beta`/`pinned` + `pin_version`). Org-gated.            |
+| `GET  /fleet/audit`                  | Recent security/control events for a facility. Org-gated.                                          |
 | `POST /deploy/status` or `GET ?…`    | Proxy the latest `deploy-watchdog.yml` run for a facility (auth: install ticket).                 |
 | `POST /workflow/dispatch-deploy`   | Trigger `deploy-watchdog.yml` on the companion repo (auth: install ticket or HMAC).                 |
 | `POST /e2e/cleanup`                  | Delete companion repo, facility data dir, and facility issue (auth: HMAC).                        |
@@ -82,6 +87,37 @@ the rest of the Worker keeps working.
 - **Stale alerts**: a cron (`*/15 * * * *` in `wrangler.toml`) flags facilities
   silent for >15 min. Set the optional `ALERT_SLACK_WEBHOOK` secret to receive
   Slack notifications; otherwise stale facilities just surface in the dashboard.
+
+## Remote control, updates & security (Phases 2–4)
+
+All of the following build on the heartbeat/KV channel and require the `FLEET`
+KV namespace (above). The dashboard exposes them as per-facility buttons.
+
+- **Remote control** — `POST /fleet/command` queues a command; the watchdog
+  picks it up on its next heartbeat and acks it (so it runs once). Supported:
+  `pause`, `resume`, `run-once`, `reload-config`, `configure` (e.g.
+  `{polling_interval_seconds}`), `update-now`, `restart`.
+- **Remote updates** — facilities have a channel (`stable`/`beta`/`pinned`) set
+  via `/fleet/set-channel`. The watchdog polls `/watchdog/version`; the Worker
+  maps the channel to a **GitHub Release** on the main repo (stable = latest
+  release, beta = latest prerelease, pinned = an exact tag) and returns the
+  zip + a `sha256` if one is present in the release body
+  (`sha256: <64-hex>`). The watchdog verifies the hash, `pip install`s, and
+  re-execs. With no releases yet it tracks `STABLE_REF` (default `main`) and
+  only updates on an explicit `update-now`.
+- **Kill switch** — `/fleet/revoke` writes a KV tombstone; `verifyInstallTicket`
+  rejects revoked tickets (by `jti` or `slug`) everywhere, instantly cutting a
+  compromised machine off from tokens, heartbeats, and deploys.
+- **Machine binding** — the watchdog sends a stable `machine_id` on token and
+  heartbeat requests. The Worker records the first one per facility and flags
+  mismatches in the dashboard. Set `ENFORCE_MACHINE_BINDING=1` to also *deny*
+  token mints from a different machine (a leaked ticket becomes useless).
+- **Audit log** — token first-seen, machine conflicts, revocations, channel
+  changes, and queued commands are recorded per facility and viewable via
+  `/fleet/audit`.
+
+Optional Worker vars/secrets for these phases: `ENFORCE_MACHINE_BINDING`
+(bind enforcement), `STABLE_REF` (branch to track when no releases exist).
 
 ## GitHub App "Rosetta Upload" — required permissions
 
