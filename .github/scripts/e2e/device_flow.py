@@ -66,7 +66,7 @@ def summary(lines: list[str]) -> None:
 def banner(user_code: str, verification_uri: str, wait: int) -> None:
     bar = "=" * 64
     print(bar, flush=True)
-    print(" DEVICE AUTHORIZATION REQUIRED — action needed within "
+    print(" DEVICE AUTHORIZATION REQUIRED - action needed within "
           f"{wait}s", flush=True)
     print(bar, flush=True)
     print(f"  1) Open:  {verification_uri}", flush=True)

@@ -224,8 +224,13 @@ jobs:
       - name: Install watchdog (pip)
         shell: powershell
         run: |
-          & $env:PYTHON -m pip install --upgrade pip
-          & $env:PYTHON -m pip install "$env:GITHUB_WORKSPACE/edge"
+          # Embeddable Python can't bootstrap a build backend in pip's isolated
+          # env ("Cannot import setuptools.build_meta"), so install the build
+          # deps up front and disable build isolation. edge/ is pure Python.
+          & $env:PYTHON -m pip install --upgrade pip setuptools wheel
+          if ($LASTEXITCODE -ne 0) { throw "pip bootstrap failed ($LASTEXITCODE)" }
+          & $env:PYTHON -m pip install --no-build-isolation "$env:GITHUB_WORKSPACE/edge"
+          if ($LASTEXITCODE -ne 0) { throw "watchdog install failed ($LASTEXITCODE)" }
 
       - name: Write config.yml + seed test scan
         shell: powershell
