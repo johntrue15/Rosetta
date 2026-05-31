@@ -24,7 +24,8 @@ gh workflow run watchdog-device-e2e.yml -f wait_seconds=120
 # then: gh run watch $(gh run list -w watchdog-device-e2e.yml -L1 --json databaseId --jq '.[0].databaseId')
 ```
 
-Requires `ROSETTA_E2E_ENABLED=true` and the `rosetta-ci-dell` runner (below).
+No repo variable needed — it's manual-only. Just requires the `rosetta-ci-dell`
+runner (below) online and the `ROSETTA_WORKER_URL` secret set.
 
 **Setting up the Dell for the first time?** A Cursor agent (or human) should
 follow **[DELL_SETUP.md](./DELL_SETUP.md)** after cloning the repo onto the Dell.

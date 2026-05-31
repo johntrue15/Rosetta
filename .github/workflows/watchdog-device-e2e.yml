@@ -11,8 +11,10 @@ name: Watchdog Device-Flow E2E (Dell)
 #      endpoints (/facility/data + /facility/status)
 #   4. tear everything down.
 #
-# Manual only (needs a human to approve). Requires the Dell self-hosted runner
-# labeled `rosetta-ci-dell` and repo variable ROSETTA_E2E_ENABLED=true.
+# Manual only (needs a human to approve). Just dispatch it from the Actions tab
+# (or `gh workflow run`). Requires the Dell self-hosted runner labeled
+# `rosetta-ci-dell` to be online, plus secrets ROSETTA_WORKER_URL and
+# ROSETTA_ONBOARD_HMAC_KEY (the latter only for the cleanup job).
 
 on:
   workflow_dispatch:
@@ -40,7 +42,6 @@ env:
 
 jobs:
   provision:
-    if: vars.ROSETTA_E2E_ENABLED == 'true'
     runs-on: ubuntu-latest
     outputs:
       slug: ${{ steps.meta.outputs.slug }}
@@ -120,7 +121,6 @@ jobs:
 
   device-install:
     needs: provision
-    if: vars.ROSETTA_E2E_ENABLED == 'true'
     runs-on: [self-hosted, rosetta-ci-dell]
     env:
       ROSETTA_WORKER_URL: ${{ secrets.ROSETTA_WORKER_URL }}
@@ -210,7 +210,7 @@ jobs:
 
   cleanup-github:
     needs: [provision, device-install]
-    if: always() && needs.provision.result != 'skipped' && vars.ROSETTA_E2E_ENABLED == 'true'
+    if: always() && needs.provision.result != 'skipped'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
