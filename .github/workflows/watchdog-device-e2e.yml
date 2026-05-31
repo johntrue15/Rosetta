@@ -143,11 +143,43 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The CI runner service may run under an account where `python` isn't on
+      # PATH (the python.org installer only adds it to the installing user's
+      # PATH). Resolve a real interpreter — preferring the `py` launcher, which
+      # the installer registers system-wide — and skip the Windows Store alias
+      # stub (it can't run `-c`). Export the concrete exe path for later steps.
+      - name: Resolve Python
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "SilentlyContinue"
+          $candidates = @(
+            @{ cmd = "py";      pre = @("-3") },
+            @{ cmd = "python";  pre = @() },
+            @{ cmd = "python3"; pre = @() }
+          )
+          $py = $null
+          foreach ($cand in $candidates) {
+            if (-not (Get-Command $cand.cmd -ErrorAction SilentlyContinue)) { continue }
+            $pyArgs = @($cand.pre) + @("-c", "import sys; print(sys.executable)")
+            $out = & $cand.cmd $pyArgs 2>$null
+            if ($LASTEXITCODE -eq 0 -and $out) {
+              $py = ($out | Select-Object -Last 1).ToString().Trim()
+              break
+            }
+          }
+          if (-not $py) {
+            Write-Error "No working Python found on the runner. Install Python 3.9+ (python.org) and ensure 'py' or 'python' is available."
+            exit 1
+          }
+          Write-Host "Using Python: $py"
+          & $py --version
+          "PYTHON=$py" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Device authorization (enter the code shown below)
         id: auth
         shell: powershell
         run: |
-          python "$env:GITHUB_WORKSPACE/.github/scripts/e2e/device_flow.py" authorize `
+          & $env:PYTHON "$env:GITHUB_WORKSPACE/.github/scripts/e2e/device_flow.py" authorize `
             --worker-url "$env:ROSETTA_WORKER_URL" `
             --slug "$env:ROSETTA_SLUG" `
             --facility "$env:ROSETTA_FACILITY" `
@@ -157,8 +189,8 @@ jobs:
       - name: Install watchdog (pip)
         shell: powershell
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install "$env:GITHUB_WORKSPACE/edge"
+          & $env:PYTHON -m pip install --upgrade pip
+          & $env:PYTHON -m pip install "$env:GITHUB_WORKSPACE/edge"
 
       - name: Write config.yml + seed test scan
         shell: powershell
@@ -201,14 +233,14 @@ jobs:
           ROSETTA_INSTALL_TICKET: ${{ steps.auth.outputs.install_ticket }}
         run: |
           $cfg = Join-Path $env:INSTALL_DIR "config.yml"
-          python -m rosetta_watchdog.cli -c $cfg --once
+          & $env:PYTHON -m rosetta_watchdog.cli -c $cfg --once
 
       - name: Verify upload via Worker dashboard endpoints
         shell: powershell
         env:
           ROSETTA_INSTALL_TICKET: ${{ steps.auth.outputs.install_ticket }}
         run: |
-          python "$env:GITHUB_WORKSPACE/.github/scripts/e2e/device_flow.py" verify `
+          & $env:PYTHON "$env:GITHUB_WORKSPACE/.github/scripts/e2e/device_flow.py" verify `
             --worker-url "$env:ROSETTA_WORKER_URL" `
             --install-ticket "$env:ROSETTA_INSTALL_TICKET" `
             --wait 90
