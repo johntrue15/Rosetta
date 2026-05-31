@@ -175,19 +175,30 @@ jobs:
           if (-not $py) { $py = Test-Py "py" @("-3") }
           if (-not $py) { $py = Test-Py "python3" @() }
           if (-not $py) {
+            # Use the embeddable ZIP, not the .exe installer: the MSI installer
+            # fails under the NetworkService account (error 1601, no Installer
+            # service access). The embeddable is just an unzip — no admin, no MSI.
             $ver = "3.12.6"
             $cache = $env:RUNNER_TOOL_CACHE; if (-not $cache) { $cache = $env:RUNNER_TEMP }
-            $dir = Join-Path $cache "rosetta-python-$ver"
+            $dir = Join-Path $cache "rosetta-python-embed-$ver"
             $exe = Join-Path $dir "python.exe"
             if (-not (Test-Path $exe)) {
-              Write-Host "No Python found; installing a private copy ($ver, no admin)..."
-              $inst = Join-Path $env:RUNNER_TEMP "python-$ver-amd64.exe"
-              Invoke-WebRequest -UseBasicParsing -Uri "https://www.python.org/ftp/python/$ver/python-$ver-amd64.exe" -OutFile $inst
-              $p = Start-Process -FilePath $inst -Wait -PassThru -ArgumentList @(
-                "/quiet","InstallAllUsers=0","PrependPath=0","Include_launcher=0","Include_test=0","TargetDir=$dir")
-              if ($p.ExitCode -ne 0) { throw "Python installer exited $($p.ExitCode)" }
+              Write-Host "No Python found; unpacking embeddable Python $ver (no admin)..."
+              $zip = Join-Path $env:RUNNER_TEMP "python-$ver-embed.zip"
+              Invoke-WebRequest -UseBasicParsing -Uri "https://www.python.org/ftp/python/$ver/python-$ver-embed-amd64.zip" -OutFile $zip
+              if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
+              Expand-Archive -Path $zip -DestinationPath $dir -Force
+              # Enable site-packages so pip-installed packages are importable.
+              $pth = Get-ChildItem -Path $dir -Filter "*._pth" | Select-Object -First 1
+              (Get-Content $pth.FullName) -replace '^\s*#\s*import site', 'import site' | Set-Content $pth.FullName
+              Add-Content -Path $pth.FullName -Value "Lib\site-packages"
+              # Bootstrap pip into the embeddable.
+              $getpip = Join-Path $env:RUNNER_TEMP "get-pip.py"
+              Invoke-WebRequest -UseBasicParsing -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getpip
+              & $exe $getpip --no-warn-script-location
+              if ($LASTEXITCODE -ne 0) { throw "get-pip.py failed ($LASTEXITCODE)" }
             }
-            if (-not (Test-Path $exe)) { throw "Python install did not produce $exe" }
+            if (-not (Test-Path $exe)) { throw "Embeddable Python unpack did not produce $exe" }
             $py = $exe
           }
           Write-Host "Using Python: $py"
