@@ -1,0 +1,260 @@
+name: Watchdog Device-Flow E2E (Dell)
+
+# Interactive end-to-end test of the *real* operator install path on the Dell
+# Windows runner:
+#   1. provision an approved facility (issue -> approve -> onboard config.yml)
+#   2. on the Dell, run the GitHub device OAuth flow — the workflow PRINTS a
+#      user code and WAITS (default 120s) for you to enter it at
+#      https://github.com/login/device and approve the Rosetta Upload app
+#   3. mint the install ticket, install + run the watchdog (download-and-run
+#      equivalent), upload a test scan, and confirm it via the Worker dashboard
+#      endpoints (/facility/data + /facility/status)
+#   4. tear everything down.
+#
+# Manual only (needs a human to approve). Requires the Dell self-hosted runner
+# labeled `rosetta-ci-dell` and repo variable ROSETTA_E2E_ENABLED=true.
+
+on:
+  workflow_dispatch:
+    inputs:
+      wait_seconds:
+        description: "Seconds to wait for you to enter the device code"
+        required: false
+        default: "120"
+      watch_path:
+        description: "Local watch folder on the Dell"
+        required: false
+        default: "C:/RosettaDeviceE2E/Scans"
+
+concurrency:
+  group: watchdog-device-e2e
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  actions: read
+
+env:
+  MAIN_REPO: johntrue15/Rosetta
+
+jobs:
+  provision:
+    if: vars.ROSETTA_E2E_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      slug: ${{ steps.meta.outputs.slug }}
+      facility: ${{ steps.meta.outputs.facility }}
+      issue_number: ${{ steps.issue.outputs.number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute identifiers
+        id: meta
+        run: |
+          SLUG="e2e-dev-${GITHUB_RUN_ID}"
+          FACILITY="E2E-Device-${GITHUB_RUN_ID}"
+          {
+            echo "slug=$SLUG"
+            echo "facility=$FACILITY"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create facility request issue
+        id: issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const facility = `${{ steps.meta.outputs.facility }}`;
+            const watchPath = `${{ inputs.watch_path }}`.replace(/\//g, '\\');
+            const body = [
+              '### Facility Name', '', facility, '',
+              '### Institution / Organization', '', 'Rosetta E2E Automation', '',
+              '### Contact Email', '', 'e2e@rosetta.local', '',
+              '### X-ray Machines', '',
+              '| Format | Machine Name | Watch Path |',
+              '|--------|-------------|------------|',
+              `| .pca | E2E-Device | ${watchPath} |`, '',
+              '### Notes', '', '_Automated device-flow E2E test — safe to delete._', '',
+              '---', '_Created by watchdog-device-e2e.yml_',
+            ].join('\n');
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Facility request: ${facility}`,
+              body,
+              labels: ['request-facility', 'e2e-automation'],
+            });
+            core.setOutput('number', String(issue.data.number));
+
+      - name: Approve facility (trigger onboard)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.issue.outputs.number }},
+              labels: ['facility-approved'],
+            });
+
+      - name: Wait for onboard to create config.yml
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const slug = `${{ steps.meta.outputs.slug }}`;
+            const path = `data/${slug}/config.yml`;
+            for (let attempt = 0; attempt < 30; attempt++) {
+              try {
+                await github.rest.repos.getContent({
+                  owner: context.repo.owner, repo: context.repo.repo, path, ref: 'main',
+                });
+                core.info(`Found ${path}`);
+                return;
+              } catch (err) {
+                core.info(`Waiting for ${path} (attempt ${attempt + 1}/30)...`);
+                await new Promise(r => setTimeout(r, 15000));
+              }
+            }
+            core.setFailed(`Timed out waiting for ${path}`);
+            throw new Error('onboard timeout');
+
+  device-install:
+    needs: provision
+    if: vars.ROSETTA_E2E_ENABLED == 'true'
+    runs-on: [self-hosted, rosetta-ci-dell]
+    env:
+      ROSETTA_WORKER_URL: ${{ secrets.ROSETTA_WORKER_URL }}
+      ROSETTA_SLUG: ${{ needs.provision.outputs.slug }}
+      ROSETTA_FACILITY: ${{ needs.provision.outputs.facility }}
+      WATCH_PATH: ${{ inputs.watch_path }}
+      INSTALL_DIR: C:/rosetta-watchdog-device-e2e
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Device authorization (enter the code shown below)
+        id: auth
+        shell: pwsh
+        run: |
+          python "$env:GITHUB_WORKSPACE/.github/scripts/e2e/device_flow.py" authorize `
+            --worker-url "$env:ROSETTA_WORKER_URL" `
+            --slug "$env:ROSETTA_SLUG" `
+            --facility "$env:ROSETTA_FACILITY" `
+            --wait ${{ inputs.wait_seconds }} `
+            --github-output "$env:GITHUB_OUTPUT"
+
+      - name: Install watchdog (pip)
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "$env:GITHUB_WORKSPACE/edge"
+
+      - name: Write config.yml + seed test scan
+        shell: pwsh
+        env:
+          COMPANION_REPO: ${{ steps.auth.outputs.companion_repo }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path $env:INSTALL_DIR | Out-Null
+          New-Item -ItemType Directory -Force -Path $env:WATCH_PATH | Out-Null
+          $config = @"
+          watch_directories:
+            - path: '$($env:WATCH_PATH)'
+              machine_name: 'E2E-Device'
+          polling_interval_seconds: 30
+          include_drift_files: false
+          parser_backend: "auto"
+          state_file: '$($env:INSTALL_DIR)\processed_files.json'
+          github:
+            repo: "$($env:COMPANION_REPO)"
+            branch: "main"
+            upload_path: "data/$($env:ROSETTA_SLUG)/"
+            commit_prefix: "[edge-watchdog]"
+          auth:
+            token_url: "$($env:ROSETTA_WORKER_URL)/watchdog/token"
+            install_ticket_env: "ROSETTA_INSTALL_TICKET"
+          monitoring:
+            heartbeat_url: "$($env:ROSETTA_WORKER_URL)/watchdog/heartbeat"
+            interval_seconds: 300
+          logging:
+            level: "INFO"
+          "@
+          $cfg = Join-Path $env:INSTALL_DIR "config.yml"
+          Set-Content -Path $cfg -Value $config -Encoding UTF8
+          Copy-Item "$env:GITHUB_WORKSPACE/edge/test_data/example.pca" (Join-Path $env:WATCH_PATH "example.pca") -Force
+          Get-Content $cfg
+
+      - name: Run watchdog once (parse + push + heartbeat)
+        shell: pwsh
+        env:
+          ROSETTA_INSTALL_TICKET: ${{ steps.auth.outputs.install_ticket }}
+        run: |
+          $cfg = Join-Path $env:INSTALL_DIR "config.yml"
+          python -m rosetta_watchdog.cli -c $cfg --once
+
+      - name: Verify upload via Worker dashboard endpoints
+        shell: pwsh
+        env:
+          ROSETTA_INSTALL_TICKET: ${{ steps.auth.outputs.install_ticket }}
+        run: |
+          python "$env:GITHUB_WORKSPACE/.github/scripts/e2e/device_flow.py" verify `
+            --worker-url "$env:ROSETTA_WORKER_URL" `
+            --install-ticket "$env:ROSETTA_INSTALL_TICKET" `
+            --wait 90
+
+      - name: Cleanup local install
+        if: always()
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force $env:INSTALL_DIR -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force (Split-Path $env:WATCH_PATH -Parent) -ErrorAction SilentlyContinue
+
+  cleanup-github:
+    needs: [provision, device-install]
+    if: always() && needs.provision.result != 'skipped' && vars.ROSETTA_E2E_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Worker cleanup (companion repo + facility dir + issue)
+        if: needs.provision.outputs.slug != ''
+        env:
+          ROSETTA_WORKER_URL: ${{ secrets.ROSETTA_WORKER_URL }}
+          ROSETTA_ONBOARD_HMAC_KEY: ${{ secrets.ROSETTA_ONBOARD_HMAC_KEY }}
+        run: |
+          python3 .github/scripts/e2e/worker_request.py cleanup \
+            --worker-url "$ROSETTA_WORKER_URL" \
+            --hmac-key "$ROSETTA_ONBOARD_HMAC_KEY" \
+            --slug "${{ needs.provision.outputs.slug }}" \
+            --facility "${{ needs.provision.outputs.facility }}" \
+            --issue-number "${{ needs.provision.outputs.issue_number }}" || true
+
+      - name: Remove facility from users.csv
+        if: needs.provision.outputs.facility != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const facility = `${{ needs.provision.outputs.facility }}`;
+            const { data: file } = await github.rest.repos.getContent({
+              owner: context.repo.owner, repo: context.repo.repo, path: 'users.csv', ref: 'main',
+            });
+            const raw = Buffer.from(file.content, 'base64').toString('utf8');
+            const kept = raw.split('\n').filter(l => l.trim() && !l.startsWith(facility + ','));
+            if (kept.length === raw.split('\n').filter(l => l.trim()).length) {
+              core.info('Facility not in users.csv — nothing to remove');
+              return;
+            }
+            await github.rest.repos.createOrUpdateFileContents({
+              owner: context.repo.owner, repo: context.repo.repo, path: 'users.csv',
+              message: `chore(e2e): remove ${facility} from users.csv [skip ci]`,
+              content: Buffer.from(kept.join('\n') + '\n', 'utf8').toString('base64'),
+              sha: file.sha, branch: 'main',
+            });
+
+      - name: Summarize
+        if: always()
+        run: |
+          echo "### Watchdog Device-Flow E2E" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Slug: \`${{ needs.provision.outputs.slug }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Device-install job: \`${{ needs.device-install.result }}\`" >> "$GITHUB_STEP_SUMMARY"

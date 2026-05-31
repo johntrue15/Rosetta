@@ -6,6 +6,26 @@ facility runner → `deploy-watchdog.yml` → NSSM service → file upload → c
 
 Workflow: [`.github/workflows/watchdog-windows-e2e.yml`](../../workflows/watchdog-windows-e2e.yml)
 
+## Interactive device-flow E2E (what real operators do)
+
+[`.github/workflows/watchdog-device-e2e.yml`](../../workflows/watchdog-device-e2e.yml)
+tests the **download-and-run** path with the real **device OAuth** flow. It
+provisions an approved facility, then on the Dell runner **prints a device code
+and waits** (default 120s) for *you* to open <https://github.com/login/device>,
+enter the code, and approve the Rosetta Upload app. It then mints the install
+ticket, installs + runs the watchdog once, uploads a test scan, and confirms it
+through the Worker dashboard endpoints (`/facility/data` + `/facility/status`)
+before tearing everything down.
+
+Run it manually and watch the live logs for the code:
+
+```bash
+gh workflow run watchdog-device-e2e.yml -f wait_seconds=120
+# then: gh run watch $(gh run list -w watchdog-device-e2e.yml -L1 --json databaseId --jq '.[0].databaseId')
+```
+
+Requires `ROSETTA_E2E_ENABLED=true` and the `rosetta-ci-dell` runner (below).
+
 **Setting up the Dell for the first time?** A Cursor agent (or human) should
 follow **[DELL_SETUP.md](./DELL_SETUP.md)** after cloning the repo onto the Dell.
 
