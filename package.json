@@ -6,6 +6,7 @@
     "worker:deploy": "node cloudflare/run.mjs deploy",
     "worker:secrets": "node cloudflare/run.mjs secrets",
     "worker:dev": "node cloudflare/run.mjs dev",
+    "worker:kv-setup": "node cloudflare/setup-kv.mjs",
     "deploy": "npm run worker:deploy"
   },
   "devDependencies": {

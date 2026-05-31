@@ -69,16 +69,25 @@ the same install ticket it uses for data pushes. The Worker stores the latest
 heartbeat per facility in a KV namespace, and the org dashboard at
 `docs/fleet/` reads it back via `GET /fleet/status`.
 
-**Enable it (one-time):**
+**Enable it (one command):**
+
+```bash
+npm run worker:kv-setup
+```
+
+This finds-or-creates the `FLEET` Workers KV namespace, writes the binding into
+`wrangler.toml` (idempotent), and deploys. Pass `--no-deploy` to only
+create/bind. Until KV is configured the heartbeat and fleet endpoints **degrade
+gracefully** (return `ok` / empty) so the rest of the Worker keeps working.
+
+<details><summary>Manual equivalent</summary>
 
 ```bash
 npx wrangler kv namespace create FLEET
+# copy the printed id into the [[kv_namespaces]] block in wrangler.toml, then:
+npm run worker:deploy
 ```
-
-Copy the printed `id` into the commented `[[kv_namespaces]]` block in
-`wrangler.toml` (binding `FLEET`), uncomment it, and redeploy. Until then the
-heartbeat and fleet endpoints **degrade gracefully** (return `ok` / empty) so
-the rest of the Worker keeps working.
+</details>
 
 - **Dashboard access** is gated to **active members of the `FACILITY_OWNER`
   org**. The dashboard runs device OAuth requesting the `read:org` scope, and

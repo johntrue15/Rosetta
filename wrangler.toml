@@ -8,14 +8,19 @@ compatibility_date = "2024-01-01"
 [vars]
 ALLOWED_ORIGIN = "https://johntrue15.github.io"
 
-# Fleet monitoring (Phase 1). The Worker stores the latest watchdog heartbeat
-# per facility in this KV namespace and the dashboard reads it back.
+# Fleet monitoring (Phases 1-4). The Worker stores the latest watchdog
+# heartbeat, queued commands, channels, revocations, and audit log per facility
+# in this KV namespace; the dashboard reads it back.
 #
-# One-time setup (creates the namespace, prints an id):
+# One-time setup — automated (creates the namespace, writes the binding here,
+# and deploys):
+#   npm run worker:kv-setup
+#
+# ...or manual:
 #   npx wrangler kv namespace create FLEET
-# then uncomment the block below and paste the printed id. The heartbeat and
-# /fleet/status endpoints degrade gracefully (no-op) until this is configured,
-# so deploying before creating the namespace will not break the other routes.
+# then uncomment the block below and paste the printed id. The fleet endpoints
+# degrade gracefully (no-op) until this is configured, so deploying before
+# creating the namespace will not break the other routes.
 #
 # [[kv_namespaces]]
 # binding = "FLEET"
