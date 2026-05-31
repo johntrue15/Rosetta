@@ -143,22 +143,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The CI runner service may run under an account where `python` isn't on
-      # PATH (the python.org installer only adds it to the installing user's
-      # PATH). Resolve a real interpreter — preferring the `py` launcher, which
-      # the installer registers system-wide — and skip the Windows Store alias
-      # stub (it can't run `-c`). Export the concrete exe path for later steps.
+      # The runner service account usually can't see the per-user Python the
+      # wizard installs, so provide a job-scoped interpreter. setup-python adds
+      # it to PATH for this job regardless of account. continue-on-error so the
+      # resolver below can still fall back to a system Python if this no-ops.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+        continue-on-error: true
+
+      # Resolve a concrete interpreter path (prefers what setup-python put on
+      # PATH; falls back to the `py` launcher / python3). Running `-c` also
+      # skips the Windows Store alias stub, which can't execute it.
       - name: Resolve Python
         shell: powershell
         run: |
           $ErrorActionPreference = "SilentlyContinue"
           $candidates = @(
-            @{ cmd = "py";      pre = @("-3") },
             @{ cmd = "python";  pre = @() },
+            @{ cmd = "py";      pre = @("-3") },
             @{ cmd = "python3"; pre = @() }
           )
           $py = $null
+          $tried = @()
           foreach ($cand in $candidates) {
+            $tried += $cand.cmd
             if (-not (Get-Command $cand.cmd -ErrorAction SilentlyContinue)) { continue }
             $pyArgs = @($cand.pre) + @("-c", "import sys; print(sys.executable)")
             $out = & $cand.cmd $pyArgs 2>$null
@@ -168,7 +178,8 @@ jobs:
             }
           }
           if (-not $py) {
-            Write-Error "No working Python found on the runner. Install Python 3.9+ (python.org) and ensure 'py' or 'python' is available."
+            Write-Host "ERROR: No working Python found. Tried: $($tried -join ', ')."
+            Write-Host "PATH=$env:PATH"
             exit 1
           }
           Write-Host "Using Python: $py"
