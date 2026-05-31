@@ -1,0 +1,10 @@
+# Rosetta facility approval marker for E2E-Device-26717705753
+# Auto-created by watchdog-device-e2e.yml (E2E test) — safe to delete.
+watch_directories:
+  - path: "C:UsersDELL_DocumentsTest531"
+    machine_name: "E2E-Device"
+polling_interval_seconds: 30
+github:
+  repo: "x-raymetadata/rosetta-facility-e2e-dev-26717705753"
+  branch: "main"
+  upload_path: "data/e2e-dev-26717705753/"
