@@ -26,9 +26,9 @@ on:
         required: false
         default: "120"
       watch_path:
-        description: "Local watch folder on the Dell"
+        description: "Watch folder (leave blank to use a runner-writable temp dir; a user folder like C:\\Users\\... won't work while the runner runs as NetworkService)"
         required: false
-        default: "C:/RosettaDeviceE2E/Scans"
+        default: ""
 
 concurrency:
   group: watchdog-device-e2e
@@ -138,8 +138,6 @@ jobs:
       ROSETTA_WORKER_URL: ${{ secrets.ROSETTA_WORKER_URL }}
       ROSETTA_SLUG: ${{ needs.provision.outputs.slug }}
       ROSETTA_FACILITY: ${{ needs.provision.outputs.facility }}
-      WATCH_PATH: ${{ inputs.watch_path }}
-      INSTALL_DIR: C:/rosetta-watchdog-device-e2e
     steps:
       - uses: actions/checkout@v4
 
@@ -239,16 +237,36 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $worker = $env:ROSETTA_WORKER_URL.Trim().TrimEnd('/')
-          New-Item -ItemType Directory -Force -Path $env:INSTALL_DIR | Out-Null
-          New-Item -ItemType Directory -Force -Path $env:WATCH_PATH | Out-Null
+
+          # The runner service account (NetworkService) can't write to user
+          # folders or C:\ root, so keep the install + watch dirs under
+          # RUNNER_TEMP. If an explicit watch_path was given but isn't writable,
+          # warn and fall back so the E2E still validates the pipeline.
+          $installDir = Join-Path $env:RUNNER_TEMP "rosetta-wd-e2e"
+          $fallback   = Join-Path $installDir "Scans"
+          $watch = "${{ inputs.watch_path }}".Trim()
+          if (-not $watch) { $watch = $fallback }
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+          try {
+            New-Item -ItemType Directory -Force -Path $watch -ErrorAction Stop | Out-Null
+          } catch {
+            Write-Host "WARNING: watch path '$watch' not usable ($($_.Exception.Message))."
+            Write-Host "Falling back to $fallback (runner service account can't access user folders)."
+            $watch = $fallback
+            New-Item -ItemType Directory -Force -Path $watch | Out-Null
+          }
+          # Export resolved paths for the run + cleanup steps.
+          "INSTALL_DIR=$installDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "WATCH_PATH=$watch"       | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
           $config = @"
           watch_directories:
-            - path: '$($env:WATCH_PATH)'
+            - path: '$watch'
               machine_name: 'E2E-Device'
           polling_interval_seconds: 30
           include_drift_files: false
           parser_backend: "auto"
-          state_file: '$($env:INSTALL_DIR)\processed_files.json'
+          state_file: '$installDir\processed_files.json'
           github:
             repo: "$($env:COMPANION_REPO)"
             branch: "main"
@@ -263,9 +281,9 @@ jobs:
           logging:
             level: "INFO"
           "@
-          $cfg = Join-Path $env:INSTALL_DIR "config.yml"
+          $cfg = Join-Path $installDir "config.yml"
           Set-Content -Path $cfg -Value $config -Encoding UTF8
-          Copy-Item "$env:GITHUB_WORKSPACE/edge/test_data/example.pca" (Join-Path $env:WATCH_PATH "example.pca") -Force
+          Copy-Item "$env:GITHUB_WORKSPACE/edge/test_data/example.pca" (Join-Path $watch "example.pca") -Force
           Get-Content $cfg
 
       - name: Run watchdog once (parse + push + heartbeat)
