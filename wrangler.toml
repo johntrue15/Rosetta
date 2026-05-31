@@ -8,25 +8,17 @@ compatibility_date = "2024-01-01"
 [vars]
 ALLOWED_ORIGIN = "https://johntrue15.github.io"
 
-# Fleet monitoring (Phases 1-4). The Worker stores the latest watchdog
-# heartbeat, queued commands, channels, revocations, and audit log per facility
-# in this KV namespace; the dashboard reads it back.
-#
-# One-time setup — automated (creates the namespace, writes the binding here,
-# and deploys):
-#   npm run worker:kv-setup
-#
-# ...or manual:
-#   npx wrangler kv namespace create FLEET
-# then uncomment the block below and paste the printed id. The fleet endpoints
-# degrade gracefully (no-op) until this is configured, so deploying before
-# creating the namespace will not break the other routes.
-#
-# [[kv_namespaces]]
-# binding = "FLEET"
-# id = "REPLACE_WITH_KV_NAMESPACE_ID"
-
 # Stale-facility detection runs on a schedule and flags facilities whose
-# watchdog has gone silent. Harmless (no-op) until FLEET KV is configured.
+# watchdog has gone silent.
 [triggers]
 crons = ["*/15 * * * *"]
+
+# Fleet monitoring KV (Phases 1-4): latest heartbeat, queued commands, channels,
+# revocations, and audit log per facility. The dashboard reads it back.
+#
+# Created + bound + deployed once by the maintainer (not per install):
+#   npm run worker:setup     # node-only, no wrangler/npx needed (REST API)
+#   npm run worker:kv-setup  # wrangler-based equivalent
+[[kv_namespaces]]
+binding = "FLEET"
+id = "88c034b95ffd4e1fac3c2c50bc6aa286"

@@ -71,16 +71,26 @@ the same install ticket it uses for data pushes. The Worker stores the latest
 heartbeat per facility in a KV namespace, and the org dashboard at
 `docs/fleet/` reads it back via `GET /fleet/status`.
 
-**Enable it (one command):**
+**Enable it (one command, run once by the maintainer — not per install):**
 
 ```bash
+npm run worker:setup      # node-only: no npm/npx/wrangler needed (uses the REST API)
+# or, if you have wrangler:
 npm run worker:kv-setup
 ```
 
-This finds-or-creates the `FLEET` Workers KV namespace, writes the binding into
-`wrangler.toml` (idempotent), and deploys. Pass `--no-deploy` to only
-create/bind. Until KV is configured the heartbeat and fleet endpoints **degrade
-gracefully** (return `ok` / empty) so the rest of the Worker keeps working.
+`worker:setup` finds-or-creates the `FLEET` KV namespace, writes the binding
+into `wrangler.toml`, and deploys the Worker **while preserving every existing
+secret** (it re-sends non-secret bindings and inherits secrets via
+`keep_bindings`, so `GITHUB_APP_PRIVATE_KEY` etc. are never touched). It also
+sets the cron schedule. `npm run worker:inspect` prints the live bindings
+(values redacted) to verify. Until KV is configured the heartbeat and fleet
+endpoints **degrade gracefully** (return `ok` / empty) so the rest of the
+Worker keeps working.
+
+> This is a **one-time server-side step**. It is *not* part of the end-user
+> install — the per-user one-line installer just runs the watchdog, which talks
+> to the already-bound Worker. One binding serves the whole fleet.
 
 <details><summary>Manual equivalent</summary>
 
