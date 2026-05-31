@@ -143,47 +143,56 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The runner service account usually can't see the per-user Python the
-      # wizard installs, so provide a job-scoped interpreter. setup-python adds
-      # it to PATH for this job regardless of account. continue-on-error so the
-      # resolver below can still fall back to a system Python if this no-ops.
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-        continue-on-error: true
-
-      # Resolve a concrete interpreter path (prefers what setup-python put on
-      # PATH; falls back to the `py` launcher / python3). Running `-c` also
-      # skips the Windows Store alias stub, which can't execute it.
-      - name: Resolve Python
+      - name: Check required secrets
         shell: powershell
         run: |
-          $ErrorActionPreference = "SilentlyContinue"
-          $candidates = @(
-            @{ cmd = "python";  pre = @() },
-            @{ cmd = "py";      pre = @("-3") },
-            @{ cmd = "python3"; pre = @() }
-          )
-          $py = $null
-          $tried = @()
-          foreach ($cand in $candidates) {
-            $tried += $cand.cmd
-            if (-not (Get-Command $cand.cmd -ErrorAction SilentlyContinue)) { continue }
-            $pyArgs = @($cand.pre) + @("-c", "import sys; print(sys.executable)")
-            $out = & $cand.cmd $pyArgs 2>$null
-            if ($LASTEXITCODE -eq 0 -and $out) {
-              $py = ($out | Select-Object -Last 1).ToString().Trim()
-              break
-            }
-          }
-          if (-not $py) {
-            Write-Host "ERROR: No working Python found. Tried: $($tried -join ', ')."
-            Write-Host "PATH=$env:PATH"
+          if (-not $env:ROSETTA_WORKER_URL) {
+            Write-Host "ERROR: the ROSETTA_WORKER_URL secret is empty/unset."
+            Write-Host "Set it under Settings > Secrets and variables > Actions > New repository secret"
+            Write-Host "  name:  ROSETTA_WORKER_URL"
+            Write-Host "  value: https://rosetta.jtrue15.workers.dev"
             exit 1
+          }
+          Write-Host "ROSETTA_WORKER_URL is set."
+
+      # The runner service (NetworkService) can't see the per-user Python the
+      # wizard installs, and setup-python is unreliable on this self-hosted box.
+      # So resolve an existing interpreter, and if none works, install a private
+      # copy with the official installer (no admin: InstallAllUsers=0). Cached in
+      # RUNNER_TOOL_CACHE so it only downloads once.
+      - name: Ensure Python
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          function Test-Py($cmd, $pre) {
+            if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) { return $null }
+            $a = @($pre) + @("-c", "import sys; print(sys.executable)")
+            $o = & $cmd $a 2>$null
+            if ($LASTEXITCODE -eq 0 -and $o) { return ($o | Select-Object -Last 1).ToString().Trim() }
+            return $null
+          }
+          $py = Test-Py "python" @()
+          if (-not $py) { $py = Test-Py "py" @("-3") }
+          if (-not $py) { $py = Test-Py "python3" @() }
+          if (-not $py) {
+            $ver = "3.12.6"
+            $cache = $env:RUNNER_TOOL_CACHE; if (-not $cache) { $cache = $env:RUNNER_TEMP }
+            $dir = Join-Path $cache "rosetta-python-$ver"
+            $exe = Join-Path $dir "python.exe"
+            if (-not (Test-Path $exe)) {
+              Write-Host "No Python found; installing a private copy ($ver, no admin)..."
+              $inst = Join-Path $env:RUNNER_TEMP "python-$ver-amd64.exe"
+              Invoke-WebRequest -UseBasicParsing -Uri "https://www.python.org/ftp/python/$ver/python-$ver-amd64.exe" -OutFile $inst
+              $p = Start-Process -FilePath $inst -Wait -PassThru -ArgumentList @(
+                "/quiet","InstallAllUsers=0","PrependPath=0","Include_launcher=0","Include_test=0","TargetDir=$dir")
+              if ($p.ExitCode -ne 0) { throw "Python installer exited $($p.ExitCode)" }
+            }
+            if (-not (Test-Path $exe)) { throw "Python install did not produce $exe" }
+            $py = $exe
           }
           Write-Host "Using Python: $py"
           & $py --version
+          & $py -m pip --version
           "PYTHON=$py" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Device authorization (enter the code shown below)
