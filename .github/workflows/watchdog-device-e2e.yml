@@ -2,7 +2,9 @@ name: Watchdog Device-Flow E2E (Dell)
 
 # Interactive end-to-end test of the *real* operator install path on the Dell
 # Windows runner:
-#   1. provision an approved facility (issue -> approve -> onboard config.yml)
+#   1. provision an approved facility (open issue + commit the config.yml
+#      approval marker directly on main — no label/onboard chain, since
+#      GITHUB_TOKEN actions don't trigger other workflows)
 #   2. on the Dell, run the GitHub device OAuth flow — the workflow PRINTS a
 #      user code and WAITS (default 120s) for you to enter it at
 #      https://github.com/login/device and approve the Rosetta Upload app
@@ -87,37 +89,47 @@ jobs:
             });
             core.setOutput('number', String(issue.data.number));
 
-      - name: Approve facility (trigger onboard)
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: ${{ steps.issue.outputs.number }},
-              labels: ['facility-approved'],
-            });
-
-      - name: Wait for onboard to create config.yml
+      # Approve the facility by committing the approval marker directly. We do
+      # NOT rely on the label -> facility-onboard.yml chain here: events made
+      # with the default GITHUB_TOKEN (like adding a label) intentionally do not
+      # trigger other workflows, so onboard would never run from inside CI.
+      # The Worker's approval gate only checks that data/<slug>/config.yml exists
+      # on main; the cleanup job removes it afterward.
+      - name: Approve facility (commit config.yml marker on main)
         uses: actions/github-script@v7
         with:
           script: |
             const slug = `${{ steps.meta.outputs.slug }}`;
+            const facility = `${{ steps.meta.outputs.facility }}`;
+            const watchPath = `${{ inputs.watch_path }}`;
             const path = `data/${slug}/config.yml`;
-            for (let attempt = 0; attempt < 30; attempt++) {
-              try {
-                await github.rest.repos.getContent({
-                  owner: context.repo.owner, repo: context.repo.repo, path, ref: 'main',
-                });
-                core.info(`Found ${path}`);
-                return;
-              } catch (err) {
-                core.info(`Waiting for ${path} (attempt ${attempt + 1}/30)...`);
-                await new Promise(r => setTimeout(r, 15000));
-              }
-            }
-            core.setFailed(`Timed out waiting for ${path}`);
-            throw new Error('onboard timeout');
+            const config = [
+              `# Rosetta facility approval marker for ${facility}`,
+              `# Auto-created by watchdog-device-e2e.yml (E2E test) — safe to delete.`,
+              `watch_directories:`,
+              `  - path: "${watchPath}"`,
+              `    machine_name: "E2E-Device"`,
+              `polling_interval_seconds: 30`,
+              `github:`,
+              `  repo: "x-raymetadata/rosetta-facility-${slug}"`,
+              `  branch: "main"`,
+              `  upload_path: "data/${slug}/"`,
+              ``,
+            ].join('\n');
+            let sha;
+            try {
+              const { data } = await github.rest.repos.getContent({
+                owner: context.repo.owner, repo: context.repo.repo, path, ref: 'main',
+              });
+              sha = data.sha; // a rerun may have left it behind
+            } catch (e) { /* not present yet */ }
+            await github.rest.repos.createOrUpdateFileContents({
+              owner: context.repo.owner, repo: context.repo.repo, path,
+              message: `chore(e2e): approve ${slug} [skip ci]`,
+              content: Buffer.from(config, 'utf8').toString('base64'),
+              sha, branch: 'main',
+            });
+            core.info(`Wrote ${path} on main (approval marker).`);
 
   device-install:
     needs: provision
