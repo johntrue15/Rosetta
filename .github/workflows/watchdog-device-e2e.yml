@@ -153,7 +153,11 @@ jobs:
             Write-Host "  value: https://rosetta.jtrue15.workers.dev"
             exit 1
           }
-          Write-Host "ROSETTA_WORKER_URL is set."
+          # Secrets often carry a trailing newline/space; trim once and re-export
+          # so every later step (device flow + config.yml URLs) gets a clean value.
+          $u = $env:ROSETTA_WORKER_URL.Trim().TrimEnd('/')
+          "ROSETTA_WORKER_URL=$u" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "ROSETTA_WORKER_URL is set ($u)."
 
       # The runner service (NetworkService) can't see the per-user Python the
       # wizard installs, and setup-python is unreliable on this self-hosted box.
@@ -229,6 +233,7 @@ jobs:
           COMPANION_REPO: ${{ steps.auth.outputs.companion_repo }}
         run: |
           $ErrorActionPreference = "Stop"
+          $worker = $env:ROSETTA_WORKER_URL.Trim().TrimEnd('/')
           New-Item -ItemType Directory -Force -Path $env:INSTALL_DIR | Out-Null
           New-Item -ItemType Directory -Force -Path $env:WATCH_PATH | Out-Null
           $config = @"
@@ -245,10 +250,10 @@ jobs:
             upload_path: "data/$($env:ROSETTA_SLUG)/"
             commit_prefix: "[edge-watchdog]"
           auth:
-            token_url: "$($env:ROSETTA_WORKER_URL)/watchdog/token"
+            token_url: "$worker/watchdog/token"
             install_ticket_env: "ROSETTA_INSTALL_TICKET"
           monitoring:
-            heartbeat_url: "$($env:ROSETTA_WORKER_URL)/watchdog/heartbeat"
+            heartbeat_url: "$worker/watchdog/heartbeat"
             interval_seconds: 300
           logging:
             level: "INFO"

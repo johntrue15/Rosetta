@@ -85,7 +85,7 @@ def banner(user_code: str, verification_uri: str, wait: int) -> None:
 
 
 def authorize(args: argparse.Namespace) -> int:
-    worker = args.worker_url.rstrip("/")
+    worker = args.worker_url.strip().rstrip("/")
 
     status, init = post_json(f"{worker}/device/init", {"scope": args.scope})
     if status >= 400 or "device_code" not in init:
@@ -159,7 +159,7 @@ def authorize(args: argparse.Namespace) -> int:
 
 def verify(args: argparse.Namespace) -> int:
     """Confirm the dashboard data path: /facility/status + /facility/data."""
-    worker = args.worker_url.rstrip("/")
+    worker = args.worker_url.strip().rstrip("/")
     deadline = time.time() + args.wait
     last = {}
     while time.time() < deadline:
