@@ -205,6 +205,19 @@ class DirectoryWatcher:
 
         return total
 
+    def _poll_commands(self, *, state: str, force: bool) -> None:
+        """Send a heartbeat (if due) and dispatch any returned commands.
+        May raise RestartRequested."""
+        try:
+            commands = self._heartbeat.maybe_send(self, state=state, force=force)
+        except RestartRequested:
+            raise
+        except Exception:
+            logger.debug("Heartbeat error (ignored)", exc_info=True)
+            return
+        for cmd in commands or []:
+            self._dispatch_command(cmd)  # may raise RestartRequested
+
     def _ack_and_flush(self, command_id) -> None:
         """Ack a command and immediately flush it to the Worker. Used before a
         restart so the command is not re-delivered to the new process."""
@@ -262,28 +275,28 @@ class DirectoryWatcher:
 
         try:
             while True:
-                # Heartbeat + remote commands run outside the scan try/except so
-                # monitoring and control keep working even if scanning fails.
+                # Periodic heartbeat (KV write) + command poll. force=False so it
+                # honours monitoring.interval_seconds — at fleet scale this keeps
+                # KV writes bounded (idle facilities write ~once per interval, not
+                # once per poll). Activity triggers an immediate heartbeat below.
                 if self._heartbeat is not None:
-                    try:
-                        state = "paused" if self._paused else "running"
-                        commands = self._heartbeat.maybe_send(self, state=state, force=True)
-                    except RestartRequested:
-                        raise
-                    except Exception:
-                        commands = []
-                        logger.debug("Heartbeat error (ignored)", exc_info=True)
-                    for cmd in commands or []:
-                        self._dispatch_command(cmd)  # may raise RestartRequested
+                    self._poll_commands(state="paused" if self._paused else "running",
+                                        force=False)  # may raise RestartRequested
 
                 if self._on_loop is not None:
                     self._on_loop(self)  # periodic auto-update; may raise RestartRequested
 
                 if not self._paused:
                     try:
-                        self.run_once()
+                        processed = self.run_once()
                         consecutive_errors = 0
+                        # Push an immediate heartbeat when something happened so
+                        # the dashboard reflects activity (and commands are polled).
+                        if processed and self._heartbeat is not None:
+                            self._poll_commands(state="running", force=True)
                     except KeyboardInterrupt:
+                        raise
+                    except RestartRequested:
                         raise
                     except Exception:
                         consecutive_errors += 1

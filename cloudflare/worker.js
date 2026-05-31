@@ -34,6 +34,8 @@
  *   POST /watchdog/token              Mint short-lived push token for the watchdog
  *   POST /watchdog/heartbeat          Ingest a watchdog status heartbeat (KV); returns commands
  *   POST /watchdog/version            Target version for the facility's channel
+ *   POST /facility/status             Single-facility status (auth: install ticket or org member)
+ *   POST /facility/data               List uploaded data in the companion repo (ticket or org)
  *   GET  /fleet/status                Org-gated fleet status for the dashboard
  *   POST /fleet/command               Org-gated: queue a control command for a facility
  *   POST /fleet/revoke|unrevoke       Org-gated: revoke/restore an install ticket (kill switch)
@@ -79,6 +81,10 @@ export default {
           return await handleHeartbeat(request, env);
         case "/watchdog/version":
           return await handleWatchdogVersion(request, env);
+        case "/facility/status":
+          return await handleFacilityStatus(request, env);
+        case "/facility/data":
+          return await handleFacilityData(request, env);
         case "/fleet/status":
           return await handleFleetStatus(request, env);
         case "/fleet/command":
@@ -632,12 +638,15 @@ async function popAndListCommands(env, slug, ackedIds) {
 
 async function handleFleetCommand(request, env) {
   if (request.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
-  const member = await requireOrgMember(request, env);
-  if (!member.ok) return jsonResponse({ error: member.error }, member.status);
-
   const body = await safeJson(request);
-  if (!body || !body.slug || !body.type) return jsonResponse({ error: "missing_slug_or_type" }, 400);
-  const slug = sanitizeSlug(body.slug);
+  if (!body || !body.type) return jsonResponse({ error: "missing_type" }, 400);
+  // Org members can command any facility; a facility operator can command their
+  // own (slug derived from their install ticket). All commands are
+  // self-management (pause/resume/run-once/update/restart/...), so ticket auth
+  // scoped to the same slug is safe.
+  const authz = await authorizeFacility(request, env, body);
+  if (!authz.ok) return jsonResponse({ error: authz.error }, authz.status);
+  const slug = authz.slug;
   const type = String(body.type);
   if (!ALLOWED_COMMANDS.has(type)) return jsonResponse({ error: "unknown_command", type }, 400);
   if (!env.FLEET) return jsonResponse({ error: "kv_not_configured" }, 503);
@@ -647,7 +656,7 @@ async function handleFleetCommand(request, env) {
     type,
     args: body.args && typeof body.args === "object" ? body.args : {},
     created_at: new Date().toISOString(),
-    by: member.login || "unknown",
+    by: authz.login || "unknown",
   };
   const key = `cmd:${slug}`;
   let list = [];
@@ -882,6 +891,134 @@ async function requireOrgMember(request, env) {
   const data = await res.json();
   if (data.state !== "active") return { ok: false, status: 403, error: "org_membership_inactive" };
   return { ok: true, login: data.user && data.user.login, role: data.role, org };
+}
+
+// Authorizes access to a single facility's status/data/control. Two callers:
+//   - an org member (bearer token) acting on any facility (slug from body), or
+//   - a facility operator presenting their install ticket (slug from the
+//     ticket; this is how the post-install wizard manages its own watchdog).
+async function authorizeFacility(request, env, body) {
+  const auth = request.headers.get("Authorization") || "";
+  if (auth.startsWith("Bearer ")) {
+    const m = await requireOrgMember(request, env);
+    if (!m.ok) return { ok: false, status: m.status, error: m.error };
+    const slug = sanitizeSlug((body && body.slug) || "");
+    if (!slug) return { ok: false, status: 400, error: "missing_slug" };
+    return { ok: true, via: "org", login: m.login, slug };
+  }
+  if (body && body.install_ticket) {
+    const v = await verifyInstallTicket(env, body.install_ticket);
+    if (!v.ok) return { ok: false, status: 401, error: v.error };
+    const slug = sanitizeSlug(v.claims.slug || "");
+    if (!slug) return { ok: false, status: 400, error: "ticket_missing_slug" };
+    if (body.slug && sanitizeSlug(body.slug) !== slug) return { ok: false, status: 403, error: "slug_mismatch" };
+    return { ok: true, via: "ticket", login: v.claims.sub || "install-ticket", slug };
+  }
+  return { ok: false, status: 401, error: "missing_authentication" };
+}
+
+// Single-facility status for the post-install wizard dashboard (and the fleet
+// dashboard's drill-in). Authorized by install ticket or org membership.
+async function handleFacilityStatus(request, env) {
+  if (request.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
+  const body = await safeJson(request);
+  const authz = await authorizeFacility(request, env, body);
+  if (!authz.ok) return jsonResponse({ error: authz.error }, authz.status);
+  const slug = authz.slug;
+
+  if (!env.FLEET) {
+    return jsonResponse({ slug, kv_configured: false, health: "unknown", status: {}, pending_commands: 0 });
+  }
+  let rec = null;
+  try { rec = JSON.parse((await env.FLEET.get(`hb:${slug}`)) || "null"); } catch { rec = null; }
+  let pending = [];
+  try { pending = JSON.parse((await env.FLEET.get(`cmd:${slug}`)) || "[]"); } catch { pending = []; }
+  const ch = await getChannelConfig(env, slug);
+
+  if (!rec) {
+    return jsonResponse({
+      slug, kv_configured: true, health: "unknown", received_at: null, age_seconds: null,
+      channel: ch.channel, pin_version: ch.pin_version, status: {}, pending_commands: pending.length,
+    });
+  }
+  const seen = Date.parse(rec.received_at || "") || 0;
+  const ageSeconds = seen ? Math.round((Date.now() - seen) / 1000) : null;
+  const stale = ageSeconds == null || ageSeconds > STALE_THRESHOLD_SECONDS;
+  const stopped = rec.status && rec.status.state === "stopped";
+  return jsonResponse({
+    slug,
+    kv_configured: true,
+    health: stopped ? "stopped" : (stale ? "stale" : "online"),
+    received_at: rec.received_at,
+    age_seconds: ageSeconds,
+    binding: rec.binding || "unknown",
+    channel: ch.channel,
+    pin_version: ch.pin_version,
+    status: rec.status || {},
+    pending_commands: pending.length,
+  });
+}
+
+// Lists what the watchdog has uploaded to its companion repo (data/<slug>/),
+// using a read-only App token so the operator (who is not an org member and
+// can't read the private repo directly) can still confirm uploads.
+async function handleFacilityData(request, env) {
+  if (request.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
+  const body = await safeJson(request);
+  const authz = await authorizeFacility(request, env, body);
+  if (!authz.ok) return jsonResponse({ error: authz.error }, authz.status);
+  const slug = authz.slug;
+
+  const dataRepo = facilityDataRepo(env, slug);
+  const installationToken = await mintInstallationToken(env, {
+    owner: dataRepo.owner,
+    repositories: [dataRepo.name],
+    permissions: { contents: "read" },
+  });
+  const dirPath = `data/${slug}`;
+  const treeUrl = `https://github.com/${dataRepo.full}/tree/main/${dirPath}`;
+
+  const res = await fetch(
+    `${GH_API}/repos/${dataRepo.full}/contents/${dirPath}?ref=main`,
+    { headers: githubAppHeaders(installationToken) },
+  );
+  if (res.status === 404) {
+    return jsonResponse({ slug, repo: dataRepo.full, exists: false, count: 0, files: [], tree_url: treeUrl });
+  }
+  if (!res.ok) {
+    const detail = await res.text();
+    return jsonResponse({ error: "contents_failed", status: res.status, detail }, 502);
+  }
+  const listing = await res.json();
+  const isData = (n) => /\.(json|pca|txrm)$/i.test(n) && n !== "config.yml";
+  const files = (Array.isArray(listing) ? listing : [])
+    .filter((f) => f.type === "file" && isData(f.name))
+    .map((f) => ({ name: f.name, size: f.size, html_url: f.html_url, sha: f.sha }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  // Latest commit touching the data dir (best-effort).
+  let lastCommit = null;
+  try {
+    const cRes = await fetch(
+      `${GH_API}/repos/${dataRepo.full}/commits?path=${encodeURIComponent(dirPath)}&per_page=1`,
+      { headers: githubAppHeaders(installationToken) },
+    );
+    if (cRes.ok) {
+      const commits = await cRes.json();
+      if (commits[0]) {
+        lastCommit = {
+          message: commits[0].commit && commits[0].commit.message,
+          date: commits[0].commit && commits[0].commit.committer && commits[0].commit.committer.date,
+          html_url: commits[0].html_url,
+        };
+      }
+    }
+  } catch (_) { /* ignore */ }
+
+  return jsonResponse({
+    slug, repo: dataRepo.full, exists: true, count: files.length, files,
+    last_commit: lastCommit, tree_url: treeUrl,
+  });
 }
 
 async function detectStaleFacilities(env) {

@@ -25,6 +25,8 @@ pipeline:
 | `POST /watchdog/token`               | Trade install ticket for a 1-hour App installation token (used by the watchdog).                  |
 | `POST /watchdog/heartbeat`           | Ingest a watchdog status heartbeat into KV (auth: install ticket). Returns pending control commands. |
 | `POST /watchdog/version`             | Target version for the facility's channel (auth: install ticket). Drives self-update.             |
+| `POST /facility/status`              | Single-facility status (auth: install ticket **or** org member). Powers the post-install dashboard. |
+| `POST /facility/data`                | List the watchdog's uploads in the companion repo via a read-only App token (ticket or org).      |
 | `GET  /fleet/status`                 | Aggregated fleet status for the dashboard (auth: bearer token of an active `FACILITY_OWNER` org member). |
 | `POST /fleet/command`                | Queue a control command (`pause`/`resume`/`run-once`/`reload-config`/`update-now`/`restart`/`configure`). Org-gated. |
 | `POST /fleet/revoke` / `unrevoke`    | Kill switch: revoke/restore an install ticket by `slug` (or `jti`). Org-gated.                     |
@@ -127,6 +129,45 @@ KV namespace (above). The dashboard exposes them as per-facility buttons.
 
 Optional Worker vars/secrets for these phases: `ENFORCE_MACHINE_BINDING`
 (bind enforcement), `STABLE_REF` (branch to track when no releases exist).
+
+### Two dashboards
+
+- **Per-facility (operator)** — the setup wizard's Step 4 becomes a live
+  dashboard for the watchdog you just installed: status, uploaded-file list,
+  and Stop/Start/Scan-now/Update/Restart buttons. It is authorized by the
+  **install ticket** the operator already holds, so it works even though the
+  operator is not an org member and can't read the private companion repo
+  directly (the Worker reads it with a scoped App token).
+- **Fleet (org)** — `docs/fleet/` shows every facility and adds channel,
+  revoke, and audit controls. Gated to `FACILITY_OWNER` org members.
+
+## Scaling to ~100 facilities
+
+The design is built for a fleet; the main thing to size is **Workers KV**.
+
+- **Writes** — each watchdog writes one heartbeat per
+  `monitoring.interval_seconds` (default **300 s**) plus one on activity. ~100
+  idle facilities ≈ 100 × 288 ≈ **29k writes/day**. That's comfortable on the
+  **Workers Paid** plan (millions of KV writes/month included) but exceeds the
+  free tier's 1k/day — use Paid for a real fleet. Don't lower the interval to a
+  few seconds across the fleet; command latency is bounded by it, and a
+  facility picks up commands immediately whenever it processes a file.
+- **Reads** — `/fleet/status` reads every facility's key per refresh and the
+  per-facility dashboard reads one. Keep the dashboard's auto-refresh modest
+  (30 s fleet / 15 s single) and don't leave many dashboards open.
+- **Cron** — stale detection lists all keys every 15 min (~100 reads/run).
+- **Beyond ~1,000 facilities**, move the store from KV to **D1** (SQLite) for
+  indexed queries and higher write throughput; the endpoint shapes stay the same.
+
+### Ready-for-100 checklist
+
+- [ ] `FACILITY_OWNER` org has the app installed; `npm run worker:kv-setup` run.
+- [ ] Workers **Paid** plan enabled (KV quotas).
+- [ ] `ENFORCE_MACHINE_BINDING=1` if you want leaked-ticket protection.
+- [ ] Use update **channels** (`beta` on a couple of canaries before `stable`).
+- [ ] Each facility is isolated: its own approved allow-list entry, its own
+      private companion repo, and only scoped, short-lived tokens leave the Worker.
+- [ ] `ALERT_SLACK_WEBHOOK` set so stale facilities page someone.
 
 ## GitHub App "Rosetta Upload" — required permissions
 

@@ -165,6 +165,20 @@
     .poll-status a { color: var(--accent); text-decoration: none; }
     .poll-status a:hover { text-decoration: underline; }
 
+    .fac-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+    @media (max-width: 640px) { .fac-grid { grid-template-columns: 1fr; } }
+    .fac-card { background: var(--card-2, rgba(255,255,255,0.03)); border: 1px solid var(--border); border-radius: 8px; padding: 0.9rem 1rem; }
+    .fac-card-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.5rem; }
+    .fac-kv { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.6rem; font-size: 0.85rem; }
+    .fac-kv .k { color: var(--muted); }
+    .fac-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+    .fac-badge { display: inline-block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; padding: 0.1rem 0.5rem; border-radius: 999px; }
+    .fac-badge.online { background: rgba(63,185,80,0.15); color: var(--success); }
+    .fac-badge.stale { background: rgba(248,81,73,0.15); color: var(--danger, #f85149); }
+    .fac-badge.stopped { background: rgba(210,153,34,0.15); color: var(--warning); }
+    .fac-badge.unknown { background: rgba(139,148,158,0.15); color: var(--muted); }
+    .fac-files { max-height: 160px; overflow-y: auto; font-size: 0.82rem; margin-top: 0.4rem; }
+    .fac-files a { color: var(--accent); display: block; padding: 0.1rem 0; }
     .verify-result { margin: 1rem 0; padding: 1rem 1.25rem; border-radius: 8px; font-size: 0.88rem; line-height: 1.6; }
     .verify-result.found { background: rgba(63,185,80,0.08); border: 1px solid rgba(63,185,80,0.25); color: var(--success); }
     .verify-result.not-found { background: rgba(210,153,34,0.08); border: 1px solid rgba(210,153,34,0.25); color: var(--warning); }
@@ -460,17 +474,40 @@
         </div>
       </div>
 
-      <!-- Step 4: Verify data -->
+      <!-- Step 4: Your watchdog dashboard -->
       <div class="step-panel" id="step-4">
         <div class="step-card">
-          <h2>Step 4 — Verify Data Upload</h2>
-          <p class="subtitle">Let's check if the watchdog is successfully pushing data to your facility directory on <code>main</code>.</p>
+          <h2>Step 4 — Your Watchdog</h2>
+          <p class="subtitle">Live status, uploaded data, and controls for this facility's watchdog.</p>
           <div id="verify-status"></div>
-          <div style="margin-top:1rem">
+
+          <div class="fac-grid">
+            <div class="fac-card" id="fac-status-card">
+              <div class="fac-card-title">Status</div>
+              <div id="fac-status-body" class="muted"><span class="spinner-inline"></span> Loading&hellip;</div>
+            </div>
+            <div class="fac-card" id="fac-data-card">
+              <div class="fac-card-title">Uploaded data</div>
+              <div id="fac-data-body" class="muted"><span class="spinner-inline"></span> Loading&hellip;</div>
+            </div>
+          </div>
+
+          <div class="fac-card-title" style="margin-top:1.25rem">Controls</div>
+          <div class="fac-controls" id="fac-controls">
+            <button class="btn btn-sm" onclick="facilityCommand('pause')">Stop</button>
+            <button class="btn btn-sm" onclick="facilityCommand('resume')">Start</button>
+            <button class="btn btn-sm" onclick="facilityCommand('run-once')">Scan now</button>
+            <button class="btn btn-sm" onclick="facilityCommand('update-now')">Update</button>
+            <button class="btn btn-sm" onclick="facilityCommand('restart')">Restart</button>
+          </div>
+          <div class="hint" style="margin-top:0.5rem">Commands are picked up on the watchdog's next check-in (within the heartbeat interval, or immediately on activity).</div>
+
+          <div style="margin-top:1.25rem">
             <button class="btn" id="recheck-data-btn">
               <span class="spinner-inline" id="verify-spinner" style="display:none"></span>
-              Check again
+              Refresh
             </button>
+            <label class="hint" style="margin-left:0.75rem"><input type="checkbox" id="fac-auto" checked> Auto-refresh (15s)</label>
           </div>
           <div id="verify-result"></div>
         </div>
@@ -1427,61 +1464,131 @@
     /*  Step 5: Verify data                                            */
     /* ============================================================== */
     document.getElementById("recheck-data-btn").addEventListener("click", runVerify);
+    document.getElementById("fac-auto").addEventListener("change", scheduleFacRefresh);
+
+    /* ============================================================== */
+    /*  Per-facility dashboard (Worker-backed, install-ticket auth)    */
+    /* ============================================================== */
+    let facAutoTimer = null;
+
+    function facEsc(s) {
+      return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => (
+        { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    }
+    function facAge(sec) {
+      if (sec == null) return "never";
+      if (sec < 60) return sec + "s ago";
+      if (sec < 3600) return Math.round(sec / 60) + "m ago";
+      if (sec < 86400) return Math.round(sec / 3600) + "h ago";
+      return Math.round(sec / 86400) + "d ago";
+    }
+
+    // Calls a Worker facility endpoint, authorized by the install ticket when we
+    // have one (post-install), else by the signed-in org member's token.
+    async function facilityApi(path, extraBody) {
+      const body = Object.assign({}, extraBody || {});
+      const headers = { "Content-Type": "application/json" };
+      if (installTicket) {
+        body.install_ticket = installTicket;
+      } else {
+        const t = deviceUserToken || token;
+        if (!t) throw new Error("Not authorized — sign in or complete the install first.");
+        headers.Authorization = "Bearer " + t;
+        body.slug = facility.slug;
+      }
+      const res = await fetch(WORKER_URL + path, { method: "POST", headers, body: JSON.stringify(body) });
+      let data = {};
+      try { data = await res.json(); } catch (e) {}
+      if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+      return data;
+    }
+
+    async function facilityCommand(type) {
+      const confirmable = { "update-now": "update", "restart": "restart", "pause": "stop" };
+      if (confirmable[type] && !confirm("Send '" + type + "' to this watchdog?")) return;
+      try {
+        await facilityApi("/fleet/command", { type });
+        showVerifyNote("Queued '" + type + "' — it runs on the watchdog's next check-in.", "found");
+        setTimeout(runVerify, 1500);
+      } catch (e) {
+        showVerifyNote("Command failed: " + e.message, "not-found");
+      }
+    }
+
+    function showVerifyNote(msg, cls) {
+      document.getElementById("verify-result").innerHTML =
+        '<div class="verify-result ' + cls + '">' + facEsc(msg) + '</div>';
+    }
+
+    async function loadFacilityStatus() {
+      const el = document.getElementById("fac-status-body");
+      try {
+        const s = await facilityApi("/facility/status");
+        const st = s.status || {};
+        const health = s.health || "unknown";
+        const dirs = (st.watch_dirs || []).map((d) =>
+          (d.ok ? "&#9679; " : "&#9675; ") + facEsc(d.path)).join("<br>") || '<span class="muted">none reported</span>';
+        el.innerHTML =
+          '<span class="fac-badge ' + facEsc(health) + '">' + facEsc(health) + '</span>' +
+          (s.pending_commands ? ' <span class="muted">' + s.pending_commands + ' pending command(s)</span>' : '') +
+          '<div class="fac-kv" style="margin-top:0.6rem">' +
+            '<span class="k">Host</span><span>' + facEsc(st.hostname || "?") + '</span>' +
+            '<span class="k">Version</span><span>' + facEsc(st.version || "?") +
+              ' <span class="muted">(' + facEsc(s.channel || "stable") + ')</span></span>' +
+            '<span class="k">Last seen</span><span>' + facEsc(facAge(s.age_seconds)) + '</span>' +
+            '<span class="k">Processed</span><span>' + facEsc(st.processed != null ? st.processed : "?") +
+              ' (' + facEsc(st.errors != null ? st.errors : "0") + ' errors)</span>' +
+          '</div>' +
+          '<div class="fac-card-title" style="margin-top:0.6rem">Watch folders</div>' +
+          '<div style="font-size:0.82rem">' + dirs + '</div>' +
+          (s.kv_configured === false ? '<div class="muted" style="margin-top:0.5rem">Fleet KV not configured on the Worker yet.</div>' : '');
+        if (health === "unknown") {
+          el.innerHTML += '<div class="muted" style="margin-top:0.5rem">No check-in yet — start the installer and wait ~30s.</div>';
+        }
+      } catch (e) {
+        el.innerHTML = '<span class="status-badge error">' + facEsc(e.message) + '</span>';
+      }
+    }
+
+    async function loadFacilityData() {
+      const el = document.getElementById("fac-data-body");
+      const statusEl = document.getElementById("verify-status");
+      try {
+        const d = await facilityApi("/facility/data");
+        const tree = d.tree_url || ("https://github.com/" + (companionRepo || "") + "/tree/main/data/" + facility.slug);
+        if (!d.exists || d.count === 0) {
+          el.innerHTML = '<div class="muted">No scan data uploaded yet. Drop a <code>.pca</code>/<code>.txrm</code> into your watch folder; the watchdog uploads within ~30s.</div>' +
+            '<a href="' + tree + '" target="_blank" style="color:var(--accent);font-size:0.82rem">Open companion repo</a>';
+          statusEl.innerHTML = '<span class="status-badge waiting">Waiting for first upload</span>';
+        } else {
+          const list = d.files.slice(0, 50).map((f) =>
+            '<a href="' + facEsc(f.html_url) + '" target="_blank">' + facEsc(f.name) + '</a>').join("");
+          const last = d.last_commit && d.last_commit.date ? new Date(d.last_commit.date).toLocaleString() : "?";
+          el.innerHTML =
+            '<div><strong>' + d.count + '</strong> file(s) in <code>' + facEsc(d.repo) + '</code></div>' +
+            '<div class="muted" style="font-size:0.82rem">Last upload: ' + facEsc(last) + '</div>' +
+            '<div class="fac-files">' + list + '</div>' +
+            '<a href="' + tree + '" target="_blank" style="color:var(--accent);font-size:0.82rem">View all on GitHub</a>';
+          statusEl.innerHTML = '<span class="status-badge success">&#10003; Uploading — ' + d.count + ' file(s)</span>';
+        }
+      } catch (e) {
+        el.innerHTML = '<span class="status-badge error">' + facEsc(e.message) + '</span>';
+      }
+    }
+
+    function scheduleFacRefresh() {
+      if (facAutoTimer) clearTimeout(facAutoTimer);
+      const cb = document.getElementById("fac-auto");
+      if (cb && cb.checked) facAutoTimer = setTimeout(runVerify, 15000);
+    }
 
     async function runVerify() {
       if (!facility) return;
-      const statusEl = document.getElementById("verify-status");
-      const resultEl = document.getElementById("verify-result");
       const spinner = document.getElementById("verify-spinner");
-      const uploadPath = "data/" + facility.slug + "/";
-      const dirPath = uploadPath.replace(/\/$/, "");
-
-      // Scan data lands in the private companion repo (not the main repo).
-      const verifyRepo = companionRepo || (OWNER + "/" + REPO);
-      const [vOwner, vRepo] = verifyRepo.split("/");
-      const repoTreeUrl = "https://github.com/" + verifyRepo + "/tree/main/" + dirPath;
-
-      spinner.style.display = "inline-block";
-      statusEl.innerHTML = '<span class="status-badge waiting"><span class="spinner-inline"></span> Checking <code>' + uploadPath + '</code> in <code>' + verifyRepo + '</code>…</span>';
-      resultEl.innerHTML = "";
-
-      // The companion repo is private; prefer the device-flow token, then the
-      // signed-in token, then an unauthenticated request (works only if public).
-      const authToken = deviceUserToken || token;
-      const doFetch = (path) => fetch(API + path, {
-        headers: Object.assign(
-          { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
-          authToken ? { Authorization: "Bearer " + authToken } : {}
-        ),
-      });
-
-      try {
-        const contentsRes = await doFetch("/repos/" + vOwner + "/" + vRepo + "/contents/" + dirPath + "?ref=main");
-        if (!contentsRes.ok) {
-          if (contentsRes.status === 404) {
-            statusEl.innerHTML = '<span class="status-badge waiting">No data uploaded yet</span>';
-            resultEl.innerHTML = '<div class="verify-result not-found"><code>' + dirPath + '</code> doesn\'t exist in <code>' + verifyRepo + '</code> yet. Drop a <code>.pca</code>/<code>.txrm</code> into your watch folder, give the watchdog ~30s, then check again.<br><br><a href="' + repoTreeUrl + '" target="_blank" style="color:var(--accent)">Open the companion repo on GitHub</a></div>';
-          } else {
-            statusEl.innerHTML = '<span class="status-badge waiting">Can\'t read the companion repo (HTTP ' + contentsRes.status + ')</span>';
-            resultEl.innerHTML = '<div class="verify-result not-found">The companion repo is private. Confirm directly on GitHub:<br><br><a href="' + repoTreeUrl + '" target="_blank" style="color:var(--accent)">' + repoTreeUrl + '</a></div>';
-          }
-          spinner.style.display = "none"; return;
-        }
-        const files = await contentsRes.json();
-        const dataFiles = Array.isArray(files) ? files.filter(f => f.name.endsWith(".json") || f.name.endsWith(".pca") || f.name.endsWith(".txrm")) : [];
-        const nonConfig = dataFiles.filter(f => f.name !== "config.yml" && f.name !== "README.md");
-
-        if (nonConfig.length > 0) {
-          statusEl.innerHTML = '<span class="status-badge success">&#10003; Data detected!</span>';
-          resultEl.innerHTML = '<div class="verify-result found"><strong>It works!</strong> Found ' + nonConfig.length + ' data file(s) in <code>' + verifyRepo + '/' + dirPath + '</code>.<br><br>The watchdog is parsing scans and pushing metadata to your companion repo.</div>' +
-            '<div class="completion-links" style="margin-top:1.25rem"><a class="btn btn-primary" href="' + repoTreeUrl + '" target="_blank">View facility data</a><a class="btn" href="../">Go to Upload page</a></div>';
-          goToStep(5);
-        } else {
-          statusEl.innerHTML = '<span class="status-badge waiting">Directory exists, no data yet</span>';
-          resultEl.innerHTML = '<div class="verify-result not-found"><code>' + dirPath + '</code> exists but has no scan files yet. Drop a <code>.pca</code>/<code>.txrm</code> into your watch folder and check again.<br><br><a href="' + repoTreeUrl + '" target="_blank" style="color:var(--accent)">Open the companion repo on GitHub</a></div>';
-        }
-      } catch (err) { statusEl.innerHTML = '<span class="status-badge error">Error: ' + err.message + '</span>'; }
-      spinner.style.display = "none";
+      if (spinner) spinner.style.display = "inline-block";
+      await Promise.all([loadFacilityStatus(), loadFacilityData()]);
+      if (spinner) spinner.style.display = "none";
+      scheduleFacRefresh();
     }
 
     /* ============================================================== */
