@@ -145,7 +145,7 @@ jobs:
 
       - name: Device authorization (enter the code shown below)
         id: auth
-        shell: pwsh
+        shell: powershell
         run: |
           python "$env:GITHUB_WORKSPACE/.github/scripts/e2e/device_flow.py" authorize `
             --worker-url "$env:ROSETTA_WORKER_URL" `
@@ -155,13 +155,13 @@ jobs:
             --github-output "$env:GITHUB_OUTPUT"
 
       - name: Install watchdog (pip)
-        shell: pwsh
+        shell: powershell
         run: |
           python -m pip install --upgrade pip
           python -m pip install "$env:GITHUB_WORKSPACE/edge"
 
       - name: Write config.yml + seed test scan
-        shell: pwsh
+        shell: powershell
         env:
           COMPANION_REPO: ${{ steps.auth.outputs.companion_repo }}
         run: |
@@ -196,7 +196,7 @@ jobs:
           Get-Content $cfg
 
       - name: Run watchdog once (parse + push + heartbeat)
-        shell: pwsh
+        shell: powershell
         env:
           ROSETTA_INSTALL_TICKET: ${{ steps.auth.outputs.install_ticket }}
         run: |
@@ -204,7 +204,7 @@ jobs:
           python -m rosetta_watchdog.cli -c $cfg --once
 
       - name: Verify upload via Worker dashboard endpoints
-        shell: pwsh
+        shell: powershell
         env:
           ROSETTA_INSTALL_TICKET: ${{ steps.auth.outputs.install_ticket }}
         run: |
@@ -215,7 +215,7 @@ jobs:
 
       - name: Cleanup local install
         if: always()
-        shell: pwsh
+        shell: powershell
         run: |
           Remove-Item -Recurse -Force $env:INSTALL_DIR -ErrorAction SilentlyContinue
           Remove-Item -Recurse -Force (Split-Path $env:WATCH_PATH -Parent) -ErrorAction SilentlyContinue

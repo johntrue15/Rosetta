@@ -161,7 +161,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Bootstrap facility runner + dispatch deploy
-        shell: pwsh
+        shell: powershell
         env:
           ROSETTA_SLUG: ${{ needs.provision.outputs.slug }}
           ROSETTA_INSTALL_TICKET: ${{ needs.provision.outputs.install_ticket }}
@@ -174,7 +174,7 @@ jobs:
           Invoke-Expression $script
 
       - name: Wait for deploy-watchdog workflow
-        shell: pwsh
+        shell: powershell
         env:
           ROSETTA_WORKER_URL: ${{ secrets.ROSETTA_WORKER_URL }}
           ROSETTA_SLUG: ${{ needs.provision.outputs.slug }}
@@ -201,7 +201,7 @@ jobs:
           throw 'Timed out waiting for deploy-watchdog to complete'
 
       - name: Prepare watch directory and drop test file
-        shell: pwsh
+        shell: powershell
         run: |
           $watch = "${{ needs.provision.outputs.watch_path }}"
           New-Item -ItemType Directory -Force -Path $watch | Out-Null
@@ -234,7 +234,7 @@ jobs:
 
       - name: Cleanup local Dell install
         if: always()
-        shell: pwsh
+        shell: powershell
         env:
           ROSETTA_RUNNER_DIR: ${{ needs.provision.outputs.runner_dir }}
           ROSETTA_WATCH_PATH: ${{ needs.provision.outputs.watch_path }}
