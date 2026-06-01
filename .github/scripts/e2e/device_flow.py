@@ -28,7 +28,8 @@ import urllib.request
 UA = "rosetta-device-e2e/1.0"
 
 
-def post_json(url: str, payload: dict, token: str | None = None) -> tuple[int, dict]:
+def post_json(url: str, payload: dict, token: str | None = None,
+              retries: int = 4) -> tuple[int, dict]:
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json",
@@ -36,18 +37,28 @@ def post_json(url: str, payload: dict, token: str | None = None) -> tuple[int, d
     }
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    req = urllib.request.Request(
-        url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST"
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            return resp.status, json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", "ignore")
+    data = json.dumps(payload).encode("utf-8")
+    last_exc: Exception | None = None
+    for attempt in range(retries):
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
         try:
-            return exc.code, json.loads(body)
-        except json.JSONDecodeError:
-            return exc.code, {"error": f"http_{exc.code}", "detail": body}
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                return resp.status, json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            # A real HTTP response (e.g. authorization_pending) — return it.
+            body = exc.read().decode("utf-8", "ignore")
+            try:
+                return exc.code, json.loads(body)
+            except json.JSONDecodeError:
+                return exc.code, {"error": f"http_{exc.code}", "detail": body}
+        except (urllib.error.URLError, ConnectionError, TimeoutError, OSError) as exc:
+            # Transient network blip (e.g. WinError 10054 connection reset).
+            last_exc = exc
+            if attempt < retries - 1:
+                time.sleep(2 * (attempt + 1))
+                continue
+            raise
+    raise last_exc if last_exc else RuntimeError("post_json failed")
 
 
 def mask(value: str) -> None:
@@ -101,7 +112,11 @@ def authorize(args: argparse.Namespace) -> int:
     deadline = time.time() + args.wait
     while time.time() < deadline:
         time.sleep(interval)
-        status, poll = post_json(f"{worker}/device/poll", {"device_code": device_code})
+        try:
+            status, poll = post_json(f"{worker}/device/poll", {"device_code": device_code})
+        except Exception as exc:
+            print(f"  ...poll transient error ({exc}); retrying", flush=True)
+            continue
         err = poll.get("error")
         if poll.get("access_token"):
             token = poll["access_token"]

@@ -308,8 +308,13 @@ jobs:
         if: always()
         shell: powershell
         run: |
-          Remove-Item -Recurse -Force $env:INSTALL_DIR -ErrorAction SilentlyContinue
-          Remove-Item -Recurse -Force (Split-Path $env:WATCH_PATH -Parent) -ErrorAction SilentlyContinue
+          if ($env:INSTALL_DIR) {
+            Remove-Item -Recurse -Force $env:INSTALL_DIR -ErrorAction SilentlyContinue
+          }
+          if ($env:WATCH_PATH) {
+            Remove-Item -Recurse -Force (Split-Path $env:WATCH_PATH -Parent) -ErrorAction SilentlyContinue
+          }
+          Write-Host "Local cleanup done."
 
   cleanup-github:
     needs: [provision, device-install]
